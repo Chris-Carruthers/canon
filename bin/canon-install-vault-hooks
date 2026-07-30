@@ -69,11 +69,21 @@ CHAINED="$HOOKS_DIR/pre-commit.canon-chained"
 # is exactly the clobbering this kit refuses to do elsewhere. So we CHAIN: move it
 # aside and call it first from ours. If it fails, we stop and never reach our own
 # checks, which is the correct precedence for a check the repo already had.
+#
+# No separate .bak: moving it to .canon-chained already preserves it byte for
+# byte, and it stays in use. A timestamped duplicate alongside it is just a
+# second identical file in a hooks directory, which invites confusion about
+# which one git actually runs.
 if [ -f "$HOOK" ] && ! grep -q 'canon-scan' "$HOOK" 2>/dev/null; then
-  cp "$HOOK" "$HOOK.bak.$(date +%Y%m%d%H%M%S)"
-  mv "$HOOK" "$CHAINED"
-  chmod +x "$CHAINED"
-  echo "  existing pre-commit preserved and chained (runs first)"
+  if [ -e "$CHAINED" ]; then
+    # Already chained something; do not overwrite that with our own hook.
+    echo "  warning: $CHAINED already exists — leaving it alone" >&2
+    echo "           inspect both before relying on the chain" >&2
+  else
+    mv "$HOOK" "$CHAINED"
+    chmod +x "$CHAINED"
+    echo "  existing pre-commit preserved as pre-commit.canon-chained (runs first)"
+  fi
 fi
 
 cat > "$HOOK" <<'EOF'

@@ -234,6 +234,11 @@ printf '#!/usr/bin/env bash\necho "PRIOR HOOK RAN"\nexit 0\n' > "$V2/.git/hooks/
 chmod +x "$V2/.git/hooks/pre-commit"
 "$KIT/bin/canon-install-vault-hooks" "$V2" >/dev/null 2>&1
 is "prior hook is chained, not deleted" "$([ -x "$V2/.git/hooks/pre-commit.canon-chained" ] && echo y)" "y"
+is "no redundant .bak duplicate"        "$(ls "$V2/.git/hooks/" | grep -c 'pre-commit\.bak')" "0"
+# re-running must not overwrite the already-chained hook with our own
+"$KIT/bin/canon-install-vault-hooks" "$V2" >/dev/null 2>&1
+if grep -q 'canon-scan' "$V2/.git/hooks/pre-commit.canon-chained" 2>/dev/null; then
+  bad "re-install does not chain our own hook"; else ok "re-install does not chain our own hook"; fi
 printf -- '---\ntype: session\n---\nok\n' > "$V2/Sessions/a.md"
 cd "$V2" && git add -A >/dev/null 2>&1
 OUTH="$(git_q commit -m "chained" 2>&1)"
