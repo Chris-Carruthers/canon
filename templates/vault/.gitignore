@@ -1,0 +1,13 @@
+# Obsidian (or other editor) local UI state — keep shared settings, drop per-user layout
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.trash/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Never commit archives of the vault into the vault
+*.zip
+*.tar.gz

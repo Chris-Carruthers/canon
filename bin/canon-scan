@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# canon-scan — inspect what is about to be committed for credentials and
+# obvious personal identifiers.
+#
+#   canon-scan [/path/to/repo]
+#
+# Scans only ADDED lines in the staged diff, so pre-existing content is not
+# re-flagged on every commit. Exits 0 clean, 1 if anything was found, 2 on
+# usage error.
+#
+# Uses gitleaks when it is on PATH (better coverage), and ALWAYS also runs a
+# small set of high-precision built-in patterns so the gate still works on a
+# machine with nothing installed.
+#
+# HONEST LIMITS — read these before trusting it:
+#   * Credentials: caught well. The patterns below are specific token formats.
+#   * Personal/health data in PROSE: caught POORLY. A regex cannot recognise
+#     "the patient in room 4 with the Crohn's flare". Convention and human
+#     review are the real controls; this is a backstop for the obvious cases.
+#   * Suppress a known-good match by adding a regex line to
+#     <repo>/.canon-scan-allow (comments with # are ignored).
+
+set -uo pipefail
+
+REPO="${1:-$PWD}"
+cd "$REPO" 2>/dev/null || { echo "canon-scan: not a directory: $REPO" >&2; exit 2; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "canon-scan: not a git repo: $REPO" >&2; exit 2; }
+
+ALLOW_FILE="$REPO/.canon-scan-allow"
+FOUND=0
+
+# ---------------------------------------------------------------------------
+# Built-in patterns. Deliberately high-precision: a noisy gate gets disabled,
+# and a disabled gate protects nothing.
+# ---------------------------------------------------------------------------
+scan_builtin() {
+  python3 - "$ALLOW_FILE" <<'PY'
+import os, re, subprocess, sys
+
+allow_file = sys.argv[1]
+allows = []
+if os.path.exists(allow_file):
+    for line in open(allow_file, encoding="utf-8", errors="replace"):
+        line = line.strip()
+        if line and not line.startswith("#"):
+            try: allows.append(re.compile(line))
+            except re.error: pass
+
+# Paths that are exempt. The scanner's own source necessarily contains every
+# string it looks for, so without this it refuses every commit in any repo that
+# ships it — a self-inflicted denial of service. Extend with CANON_SCAN_EXCLUDE
+# (colon-separated regexes) for docs that legitimately show example tokens.
+EXCLUDE = [
+    re.compile(r"(^|/)\.canon/"),          # bundled tooling
+    re.compile(r"(^|/)\.canon-scan-allow$"),  # the allow-list itself
+    re.compile(r"(^|/)canon-scan$"),       # the scanner, wherever it lives
+]
+for extra in filter(None, os.environ.get("CANON_SCAN_EXCLUDE", "").split(":")):
+    try: EXCLUDE.append(re.compile(extra))
+    except re.error: pass
+
+PATTERNS = [
+    ("private key block",   re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    ("AWS access key id",   re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("GitHub token",        re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b")),
+    ("Slack token",         re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}")),
+    ("Anthropic API key",   re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}")),
+    ("OpenAI API key",      re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b")),
+    ("Google API key",      re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
+    ("JWT",                 re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+")),
+    ("URL with password",   re.compile(r"[a-zA-Z][a-zA-Z0-9+.-]*://[^\s:/@]+:[^\s@/]{3,}@")),
+    ("US SSN",              re.compile(r"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b")),
+    ("PEM certificate",     re.compile(r"-----BEGIN CERTIFICATE-----")),
+]
+
+try:
+    diff = subprocess.run(
+        ["git", "diff", "--cached", "--unified=0", "--no-color", "--diff-filter=ACMR"],
+        capture_output=True, text=True, errors="replace", check=False).stdout
+except Exception as e:
+    print(f"canon-scan: could not read staged diff: {e}", file=sys.stderr)
+    sys.exit(0)
+
+path, lineno, hits, skipping = None, 0, [], False
+for raw in diff.splitlines():
+    if raw.startswith("+++ b/"):
+        path = raw[6:]
+        skipping = any(x.search(path) for x in EXCLUDE)
+        continue
+    if raw.startswith("@@"):
+        m = re.search(r"\+(\d+)", raw)
+        lineno = int(m.group(1)) if m else 0
+        continue
+    if skipping:
+        continue
+    if raw.startswith("+") and not raw.startswith("+++"):
+        content = raw[1:]
+        if not any(a.search(content) for a in allows):
+            for label, rx in PATTERNS:
+                if rx.search(content):
+                    snippet = content.strip()
+                    if len(snippet) > 100: snippet = snippet[:100] + "…"
+                    hits.append((path or "?", lineno, label, snippet))
+                    break
+        lineno += 1
+
+for p, ln, label, snip in hits:
+    print(f"  {p}:{ln}  [{label}]  {snip}")
+sys.exit(1 if hits else 0)
+PY
+}
+
+echo "canon-scan: checking staged changes in $(basename "$REPO")"
+
+if ! git diff --cached --quiet 2>/dev/null; then :; else
+  echo "  nothing staged — clean"
+  exit 0
+fi
+
+# --- gitleaks, if available --------------------------------------------------
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --no-banner --redact >/dev/null 2>&1; then
+    echo "  gitleaks reported findings:"
+    gitleaks protect --staged --no-banner --redact 2>&1 | sed 's/^/    /' | head -40
+    FOUND=1
+  else
+    echo "  gitleaks: clean"
+  fi
+else
+  echo "  gitleaks: not installed (using built-in patterns only)"
+  echo "           install for better coverage: brew install gitleaks"
+fi
+
+# --- built-in patterns (always) ---------------------------------------------
+if ! scan_builtin; then
+  FOUND=1
+fi
+
+if [ "$FOUND" = "1" ]; then
+  cat >&2 <<'EOF'
+
+REFUSING TO PROCEED — the staged changes look like they contain a credential or
+personal identifier. Git history is permanent: fix this before it is committed,
+not after.
+
+  * Remove the value, then re-stage.
+  * If it is a false positive, add a regex line to .canon-scan-allow and re-run.
+  * Bypass only if you are certain:  git commit --no-verify   (or CANON_SKIP_SCAN=1)
+
+Remember this gate reads patterns, not meaning. It will not catch personal or
+health information written as ordinary prose — that is on you.
+EOF
+  exit 1
+fi
+
+echo "  clean"
+exit 0

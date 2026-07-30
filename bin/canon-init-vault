@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# canon-init-vault — scaffold a new knowledge vault, or top up an existing one.
+#
+#   canon-init-vault /path/to/vault
+#
+# Non-destructive: never overwrites an existing file. Safe to re-run to pick up
+# new templates after upgrading the kit.
+
+set -euo pipefail
+
+KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TPL="$KIT_DIR/templates/vault"
+
+VAULT="${1:-}"
+[ -n "$VAULT" ] || { echo "usage: canon-init-vault /path/to/vault" >&2; exit 2; }
+mkdir -p "$VAULT"
+VAULT="$(cd "$VAULT" && pwd)"
+
+echo "Scaffolding vault at $VAULT"
+
+for d in Vision Projects Clients Decisions Reference Sessions Specs Handoffs Outputs Sources Templates Attachments _Inbox; do
+  mkdir -p "$VAULT/$d"
+done
+
+copied=0; skipped=0
+while IFS= read -r rel; do
+  src="$TPL/$rel"; dst="$VAULT/$rel"
+  mkdir -p "$(dirname "$dst")"
+  if [ -e "$dst" ]; then
+    skipped=$((skipped+1))
+  else
+    cp "$src" "$dst"; copied=$((copied+1)); printf '  + %s\n' "$rel"
+  fi
+done < <(cd "$TPL" && find . -type f \( -name '*.md' -o -name '.gitignore' \) | sed 's|^\./||')
+
+printf '  %d file(s) added, %d left alone\n' "$copied" "$skipped"
+
+# EVERY folder needs a .gitkeep. Git does not track empty directories, so
+# without these a teammate's fresh clone is missing Sessions/, Decisions/ and
+# the rest — and tooling that checks "does this folder exist" then silently does
+# nothing, which is the worst possible failure mode.
+for d in Vision Projects Clients Decisions Reference Sessions Specs Handoffs Outputs Sources Templates Attachments _Inbox; do
+  [ -e "$VAULT/$d/.gitkeep" ] || : > "$VAULT/$d/.gitkeep"
+done
+
+if [ ! -d "$VAULT/.git" ]; then
+  git -C "$VAULT" init --quiet 2>/dev/null && echo "  initialised git repo"
+fi
+
+cat <<EOF
+
+Done. Next:
+  1. Fill in Vision/Agent Router.md — delete folders you do not use.
+     Keep it under 150 lines; it is the only file agents load every session.
+  2. Set the path once per machine:
+       mkdir -p ~/.config/canon && echo "$VAULT" > ~/.config/canon/path
+     (or export CANON_HOME, or add a .canon file per repo)
+  3. Point a repo at it:  ./install.sh /path/to/repo --vault "$VAULT"
+  4. Create a PRIVATE remote and push. Read the vault rules first — nothing
+     with personal data, secrets, or credentials belongs in git history.
+EOF

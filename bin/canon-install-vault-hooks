@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# canon-install-vault-hooks — put the scanner in front of every commit to the
+# vault, not just the ones made through canon-sync.
+#
+#   canon-install-vault-hooks [/path/to/vault]
+#
+# Installs .git/hooks/pre-commit in the vault repo. Any tool that shells out to
+# real git — the CLI, canon-sync, most editors — will hit the gate.
+#
+# IMPORTANT CAVEAT: some editor sync plugins (notably Obsidian Git, which uses
+# isomorphic-git rather than the git binary) DO NOT execute git hooks. If you
+# rely on this gate, either make canon-sync the commit path for the vault, or
+# treat the remote's own push protection as the real backstop. Do not assume
+# a pre-commit hook covers every writer.
+
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+VAULT="${1:-}"
+if [ -z "$VAULT" ]; then
+  RESOLVER="$HERE/canon-path"
+  [ -x "$RESOLVER" ] || RESOLVER="$(command -v canon-path 2>/dev/null || true)"
+  [ -n "$RESOLVER" ] && VAULT="$("$RESOLVER" 2>/dev/null || true)"
+fi
+[ -n "$VAULT" ] || { echo "usage: canon-install-vault-hooks /path/to/vault" >&2; exit 2; }
+[ -d "$VAULT/.git" ] || { echo "error: not a git repo: $VAULT" >&2; exit 2; }
+VAULT="$(cd "$VAULT" && pwd)"
+
+# Ship the scanner inside the vault repo so the hook has no external dependency
+# and keeps working on a fresh clone.
+mkdir -p "$VAULT/.canon"
+cp "$HERE/canon-scan" "$VAULT/.canon/canon-scan"
+chmod +x "$VAULT/.canon/canon-scan"
+
+HOOK="$VAULT/.git/hooks/pre-commit"
+if [ -f "$HOOK" ] && ! grep -q 'canon-scan' "$HOOK" 2>/dev/null; then
+  cp "$HOOK" "$HOOK.bak.$(date +%Y%m%d%H%M%S)"
+  echo "  existing pre-commit backed up"
+fi
+
+cat > "$HOOK" <<'EOF'
+#!/usr/bin/env bash
+# Installed by canon-install-vault-hooks. Blocks commits that look like they
+# contain credentials or personal identifiers.
+#
+# Bypass (be sure):  git commit --no-verify    or   CANON_SKIP_SCAN=1 git commit
+set -uo pipefail
+[ "${CANON_SKIP_SCAN:-0}" = "1" ] && exit 0
+ROOT="$(git rev-parse --show-toplevel)"
+SCAN="$ROOT/.canon/canon-scan"
+[ -x "$SCAN" ] || SCAN="$(command -v canon-scan 2>/dev/null || true)"
+if [ -z "$SCAN" ] || [ ! -x "$SCAN" ]; then
+  echo "pre-commit: canon-scan not found — allowing commit UNGATED" >&2
+  exit 0
+fi
+exec "$SCAN" "$ROOT"
+EOF
+chmod +x "$HOOK"
+
+echo "installed: $VAULT/.git/hooks/pre-commit"
+echo "scanner:   $VAULT/.canon/canon-scan"
+cat <<EOF
+
+Note: .git/hooks is NOT shared by cloning. Each teammate must run this once:
+  canon-install-vault-hooks "$VAULT"
+
+Commit .canon/canon-scan so it travels with the repo, and consider enabling
+your git host's own secret-scanning / push protection — that is the only gate
+no local tool can bypass.
+EOF

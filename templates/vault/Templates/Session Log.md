@@ -1,0 +1,28 @@
+---
+type: session
+date: YYYY-MM-DD
+project: "[[Project Name]]"
+repo: path/to/repo
+---
+
+# Session — YYYY-MM-DD — <short title>
+
+## Goal
+What we set out to do.
+
+## What changed
+- `path/to/file.ts:42` — what and why
+- ...
+
+## Findings worth keeping
+What was surprising, or cost time to discover. Skip anything already obvious
+from reading the code.
+
+## Decisions
+- Choices made. Significant ones also get a [[Decision]] note.
+
+## Open / next
+- [ ] Follow-up
+
+## Links
+Project: [[ ]] · Related: [[ ]]

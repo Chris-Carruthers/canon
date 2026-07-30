@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# canon-sync — pull, review, commit, and (optionally) push the knowledge vault.
+#
+#   canon-sync                    pull + stage + scan + commit locally
+#   canon-sync --push             ...and push, only if the scan passed
+#   canon-sync --status           show what would happen, change nothing
+#   canon-sync -m "message"       custom commit message
+#   canon-sync --no-pull          skip the pull
+#
+# Asymmetric by design:
+#   pull  — safe, automatic where possible: you always read fresh context
+#   commit— safe, local: history and diffs, nothing leaves the machine
+#   push  — deliberate, gated: the irreversible step gets a human and a scanner
+#
+# Push is never implied. Once a note is on a remote it may be cached or indexed
+# even if you delete it later.
+
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DO_PULL=1; DO_PUSH=0; STATUS_ONLY=0; MSG=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --push) DO_PUSH=1; shift ;;
+    --no-pull) DO_PULL=0; shift ;;
+    --status) STATUS_ONLY=1; shift ;;
+    -m|--message) MSG="${2:-}"; shift 2 ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    *) echo "canon-sync: unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+# --- locate the vault --------------------------------------------------------
+RESOLVER="$HERE/canon-path"
+[ -x "$RESOLVER" ] || RESOLVER="$(command -v canon-path 2>/dev/null || true)"
+[ -n "$RESOLVER" ] && [ -x "$RESOLVER" ] || { echo "canon-sync: cannot find canon-path" >&2; exit 2; }
+
+VAULT="$("$RESOLVER" 2>/dev/null || true)"
+[ -n "$VAULT" ] || { echo "canon-sync: no vault configured (set \$CANON_HOME or ~/.config/canon/path)" >&2; exit 2; }
+[ -d "$VAULT/.git" ] || { echo "canon-sync: $VAULT is not a git repo — run: git -C \"$VAULT\" init" >&2; exit 2; }
+
+cd "$VAULT"
+echo "vault: $VAULT"
+
+# --- status ------------------------------------------------------------------
+CHANGED="$(git status --porcelain | wc -l | tr -d ' ')"
+BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+HAS_REMOTE=0; git remote get-url origin >/dev/null 2>&1 && HAS_REMOTE=1
+
+if [ "$STATUS_ONLY" = "1" ]; then
+  echo "branch: $BRANCH   local changes: $CHANGED   remote: $([ "$HAS_REMOTE" = 1 ] && git remote get-url origin || echo 'none')"
+  [ "$CHANGED" != "0" ] && git status --short | head -30
+  if [ "$HAS_REMOTE" = 1 ]; then
+    git fetch --quiet origin "$BRANCH" 2>/dev/null || true
+    AHEAD="$(git rev-list --count "origin/$BRANCH..HEAD" 2>/dev/null || echo '?')"
+    BEHIND="$(git rev-list --count "HEAD..origin/$BRANCH" 2>/dev/null || echo '?')"
+    echo "ahead: $AHEAD   behind: $BEHIND"
+  fi
+  exit 0
+fi
+
+# --- pull --------------------------------------------------------------------
+if [ "$DO_PULL" = "1" ] && [ "$HAS_REMOTE" = 1 ]; then
+  echo "pulling…"
+  if git pull --rebase --autostash --quiet 2>/dev/null; then
+    echo "  up to date with origin/$BRANCH"
+  else
+    echo "  pull failed or left a conflict — resolve it in the vault, then re-run" >&2
+    git status --short | head -20 >&2
+    exit 1
+  fi
+fi
+
+# --- nothing to do? ----------------------------------------------------------
+if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard | head -1)" ]; then
+  echo "no local changes to commit"
+  [ "$DO_PUSH" = "1" ] && [ "$HAS_REMOTE" = 1 ] && { echo "pushing existing commits…"; git push --quiet && echo "  pushed"; }
+  exit 0
+fi
+
+# --- stage + scan ------------------------------------------------------------
+git add -A
+echo
+if [ "${CANON_SKIP_SCAN:-0}" = "1" ]; then
+  echo "canon-scan: SKIPPED (CANON_SKIP_SCAN=1) — you are on your own"
+else
+  SCANNER="$HERE/canon-scan"
+  [ -x "$SCANNER" ] || SCANNER="$(command -v canon-scan 2>/dev/null || true)"
+  if [ -n "$SCANNER" ] && [ -x "$SCANNER" ]; then
+    if ! "$SCANNER" "$VAULT"; then
+      echo >&2
+      echo "left staged so you can inspect: git -C \"$VAULT\" diff --cached" >&2
+      exit 1
+    fi
+  else
+    echo "canon-scan: NOT FOUND — committing without a gate" >&2
+  fi
+fi
+
+# --- commit ------------------------------------------------------------------
+if [ -z "$MSG" ]; then
+  N="$(git diff --cached --name-only | wc -l | tr -d ' ')"
+  MSG="vault: $N file(s) updated"
+fi
+echo
+git -c user.useConfigOnly=false commit --quiet -m "$MSG" \
+  && echo "committed: $MSG" \
+  || { echo "commit failed" >&2; exit 1; }
+
+# --- push (only on request) --------------------------------------------------
+if [ "$DO_PUSH" = "1" ]; then
+  if [ "$HAS_REMOTE" != "1" ]; then
+    echo "no remote configured — commit is local only"
+    exit 0
+  fi
+  echo "pushing to origin/$BRANCH…"
+  if git push --quiet; then echo "  pushed"; else echo "  push failed" >&2; exit 1; fi
+else
+  echo
+  echo "committed locally. Nothing has left this machine."
+  echo "When you are ready:  canon-sync --push"
+fi

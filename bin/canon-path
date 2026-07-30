@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# canon-path — resolve the knowledge vault location for the current repo.
+#
+# This is the portability keystone: nothing else in the kit hardcodes a path.
+# Prints the resolved absolute path on stdout and exits 0, or prints nothing
+# and exits 1 if no vault is configured.
+#
+# Resolution order (first hit wins):
+#   1. $CANON_HOME                        — explicit override, wins always
+#   2. <repo>/.canon                      — per-repo marker file containing a path
+#   3. ~/.config/canon/path               — per-machine default, one line
+#   4. ~/canon                            — convention, if it exists
+#
+# A marker/config path may use ~ or $HOME and may be relative to the repo root.
+
+set -u
+
+expand() {
+  # Expand a leading ~ and resolve to an absolute path without requiring the
+  # target to exist yet.
+  local p="$1"
+  case "$p" in
+    "~") p="$HOME" ;;
+    "~/"*) p="$HOME/${p#\~/}" ;;
+  esac
+  case "$p" in
+    /*) printf '%s\n' "$p" ;;
+    *)  printf '%s\n' "${REPO_ROOT:-$PWD}/$p" ;;
+  esac
+}
+
+# Repo root: prefer Claude Code's own variable, fall back to git, then cwd.
+REPO_ROOT="${CLAUDE_PROJECT_DIR:-}"
+if [ -z "$REPO_ROOT" ]; then
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")"
+fi
+
+candidate=""
+
+# 1. Explicit env override.
+if [ -n "${CANON_HOME:-}" ]; then
+  candidate="$(expand "$CANON_HOME")"
+fi
+
+# 2. Per-repo marker file. First non-empty, non-comment line is the path.
+if [ -z "$candidate" ] && [ -f "$REPO_ROOT/.canon" ]; then
+  line="$(grep -vE '^[[:space:]]*(#|$)' "$REPO_ROOT/.canon" 2>/dev/null | head -1)"
+  [ -n "$line" ] && candidate="$(expand "$line")"
+fi
+
+# 3. Per-machine config.
+if [ -z "$candidate" ] && [ -f "$HOME/.config/canon/path" ]; then
+  line="$(grep -vE '^[[:space:]]*(#|$)' "$HOME/.config/canon/path" 2>/dev/null | head -1)"
+  [ -n "$line" ] && candidate="$(expand "$line")"
+fi
+
+# 4. Convention.
+if [ -z "$candidate" ] && [ -d "$HOME/canon" ]; then
+  candidate="$HOME/canon"
+fi
+
+[ -z "$candidate" ] && exit 1
+[ -d "$candidate" ] || exit 1
+
+# Normalise (resolve symlinks/.. where possible) without failing if unavailable.
+if command -v python3 >/dev/null 2>&1; then
+  python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$candidate"
+else
+  printf '%s\n' "$candidate"
+fi

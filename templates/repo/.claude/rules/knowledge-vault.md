@@ -1,0 +1,58 @@
+---
+description: Conventions for writing notes into the shared knowledge vault
+---
+
+# Writing to the knowledge vault
+
+These rules apply whenever you create or edit a markdown note inside the shared
+vault. They exist so the corpus stays findable as it grows — an agent retrieves
+by filename and structure long before it reads content.
+
+## Never
+
+- **PHI, personal data, patient/customer identifiers** — including
+  de-identified-*looking* samples, screenshots containing names, or query
+  results from a production database.
+- **Secrets** — API keys, tokens, connection strings, `.env` contents.
+- **Source code.** Link `repo/path.ts:42` instead. Code rots inside documents.
+
+Git history is permanent. If you are unsure whether something belongs, leave it
+out and say so.
+
+## Structure
+
+- **One concept per note.** Big topics get their own note; other notes link to
+  them rather than restating them.
+- **Name notes for their concept**, because filenames are the primary retrieval
+  signal. Sessions and dated artifacts: `YYYY-MM-DD — <short title>.md`.
+- **Frontmatter** on Project / Client / Decision / Reference notes:
+  `type:`, `status:`, `updated:`.
+- **Link generously** with `[[wikilinks]]`. A link to a note that does not exist
+  yet is a feature — it marks something worth writing.
+
+## Size budgets
+
+Mirroring the limits real agent runtimes impose on index files:
+
+| Note kind | Budget |
+|---|---|
+| Index / router notes | **200 lines or 25 KB** — overflow may be silently dropped |
+| Detail notes | under **500 lines** |
+| Reference chains | **one level deep** — do not build deep link ladders |
+| Any note over 100 lines | add a table of contents |
+
+If a note outgrows its budget, split it and link — do not let it sprawl.
+
+## Session notes
+
+At the end of meaningful work, write `Sessions/YYYY-MM-DD — <title>.md`:
+
+- **Goal** — what we set out to do
+- **What changed** — `repo-path:line` references and why
+- **Decisions** — anything worth remembering; significant ones also get a
+  `Decisions/` note
+- **Open / next** — checkboxes for follow-ups
+- **Links** — its `[[Project]]` and any `[[Client]]`
+
+Write what a teammate would need to pick the work up cold in three months.
+Record what was surprising, not what is already obvious from the code.

@@ -1,0 +1,54 @@
+---
+type: vision
+status: active
+updated: TODO
+---
+
+# Agent Router
+
+**This is the only vault file meant to enter an agent's context.** Everything
+else is reached on demand. Keep it under 150 lines — it is paid for on every
+request that loads it. Explanations belong in [[How We Work]]; this file is a
+map, not a manual.
+
+## Where things live
+
+| Looking for | Search here |
+|---|---|
+| Why we chose something | `Decisions/` — dated, ADR-style |
+| What a workstream is / where it stands | `Projects/<name>.md` |
+| A client / customer / domain area | `Clients/<name>.md` |
+| Durable facts, schemas, APIs, pricing | `Reference/` |
+| Intent for a feature (what & why) | `Specs/` |
+| Ops state to pick work up cold | `Handoffs/` |
+| What happened in past sessions | `Sessions/YYYY-MM-DD — <title>.md` |
+| Generated reports and decks | `Outputs/` |
+| Raw, un-compiled source material | `Sources/` |
+
+<!-- Delete folders you do not use. Add ones you do. Keep the table short. -->
+
+## How to search it
+
+1. **Filenames first.** Notes are named for their concept — glob before you grep
+   (`Projects/*auth*`, `Sessions/2026-07*`).
+2. **Then grep** the vault for the term.
+   <!-- List any large folder to exclude by default, e.g. a vendor doc mirror. -->
+3. **Read the note, then follow its `[[wikilinks]]`** — related context is one
+   hop away by design.
+4. **For "where does X stand"**: read `Projects/<name>.md`, then its newest
+   linked `Sessions/` note.
+
+## Rules when writing here
+
+- **Never** PHI, personal data, secrets, keys, tokens, or `.env` contents. This
+  is a git repo; history is permanent.
+- **No source code** — link `repo/path.ts:42` instead.
+- **One concept per note**; frontmatter `type:` / `status:` / `updated:` on
+  Project / Client / Decision / Reference notes.
+- **Size budgets:** index notes ≤200 lines / 25 KB · detail notes <500 lines ·
+  references one level deep · TOC over 100 lines.
+- **End of meaningful work:** write `Sessions/YYYY-MM-DD — <title>.md` with
+  goal, what changed (`repo-path:line`), decisions, open follow-ups, and links
+  to its `[[Project]]`.
+
+Conventions in full: [[How We Work]]
