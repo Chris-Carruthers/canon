@@ -89,7 +89,7 @@ is "invalid CANON_HOME fails, no fallback" "$?" "1"
 
 # ---------------------------------------------------------------------------
 section "install is non-destructive"
-R2="$SB/repo2"; mkdir -p "$R2/.claude"; cd "$R2"; git init -q
+R2="$SB/repo2"; mkdir -p "$R2/.claude"; cd "$R2" || exit 1; git init -q
 printf '# Mine\n\nnpm test\n' > CLAUDE.md
 printf '{"hooks":{"PostToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":"echo keep-me"}]}]},"permissions":{"allow":["Bash(npm test)"]}}\n' > .claude/settings.json
 "$KIT/install.sh" "$R2" --vault "$V" >/dev/null 2>&1

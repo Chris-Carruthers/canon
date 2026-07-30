@@ -44,7 +44,9 @@ VAULT="$("$RESOLVER" 2>/dev/null || true)"
 [ -n "$VAULT" ] || { echo "canon-sync: no vault configured (set \$CANON_HOME or ~/.config/canon/path)" >&2; exit 2; }
 [ -d "$VAULT/.git" ] || { echo "canon-sync: $VAULT is not a git repo — run: git -C \"$VAULT\" init" >&2; exit 2; }
 
-cd "$VAULT"
+# Hard fail: everything below assumes cwd is the vault, and this script runs
+# `git add -A`. A silent cd failure would stage some other repository.
+cd "$VAULT" || { echo "canon-sync: cannot enter $VAULT" >&2; exit 2; }
 echo "vault: $VAULT"
 
 # --- status ------------------------------------------------------------------

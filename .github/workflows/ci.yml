@@ -65,7 +65,7 @@ jobs:
         run: |
           want="$(cat VERSION)"
           fail=0
-          for f in bin/canon-* install.sh; do
+          for f in bin/canon-* ./install.sh; do
             got="$("$f" --version | awk '{print $2}')"
             [ "$got" = "$want" ] || { echo "$f reports $got, VERSION says $want"; fail=1; }
           done

@@ -23,6 +23,7 @@ expand() {
   # Expand a leading ~ and resolve to an absolute path without requiring the
   # target to exist yet.
   local p="$1"
+  # shellcheck disable=SC2088  # matching a literal tilde, not expanding one
   case "$p" in
     "~") p="$HOME" ;;
     "~/"*) p="$HOME/${p#\~/}" ;;
