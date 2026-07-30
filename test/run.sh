@@ -165,6 +165,22 @@ for pair in "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789:Anthropic" \
 done
 rm -f "$V/Sessions/leak.md"
 
+# Conflict markers must be caught. This is the likeliest way a git-synced vault
+# gets quietly damaged: a conflict is resolved by hand, the markers render as
+# ordinary text in the editor, and they get committed into the note.
+printf -- '# n\n<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> branch\n' > "$V/Sessions/conflict.md"
+cd "$V" && git add -A >/dev/null 2>&1
+"$V/.canon/canon-scan" "$V" >/dev/null 2>&1
+is "catches merge conflict markers" "$?" "1"
+git reset -q; rm -f "$V/Sessions/conflict.md"
+
+# ...but a run of = or - signs is a legitimate markdown setext heading underline.
+printf -- 'A Heading\n=========\n\nprose\n\nSub\n---------\n' > "$V/Sessions/setext.md"
+cd "$V" && git add -A >/dev/null 2>&1
+"$V/.canon/canon-scan" "$V" >/dev/null 2>&1
+is "allows markdown setext underlines" "$?" "0"
+git reset -q; rm -f "$V/Sessions/setext.md"
+
 # the scanner must not flag its own source
 cd "$V" && git add -A >/dev/null 2>&1
 "$V/.canon/canon-scan" "$V" >/dev/null 2>&1
@@ -187,6 +203,25 @@ cd "$V" && git add -A >/dev/null 2>&1
 git_q commit -qm sneak >/dev/null 2>&1
 is "plain git commit is blocked" "$?" "1"
 git reset -q; rm -f "$V/Sessions/sneak.md"
+
+# ---------------------------------------------------------------------------
+section "auto-pull is safe under an open editor"
+# A dirty tree means someone is mid-edit, and those are exactly the files an
+# editor is holding in memory. The hook must not touch git at all.
+cd "$V" && git_q commit -qam "settle" >/dev/null 2>&1
+printf 'mid-edit\n' > "$V/Projects/dirty.md"
+HEAD_BEFORE="$(git -C "$V" rev-parse HEAD)"
+CANON_AUTOPULL=1 CLAUDE_PROJECT_DIR="$R" bash "$R/.claude/hooks/session-start.sh" >/dev/null 2>&1
+is "dirty tree: HEAD unchanged"      "$(git -C "$V" rev-parse HEAD)" "$HEAD_BEFORE"
+is "dirty tree: local edit intact"   "$(cat "$V/Projects/dirty.md")" "mid-edit"
+rm -f "$V/Projects/dirty.md"
+
+# The unattended pull must be a fast-forward: it cannot rewrite local commits,
+# cannot leave a half-finished rebase, and cannot write conflict markers.
+if grep -q -- "--ff-only" "$R/.claude/hooks/session-start.sh"; then
+  ok "hook pulls with --ff-only"; else bad "hook is not using --ff-only"; fi
+if grep -q -- "pull --rebase" "$R/.claude/hooks/session-start.sh"; then
+  bad "hook still rebases unattended"; else ok "hook never rebases unattended"; fi
 
 # ---------------------------------------------------------------------------
 section "ownership guard"

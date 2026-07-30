@@ -151,6 +151,54 @@ written. Govern the few files where being wrong is expensive; leave the working
 layers open. **If you govern everything, people route around the vault entirely** —
 and a vault nobody writes to is worth less than no vault at all.
 
+## Pulling while an editor has the vault open
+
+A pull rewrites files on disk underneath whatever editor is showing them. Obsidian
+in particular keeps notes in memory and autosaves a second or two after you stop
+typing, so this is a real race and worth understanding rather than hoping about.
+
+**Why it is usually fine.** Notes are small, independent files, and the write
+pattern is overwhelmingly *additive* — what arrives in a pull is mostly new files
+your teammates created, and a new file cannot collide with the buffer you have
+open. Obsidian watches the folder, notices changes, and reloads notes it is
+displaying without needing a restart. Its link/tag index rebuilds itself; a
+briefly stale graph is not damage.
+
+**The one genuinely dangerous case** is narrow: a pull that *modifies the exact
+note you have open with unsaved changes*. Then two writers are racing for the same
+file — git, and Obsidian's autosave flushing its in-memory copy. Last write wins,
+and Obsidian can win with stale content, silently discarding what the pull brought
+in.
+
+**The second hazard is conflict markers.** Git writes `<<<<<<<` / `>>>>>>>` into
+the file. In an editor these render as ordinary text, which makes them easy to
+miss and easy to commit — baking git's scaffolding permanently into a note.
+
+### What this kit does about it
+
+- **The unattended pull is `--ff-only`.** A fast-forward cannot rewrite local
+  commits, cannot leave a half-finished rebase, and cannot produce conflict
+  markers. If the histories have diverged it does *nothing* and stays quiet.
+  Reconciling divergence is a deliberate act — that is `canon-sync`'s job, run
+  when you are looking at the output.
+- **It skips entirely when the tree is dirty**, because uncommitted files are
+  precisely the ones someone is editing.
+- **It runs at session start**, not on a timer. This is the important difference
+  from timer-based auto-sync: a pull fires when you begin work, not mid-sentence.
+- **`canon-scan` refuses to commit conflict markers.** A run of `=` or `-` signs
+  is left alone — that is a legitimate markdown heading underline.
+
+### What you should do
+
+- **Do not run two auto-syncers.** If you enable `CANON_AUTOPULL` *and* an editor
+  plugin that syncs every ten minutes, you have two processes pulling on
+  independent schedules, which is how you manufacture the race this section is
+  about. Pick one.
+- **Commit before you pull manually** if you have been editing — or let
+  `canon-sync` do it, which stages and commits before it touches the remote.
+- **After resolving a conflict, search the note for `<<<` before committing.** The
+  gate catches it, but seeing it yourself is faster.
+
 ## Conflict recipes
 
 **Same note, different lines** — git merges it. Nothing to do.

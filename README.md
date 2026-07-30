@@ -153,7 +153,7 @@ risk.
 
 | Step | Default | Why |
 |---|---|---|
-| **Pull** | automatic (`CANON_AUTOPULL=1`) | Pure upside. You read fresh context; nothing leaves your machine. |
+| **Pull** | automatic (`CANON_AUTOPULL=1`) | Pure upside. `--ff-only`, so it cannot rewrite history or strand a rebase under an open editor. |
 | **Commit** | local, opt-in (`CANON_AUTOCOMMIT=1`) | Real history and diffs, still nothing leaves your machine. |
 | **Push** | **never automatic** | The irreversible step. Once a note is on a remote it may be cached or indexed even after you delete it. |
 
@@ -195,6 +195,10 @@ across ~240 human- and agent-authored notes. Exclude a vendored doc tree with
 a line in the committed `.canon-scan-exclude` rather than loosening the patterns —
 committed, so the exclusion applies to the whole team instead of one shell.
 
+It also refuses **merge conflict markers**, which is the likeliest way a
+git-synced vault gets quietly damaged — they render as ordinary text in an editor,
+so they are easy to miss and easy to commit into a note.
+
 And the honest ceiling: this catches **credentials** well and **personal or
 health information written as ordinary prose** poorly. A regex cannot recognise a
 clinical anecdote. Convention and human review remain the real controls.
@@ -223,7 +227,7 @@ without accidentally requiring a PR per session note.
 | Variable | Default | Effect |
 |---|---|---|
 | `CANON_HOME` | — | Vault path override; wins over everything |
-| `CANON_AUTOPULL` | `0` | `1` = `git pull --rebase --autostash` the vault at session start |
+| `CANON_AUTOPULL` | `0` | `1` = `git pull --ff-only` at session start, skipped if the tree is dirty |
 | `CANON_ENFORCE_SESSION_NOTE` | `remind` | `block` = tell Claude to finish; `off` = disable |
 | `CANON_SESSION_NOTE_WINDOW_MIN` | `720` | How recent a session note counts as "written" |
 | `CANON_AUTOCOMMIT` | `0` | `1` = commit vault changes locally at session end (never pushes) |

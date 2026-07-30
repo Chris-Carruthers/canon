@@ -92,6 +92,13 @@ PATTERNS = [
     ("URL with password",   re.compile(r"[a-zA-Z][a-zA-Z0-9+.-]*://[^\s:/@]+:[^\s@/]{3,}@")),
     ("US SSN",              re.compile(r"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b")),
     ("PEM certificate",     re.compile(r"-----BEGIN CERTIFICATE-----")),
+    # Not a secret, but the same "do not let this into history" class, and the
+    # single most likely way a git-synced vault gets quietly damaged: a conflict
+    # is resolved by hand in an editor, the markers are missed because they
+    # render as ordinary text, and the note is committed with git's scaffolding
+    # baked into it. Only <<<<<<< and >>>>>>> are matched — a run of = signs is
+    # legitimate markdown (a setext heading underline).
+    ("merge conflict marker", re.compile(r"^(<{7}|>{7})(\s|$)")),
 ]
 
 try:

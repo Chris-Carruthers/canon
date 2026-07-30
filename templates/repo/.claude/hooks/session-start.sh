@@ -54,8 +54,23 @@ fi
 # Optional sync. Off by default: a hook that mutates a git repo the user did not
 # ask it to touch is a bad default, and a mid-rebase vault is worse than a stale
 # one. Opt in with CANON_AUTOPULL=1.
+#
+# DELIBERATELY --ff-only, and deliberately NOT --rebase --autostash.
+#
+# The vault is very likely open in an editor right now. Obsidian holds notes in
+# memory and autosaves a second or two after you stop typing, so a pull that
+# rewrites files underneath it races that buffer: whichever writes last wins, and
+# Obsidian can win with stale content. A fast-forward cannot rewrite local
+# commits, cannot leave a half-finished rebase, and cannot produce conflict
+# markers — if it is not a clean fast-forward it does nothing at all.
+#
+# We also skip entirely when the tree is dirty, because those are exactly the
+# files someone is editing. Reconciling divergent history is a deliberate act:
+# that is what `canon-sync` is for, run when you are looking at it.
 if [ "${CANON_AUTOPULL:-0}" = "1" ] && [ -d "$VAULT/.git" ]; then
-  git -C "$VAULT" pull --rebase --autostash --quiet >/dev/null 2>&1 || true
+  if [ -z "$(git -C "$VAULT" status --porcelain 2>/dev/null | head -1)" ]; then
+    git -C "$VAULT" pull --ff-only --quiet >/dev/null 2>&1 || true
+  fi
 fi
 
 ROUTER="$VAULT/$ROUTER_REL"
