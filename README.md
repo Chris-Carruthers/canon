@@ -1,25 +1,127 @@
-# canon
+<p align="center">
+  <img src="assets/hero.png" alt="canon — shared knowledge for AI teams" width="100%">
+</p>
 
-**A shared knowledge vault your whole team's AI agents read from and write back to.**
+<p align="center">
+  <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
+  <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
+  <img src="https://img.shields.io/badge/tests-66%20passing-22C55E" alt="tests">
+</p>
 
-Plain markdown in git. Your agents get the team's accumulated decisions, project
-state, and domain knowledge as context — automatically, in every repo — and they
-add to it as work happens. Knowledge compounds instead of living in one person's
-head and one person's chat history.
+<h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
 
-*A canon is the agreed body of knowledge a group works from. That's the idea:
-one shared, versioned, reviewable canon instead of fifteen private ones.*
+<p align="center">
+  Built on Obsidian, Git, and Markdown. Your team's AI agents read the same
+  accumulated knowledge — and write what they learn back into it.<br>
+  <em>Every session makes the team smarter.</em>
+</p>
 
-> Prefer your own naming? Everything is one substitution away:
-> `grep -rl canon . | xargs perl -pi -e 's/canon/yourname/g; s/CANON/YOURNAME/g'`
-> then rename the `bin/canon-*` files. (`perl -pi` rather than `sed -i`, which
-> needs different arguments on BSD and GNU.)
+---
+
+## New here? Read this first
+
+*No terminal required to understand it. Skip to [Quickstart](#quickstart) if you just want to install it.*
+
+### The one-sentence version
+
+A folder of notes on your computer that both you and your AI assistant read and
+write, shared with your team — so what everyone learns accumulates instead of
+living in one person's head and one person's chat history.
+
+### What it puts on your computer
+
+**1. A notes folder.** Ordinary text files, organised by kind: what you decided
+and why, what each project is and where it stands, background on customers or
+domains, and a dated log of every work session.
+
+**2. Your code folders, untouched.** Code never goes in the notes. Notes point at
+code by location instead — *"the bug was in `auth.ts`, line 42."*
+
+**3. A standing instruction for your AI assistant.** A small config file telling
+it: *before real work, read the notes; after real work, write down what happened.*
+It applies everywhere you work, so you don't have to remember to ask.
+
+A useful way to picture it: the notes folder is the **team's shared notebook**.
+Everyone keeps a copy on their own desk, and a master copy lives online that the
+copies get matched against. Nobody edits a live document at the same time as
+anybody else — you change your copy, then send it up.
+
+### What happens in a normal work session
+
+1. You ask your assistant for something.
+2. It reads the notes first — the project's page, the last session's log — so it
+   starts with context instead of asking you to re-explain.
+3. You do the work.
+4. At the end it writes a dated note: what changed, what was decided, what's still
+   open, linked to the project.
+
+Next week, *"why did we do it that way?"* has an answer with a date on it. In six
+months, when the person who decided it is on holiday, their reasoning is still there.
+
+### What you actually do
+
+| You want to… | You do this |
+|---|---|
+| Read or explore the notes | Open the folder in **Obsidian**. `Cmd+O` jumps to any note by name. |
+| Add a document — a PDF, a deck, a transcript | Drop it in the `Sources` folder and run `/ingest`. Your assistant reads it and files the useful parts into the right notes. |
+| Find where something stands | Open the project's note, then the newest session log linked from it. |
+| Tidy up after a busy week | Run `/lint-vault`. It reports broken links, stale notes and contradictions, and offers to fix them. |
+| Share your notes with the team | One command that checks them and sends them up. |
+
+**You rarely write the notes by hand.** You drop things in, ask questions, and the
+notes get maintained as a side effect of the work.
+
+### Automatic, versus your decision
+
+| Step | Who |
+|---|---|
+| Reading the notes at the start | **Automatic** |
+| Writing the session note at the end | **Automatic**, with a nudge if it gets skipped |
+| Getting teammates' updates | **Automatic** — and only ever a safe update; it will not overwrite something you are mid-edit on |
+| **Publishing your notes to the team** | **You decide.** Never automatic. |
+
+That last line is deliberate. Once something is published it is effectively
+permanent, so a person looks first. Reading is safe to automate; publishing isn't.
+
+### The safety net, and its limit
+
+Before anything is saved, an automatic check looks for passwords, API keys and
+things shaped like personal identifiers, and **refuses the save** if it finds any.
+
+It is honest about what it cannot do. It is good at spotting *credentials* — text
+with a recognisable shape. It is poor at spotting **personal or confidential
+information written as ordinary prose**, because a pattern-matcher cannot
+recognise a story about a named individual. So the rule stands on its own: **don't
+put sensitive personal information in the notes.** The check is a backstop, not
+permission.
+
+### How a teammate joins
+
+1. Install Obsidian — free, including for work use.
+2. Copy the notes folder down — one command, once.
+3. Tell their machine where it lives — one line, once.
+
+Then they can read everything the team knows, and so can their AI assistant.
+
+### Which assistants this works with
+
+The notes are plain Markdown, so **any** tool that can read files can use them —
+Claude Code, Codex, Cursor, Gemini CLI, or a person with `grep`.
+
+The *automatic* wiring in this kit — the part that loads context at the start of a
+session and writes the note at the end — currently ships for **Claude Code only**.
+Adding other runtimes is a small job and an explicitly welcome contribution; see
+[CONTRIBUTING](CONTRIBUTING.md). Nothing about the notes themselves is
+Claude-specific.
+
+---
 
 ## How it works
 
-A small map goes into the agent's context every session. The vault itself stays
-on disk and gets searched on demand — it is far larger than any context window,
-so loading it is not an option and is not the point.
+A small map goes into the agent's context every session. The vault itself stays on
+disk and gets searched on demand — it is far larger than any context window, so
+loading it is not an option and is not the point.
 
 ```mermaid
 flowchart TB
@@ -42,6 +144,16 @@ flowchart TB
     Q -->|"no"| N
     N -.->|"finish the job"| A
     Q -->|"yes"| E
+
+    classDef hook fill:#1F2937,stroke:#A78BFA,stroke-width:2px,color:#E5E7EB
+    classDef core fill:#161B22,stroke:#6366F1,stroke-width:2px,color:#E5E7EB
+    classDef store fill:#0D1117,stroke:#6366F1,stroke-width:2px,color:#E5E7EB
+    classDef good fill:#161B22,stroke:#22C55E,stroke-width:2px,color:#E5E7EB
+    class H,S hook
+    class R,A,W,N core
+    class V store
+    class E good
+    class Q hook
 ```
 
 Sharing is asymmetric on purpose. Reading is safe to automate; publishing is
@@ -65,6 +177,18 @@ flowchart LR
     G -->|"clean"| P
     G -->|"credential, or a path<br/>you do not own"| X
     P --> RM
+
+    classDef core fill:#161B22,stroke:#6366F1,stroke-width:2px,color:#E5E7EB
+    classDef store fill:#0D1117,stroke:#6366F1,stroke-width:2px,color:#E5E7EB
+    classDef gate fill:#1F2937,stroke:#A78BFA,stroke-width:2px,color:#E5E7EB
+    classDef good fill:#161B22,stroke:#22C55E,stroke-width:2px,color:#E5E7EB
+    classDef bad fill:#161B22,stroke:#F87171,stroke-width:2px,color:#E5E7EB
+    class W,C core
+    class RM store
+    class G gate
+    class P good
+    class X bad
+    style local fill:#0D1117,stroke:#A78BFA,stroke-width:1px,color:#A78BFA
 ```
 
 ## What you get
