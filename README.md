@@ -184,9 +184,13 @@ Two limits, stated plainly:
 - **`.git/hooks` is not shared by cloning.** Each teammate runs
   `canon-install-vault-hooks` once. Your git host's own push protection is the
   only gate nobody can skip — turn it on.
-- **Some editor sync plugins bypass git hooks entirely** (Obsidian Git uses
-  isomorphic-git, which does not execute them). If you depend on the gate, make
-  `canon-sync` the commit path for the vault.
+- **Editor sync plugins are fine on desktop, and a hole on mobile.** Obsidian Git
+  ships two backends: `simple-git` (which spawns the real `git` binary) on
+  desktop, and `isomorphic-git` on mobile, because a plugin cannot use a native
+  git install on Android or iOS. So on **desktop the plugin's commits do run your
+  hooks** and the gate holds; on **mobile they do not**, and mobile also has no
+  SSH auth and hard repo-size limits. Treat mobile as read-only for a gated
+  vault.
 
 **Measured false-positive burden.** Run over a real 2,040-file vault: 28 flagged
 lines, *all* of them inside a vendored third-party documentation mirror

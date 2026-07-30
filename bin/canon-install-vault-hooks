@@ -7,11 +7,16 @@
 # Installs .git/hooks/pre-commit in the vault repo. Any tool that shells out to
 # real git — the CLI, canon-sync, most editors — will hit the gate.
 #
-# IMPORTANT CAVEAT: some editor sync plugins (notably Obsidian Git, which uses
-# isomorphic-git rather than the git binary) DO NOT execute git hooks. If you
-# rely on this gate, either make canon-sync the commit path for the vault, or
-# treat the remote's own push protection as the real backstop. Do not assume
-# a pre-commit hook covers every writer.
+# COVERAGE, precisely — this matters if you are relying on the gate:
+#   * The git CLI, canon-sync, and most editors shell out to real git: covered.
+#   * Obsidian Git on DESKTOP uses simple-git, which spawns the git binary, so
+#     its commits ARE covered. (Verified from the plugin's own source and its
+#     issue #1055, where a global hook fired during a plugin push.)
+#   * Obsidian Git on MOBILE uses isomorphic-git, which does NOT run hooks — a
+#     plugin cannot use native git on Android or iOS. Mobile writes are UNGATED.
+#   * .git/hooks is not shared by cloning, so every teammate must run this once.
+# The only gate nobody can skip is your host's server-side push protection.
+# Turn it on; treat this hook as the early, friendly layer.
 
 set -euo pipefail
 

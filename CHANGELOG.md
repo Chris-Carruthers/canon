@@ -57,9 +57,10 @@ Stated here because they shape how much you should trust the tool:
 - **`.git/hooks` is not shared by cloning** — each teammate runs
   `canon-install-vault-hooks` once. Server-side push protection is the only gate
   nobody can skip.
-- **Some editor sync plugins bypass git hooks** (Obsidian Git uses isomorphic-git,
-  which does not execute them). Make `canon-sync` the commit path if you depend
-  on the gate.
+- **Editor sync plugins bypass git hooks on mobile only.** Obsidian Git uses
+  `simple-git` (the real git binary) on desktop, so its commits DO run the gate;
+  it falls back to `isomorphic-git` on mobile, which does not. Mobile should be
+  read-only for a gated vault.
 - **Governance cannot restrict reading.** Path ownership controls writes; if
   someone must not *read* something, it needs a separate repository.
 - **Branch protection on private GitHub repos requires a paid plan**, so the

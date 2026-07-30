@@ -193,7 +193,14 @@ miss and easy to commit — baking git's scaffolding permanently into a note.
 - **Do not run two auto-syncers.** If you enable `CANON_AUTOPULL` *and* an editor
   plugin that syncs every ten minutes, you have two processes pulling on
   independent schedules, which is how you manufacture the race this section is
-  about. Pick one.
+  about. Pick one — and prefer the session-start one, because a timer fires
+  mid-sentence and session start does not.
+- **Keep mobile read-only.** Obsidian Git ships two backends: `simple-git`, which
+  spawns the real `git` binary, on desktop; and `isomorphic-git` on mobile,
+  because a plugin cannot use a native git install on Android or iOS. That means
+  **desktop plugin commits do run your hooks** — the gate holds — while **mobile
+  commits are ungated**. Mobile also has no SSH auth and hard repo-size limits.
+  For reading on a phone, browse the repo on your git host instead.
 - **Commit before you pull manually** if you have been editing — or let
   `canon-sync` do it, which stages and commits before it touches the remote.
 - **After resolving a conflict, search the note for `<<<` before committing.** The
