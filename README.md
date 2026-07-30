@@ -15,6 +15,64 @@ one shared, versioned, reviewable canon instead of fifteen private ones.*
 > then rename the `bin/canon-*` files. (`perl -pi` rather than `sed -i`, which
 > needs different arguments on BSD and GNU.)
 
+## How it works
+
+A small map goes into the agent's context every session. The vault itself stays
+on disk and gets searched on demand — it is far larger than any context window,
+so loading it is not an option and is not the point.
+
+```mermaid
+flowchart TB
+    H(["SessionStart hook"])
+    A["Your agent"]
+    W["Work happens<br/>in the code repo"]
+    S(["Stop hook"])
+    Q{"Session note<br/>written?"}
+    N["Remind — or block"]
+    E["Session ends"]
+
+    subgraph ctx["In context every session · small"]
+        R["Agent Router<br/>~40 lines: what lives where,<br/>how to search, the rules"]
+    end
+
+    subgraph disk["On disk · large · never loaded whole"]
+        V["Decisions/ · Projects/ · Clients/ · Reference/<br/>Specs/ · Handoffs/ · Sessions/ · Outputs/"]
+    end
+
+    H -->|"injects, capped at 10k chars"| R
+    R --> A
+    A <-.->|"glob + grep, just-in-time"| V
+    A --> W
+    W --> S
+    S --> Q
+    Q -->|"no"| N
+    N --> A
+    Q -->|"yes"| E
+```
+
+Sharing is asymmetric on purpose. Reading is safe to automate; publishing is
+irreversible, so it stays deliberate and passes a gate first.
+
+```mermaid
+flowchart LR
+    RM[("Shared remote")]
+    G{{"canon-scan · canon-guard"}}
+    X["Refused —<br/>fix it before it<br/>enters history"]
+    P["push<br/>only when you ask"]
+
+    subgraph local["Your machine"]
+        W["Notes your agent wrote"]
+        C["Local commit"]
+        W --> C
+    end
+
+    RM -->|"pull · automatic"| W
+    C --> G
+    G -->|"clean"| P
+    G -->|"credential, or a path<br/>you do not own"| X
+    P --> RM
+```
+
 ## What you get
 
 | Piece | What it does |
