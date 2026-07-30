@@ -24,29 +24,23 @@ so loading it is not an option and is not the point.
 ```mermaid
 flowchart TB
     H(["SessionStart hook"])
+    R["Agent Router · ~40 lines<br/>in context, every session"]
     A["Your agent"]
-    W["Work happens<br/>in the code repo"]
+    V[("Vault on disk · thousands of notes<br/>never loaded whole")]
+    W["Work happens in the code repo"]
     S(["Stop hook"])
     Q{"Session note<br/>written?"}
     N["Remind — or block"]
     E["Session ends"]
 
-    subgraph ctx["In context every session · small"]
-        R["Agent Router<br/>~40 lines: what lives where,<br/>how to search, the rules"]
-    end
-
-    subgraph disk["On disk · large · never loaded whole"]
-        V["Decisions/ · Projects/ · Clients/ · Reference/<br/>Specs/ · Handoffs/ · Sessions/ · Outputs/"]
-    end
-
-    H -->|"injects, capped at 10k chars"| R
+    H -->|"injects · capped at 10k chars"| R
     R --> A
     A <-.->|"glob + grep, just-in-time"| V
     A --> W
     W --> S
     S --> Q
     Q -->|"no"| N
-    N --> A
+    N -.->|"finish the job"| A
     Q -->|"yes"| E
 ```
 
