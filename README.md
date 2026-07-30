@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-66%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-99%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -401,7 +401,7 @@ notes they used**, so an answer can be traced back — and the note corrected.
 
 **Read-only by construction.** The agent gets `Read`, `Grep`, `Glob` and nothing
 else, with `cwd` pinned to the vault. This lives once in
-[`connectors/shared/core.mjs`](connectors/shared/core.mjs) — two copies of a safety
+[`connectors/shared/agent.mjs`](connectors/shared/agent.mjs) — two copies of a safety
 model is two things that can drift, and drift here means a read-only bot quietly
 becoming something else. The test suite asserts the tool list *and* asserts that no
 connector declares its own.

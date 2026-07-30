@@ -37,7 +37,7 @@ Role-based allowlisting is usually the right fit for Discord:
 The agent gets `Read`, `Grep` and `Glob` — no `Write`, no `Edit`, no `Bash`, no web
 access — with `cwd` pinned to the vault.
 
-This lives in `../shared/core.mjs` alongside the Slack connector, deliberately: two
+This lives in `../shared/agent.mjs` alongside the Slack connector, deliberately: two
 copies of a safety model is two things that can drift, and drift here means a
 read-only bot quietly becoming something else. The test suite asserts the tool list
 and asserts that **no connector declares its own**.

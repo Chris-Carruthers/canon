@@ -82,6 +82,22 @@ jobs:
           done
           exit $fail
 
+      - name: README test badge matches reality
+        run: |
+          actual="$(./test/run.sh | tail -1 | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '^[0-9]+')"
+          badge="$(sed -n 's/.*tests-\([0-9]*\)%20passing.*/\1/p' README.md)"
+          [ "$actual" = "$badge" ] || {
+            echo "README badge says $badge tests, suite runs $actual"; exit 1; }
+          echo "badge matches: $actual"
+
+      - name: No references to deleted modules
+        run: |
+          if grep -rn "shared/core\.mjs" --include='*.md' --include='*.mjs' \
+               --include='*.yml' --exclude-dir=.git . ; then
+            echo "reference to a module that no longer exists"; exit 1
+          fi
+          echo "no stale module references"
+
       - name: No absolute local paths leaked
         run: |
           if grep -rn "/Users/\|/home/[a-z]" --include='*' \
