@@ -123,6 +123,42 @@ An explicitly-set `$CANON_HOME` that points nowhere **fails loudly instead of
 falling back** — silently loading a different vault than you asked for is worse
 than loading none.
 
+## Reading it as a human — Obsidian, optional but recommended
+
+The vault is plain markdown, so any editor works and `grep` works. Your agents
+never touch Obsidian; they read files. But humans navigate knowledge by following
+links, and that's what [Obsidian](https://obsidian.md) adds for free:
+
+- **`Cmd+O`** to jump to any note by name — the fastest thing in it
+- **Backlinks** — "what else references this?", which is how you find context you
+  didn't know to ask for
+- **Graph view** — see the shape of what the team knows
+- **Bases** — auto-generated tables from frontmatter, so index notes stop being
+  hand-maintained (and stop being a merge-conflict surface)
+
+It's [free for commercial use](https://obsidian.md/license) — the paid Commercial
+License is optional support, not a requirement. Point it at the vault folder with
+*Open folder as vault*.
+
+**What you lose without it:** `[[wikilinks]]` render as literal text elsewhere, so
+you get a searchable folder rather than a connected one. Everything is still
+readable. Nothing breaks.
+
+`canon-init-vault` writes a `.gitignore` that commits shared editor settings while
+excluding per-person UI state, so nobody fights over pane layouts.
+
+### Two rules if you use the Obsidian Git plugin
+
+1. **Don't run its timer alongside `CANON_AUTOPULL`.** Two processes pulling on
+   independent schedules is how you manufacture a race with the editor's own
+   autosave. Prefer the session-start pull: a timer fires mid-sentence, session
+   start doesn't.
+2. **Keep mobile read-only.** The plugin uses `simple-git` — the real git binary —
+   on desktop, so its commits *do* run your hooks and the gate holds. On mobile it
+   falls back to `isomorphic-git`, which does **not** run hooks, so mobile writes
+   are ungated. Mobile also has no SSH auth and hard repo-size limits. Read on a
+   phone by browsing the repo on your git host instead.
+
 ## Design, and why
 
 **The vault is reached on demand, never inlined.** `CLAUDE.md` loads in full on
@@ -265,6 +301,10 @@ Not an agent-memory product, not a vector store, not a server. It is a set of
 conventions plus the smallest amount of wiring that makes them fire
 automatically. It composes with markdown-native memory tools rather than
 competing with them — they own storage and retrieval; this owns the *practice*.
+
+Obsidian is **recommended, not required**: it is the nicest way for a human to
+read a linked vault, and nothing in the kit depends on it. Requirements stay
+`bash`, `git`, `python3`.
 
 ## Requirements
 
