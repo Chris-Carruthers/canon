@@ -1,4 +1,4 @@
-# canon-kit
+# canon
 
 **A shared knowledge vault your whole team's AI agents read from and write back to.**
 
@@ -7,7 +7,10 @@ state, and domain knowledge as context — automatically, in every repo — and 
 add to it as work happens. Knowledge compounds instead of living in one person's
 head and one person's chat history.
 
-> `canon` is a working name. To rename everything:
+*A canon is the agreed body of knowledge a group works from. That's the idea:
+one shared, versioned, reviewable canon instead of fifteen private ones.*
+
+> Prefer your own naming? Everything is one substitution away:
 > `grep -rl canon . | xargs sed -i '' 's/canon/yourname/g; s/CANON/YOURNAME/g'`
 > then rename the `bin/canon-*` files.
 
