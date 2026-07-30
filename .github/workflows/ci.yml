@@ -61,6 +61,9 @@ jobs:
           done
           exit $fail
 
+      - name: Slack connector parses
+        run: node --check connectors/slack/src/app.mjs
+
       - name: Versions agree with VERSION
         run: |
           want="$(cat VERSION)"

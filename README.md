@@ -203,6 +203,7 @@ flowchart LR
 | **`canon-sync`** | Pull, scan, commit, and — only when you ask — push |
 | **`canon-scan`** | Blocks credentials and obvious identifiers from entering git history |
 | **`canon-guard`** | Warns when a commit touches a note somebody else owns |
+| **Slack connector** | Ask the canon questions from Slack; read-only, cites its sources ([docs](connectors/slack/README.md)) |
 
 ## Quickstart (5 minutes)
 
@@ -377,6 +378,31 @@ so they are easy to miss and easy to commit into a note.
 And the honest ceiling: this catches **credentials** well and **personal or
 health information written as ordinary prose** poorly. A regex cannot recognise a
 clinical anecdote. Convention and human review remain the real controls.
+
+## Ask it from Slack
+
+Not everyone will open an editor. `connectors/slack/` is an optional bot that
+answers questions from the vault and **cites the notes it used**, so an answer can
+be traced back and the note corrected.
+
+```
+@canon  what did we decide about the auth migration, and why?
+  → answer, plus 📄 Decisions/2026-06-11 — ….md · Projects/Auth.md
+```
+
+**Read-only by construction** — the agent gets `Read`, `Grep`, `Glob` and nothing
+else, with `cwd` pinned to the vault. A bot that can edit the canon can quietly
+rewrite a decision with no diff and no reviewer; writing stays where it is
+reviewable.
+
+**It bypasses your git permissions**, though, and that is the part to think about:
+git decides who can clone the vault, Slack decides who is in the channel. If those
+differ, the bot is a hole. So it **refuses to start without an allowlist**.
+
+Optional by design: it needs Node and two npm packages, which the core kit does
+not. Setup, the full warning, and a verification checklist are in
+[`connectors/slack/README.md`](connectors/slack/README.md). **It has not yet been
+run against live Slack tokens** — work that checklist before you announce it.
 
 ## Ownership: not everything should be everyone's
 

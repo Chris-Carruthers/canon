@@ -279,6 +279,28 @@ git_q commit -qm "must be blocked" >/dev/null 2>&1
 is "gate actually fires under core.hooksPath" "$?" "1"
 git reset -q; cd "$V" || exit 1
 
+# The Slack connector is optional and needs Node, so we cannot run it here. But
+# its safety properties are static and MUST NOT regress — someone adding Bash "for
+# convenience" turns a read-only Q&A bot into a remote shell over the vault.
+section "slack connector safety (static)"
+SLK="$KIT/connectors/slack/src/app.mjs"
+if [ -f "$SLK" ]; then
+  if command -v node >/dev/null 2>&1; then
+    node --check "$SLK" >/dev/null 2>&1 && ok "connector parses" || bad "connector has a syntax error"
+  fi
+  TOOLS="$(python3 -c "
+import re,sys
+s=open('$SLK').read()
+m=re.search(r'allowedTools:\s*\[([^\]]*)\]', s)
+print(','.join(t.strip().strip(chr(34)+chr(39)) for t in m.group(1).split(',') if t.strip()) if m else 'PARSE-FAIL')")"
+  is "read-only tool list only"      "$TOOLS" "Read,Grep,Glob"
+  is "cwd pinned to the vault"       "$(grep -c 'cwd: VAULT' "$SLK")" "1"
+  if grep -q "refusing to start with no allowlist" "$SLK"; then
+    ok "fails closed without an allowlist"; else bad "no fail-closed allowlist check"; fi
+  if grep -qE '\.env$' "$KIT/connectors/slack/.gitignore" 2>/dev/null; then
+    ok ".env is gitignored"; else bad ".env is NOT gitignored — tokens could be committed"; fi
+fi
+
 # ---------------------------------------------------------------------------
 section "ownership guard"
 cat > "$V/.canon-owners" <<'EOF'

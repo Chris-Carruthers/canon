@@ -6,6 +6,30 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ## [Unreleased]
 
+### Added
+
+- **Slack connector** (`connectors/slack/`) — ask questions of the vault from
+  Slack; answers cite the notes they came from. Socket Mode, so no public URL.
+  Optional component: needs Node and two npm packages, which the core kit does not.
+  - **Read-only by construction**: `allowedTools` is `Read`/`Grep`/`Glob` only and
+    `cwd` is pinned to the vault. Asserted by the test suite so it cannot regress.
+  - **Fails closed**: refuses to start without `CANON_SLACK_ALLOW_CHANNELS` or
+    `CANON_SLACK_ALLOW_USERS`, because the bot bypasses git permissions — git
+    decides who can clone the vault, Slack decides who is in the channel.
+  - **Not yet run against live Slack tokens.** The design follows a working bot on
+    the same libraries, but treat `connectors/slack/README.md`'s verification list
+    as acceptance criteria rather than a formality.
+- **Vaults bootstrap themselves.** `canon-init-vault` vendors the tooling into the
+  vault's `.canon/` with a `bootstrap.sh`, so a teammate who clones only the vault
+  can complete setup in one command with nothing else to download.
+
+### Fixed
+
+- `canon-install-vault-hooks` honours `core.hooksPath`. When it is set git ignores
+  `.git/hooks` entirely, so the gate was being installed where git never looks —
+  silently inert, verified by a planted key committing successfully.
+- An existing `pre-commit` hook is now chained rather than replaced.
+
 ## [0.1.0] — 2026-07-30
 
 First release. Everything below is verified by `./test/run.sh` (51 assertions).
