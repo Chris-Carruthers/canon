@@ -234,7 +234,9 @@ printf '#!/usr/bin/env bash\necho "PRIOR HOOK RAN"\nexit 0\n' > "$V2/.git/hooks/
 chmod +x "$V2/.git/hooks/pre-commit"
 "$KIT/bin/canon-install-vault-hooks" "$V2" >/dev/null 2>&1
 is "prior hook is chained, not deleted" "$([ -x "$V2/.git/hooks/pre-commit.canon-chained" ] && echo y)" "y"
-is "no redundant .bak duplicate"        "$(ls "$V2/.git/hooks/" | grep -c 'pre-commit\.bak')" "0"
+nbak=0
+for f in "$V2/.git/hooks/"pre-commit.bak.*; do [ -e "$f" ] && nbak=$((nbak+1)); done
+is "no redundant .bak duplicate"        "$nbak" "0"
 # re-running must not overwrite the already-chained hook with our own
 "$KIT/bin/canon-install-vault-hooks" "$V2" >/dev/null 2>&1
 if grep -q 'canon-scan' "$V2/.git/hooks/pre-commit.canon-chained" 2>/dev/null; then
