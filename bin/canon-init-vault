@@ -50,6 +50,15 @@ for d in Vision Projects Clients Decisions Reference Sessions Specs Handoffs Out
   [ -e "$VAULT/$d/.gitkeep" ] || : > "$VAULT/$d/.gitkeep"
 done
 
+# Vendor the tools INTO the vault so a fresh clone can bootstrap itself with no
+# other checkout present. This is what makes onboarding a single command.
+mkdir -p "$VAULT/.canon"
+for tool in canon-scan canon-guard canon-path canon-install-vault-hooks; do
+  [ -f "$KIT_DIR/bin/$tool" ] && cp "$KIT_DIR/bin/$tool" "$VAULT/.canon/$tool"
+  [ -f "$VAULT/.canon/$tool" ] && chmod +x "$VAULT/.canon/$tool"
+done
+echo "  vendored .canon/{canon-scan,canon-guard,canon-path,canon-install-vault-hooks}"
+
 if [ ! -d "$VAULT/.git" ]; then
   git -C "$VAULT" init --quiet 2>/dev/null && echo "  initialised git repo"
 fi
@@ -59,8 +68,8 @@ cat <<EOF
 Done. Next:
   1. Fill in Vision/Agent Router.md — delete folders you do not use.
      Keep it under 150 lines; it is the only file agents load every session.
-  2. Set the path once per machine:
-       mkdir -p ~/.config/canon && echo "$VAULT" > ~/.config/canon/path
+  2. Set the path once per machine — or just run the bootstrap, which does it:
+       ./.canon/bootstrap.sh
      (or export CANON_HOME, or add a .canon file per repo)
   3. Point a repo at it:  ./install.sh /path/to/repo --vault "$VAULT"
   4. Create a PRIVATE remote and push. Read the vault rules first — nothing

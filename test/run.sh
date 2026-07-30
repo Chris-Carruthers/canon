@@ -59,6 +59,12 @@ is "creates the router"        "$([ -f "$V/Vision/Agent Router.md" ] && echo y)"
 is "creates 6 note templates" "$(find "$V/Templates" -name '*.md' | wc -l | tr -d ' ')" "6"
 is "gitkeeps every folder"    "$(find "$V" -name .gitkeep | wc -l | tr -d ' ')" "13"
 is "ships .canon-owners"      "$([ -f "$V/.canon-owners" ] && echo y)" "y"
+is "ships a self-bootstrap"   "$([ -x "$V/.canon/bootstrap.sh" ] && echo y)" "y"
+missing_tools=""
+for t in canon-scan canon-guard canon-path canon-install-vault-hooks; do
+  [ -x "$V/.canon/$t" ] || missing_tools="$missing_tools $t"
+done
+is "vendors its own tooling"  "${missing_tools:-none}" "none"
 
 # every folder the router advertises must exist
 missing=""

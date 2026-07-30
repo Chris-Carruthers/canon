@@ -38,10 +38,17 @@ VAULT="$(cd "$VAULT" && pwd)"
 
 # Ship the scanner inside the vault repo so the hook has no external dependency
 # and keeps working on a fresh clone.
+# Tolerate being run FROM the vault's own .canon/ — a vault that carries these
+# scripts can bootstrap itself on a fresh clone with no other checkout, which is
+# the only way onboarding works for someone who doesn't have this kit.
 mkdir -p "$VAULT/.canon"
 for tool in canon-scan canon-guard; do
-  cp "$HERE/$tool" "$VAULT/.canon/$tool"
-  chmod +x "$VAULT/.canon/$tool"
+  src="$HERE/$tool"; dst="$VAULT/.canon/$tool"
+  [ -f "$src" ] || continue
+  if [ "$(cd "$(dirname "$src")" && pwd)/$tool" != "$(cd "$(dirname "$dst")" && pwd)/$tool" ]; then
+    cp "$src" "$dst"
+  fi
+  chmod +x "$dst"
 done
 
 # WHERE do hooks actually live? If core.hooksPath is set — husky, the pre-commit
