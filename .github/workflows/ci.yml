@@ -61,8 +61,11 @@ jobs:
           done
           exit $fail
 
-      - name: Slack connector parses
-        run: node --check connectors/slack/src/app.mjs
+      - name: Connectors parse
+        run: |
+          node --check connectors/shared/core.mjs
+          node --check connectors/slack/src/app.mjs
+          node --check connectors/discord/src/app.mjs
 
       - name: Versions agree with VERSION
         run: |

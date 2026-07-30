@@ -203,7 +203,7 @@ flowchart LR
 | **`canon-sync`** | Pull, scan, commit, and — only when you ask — push |
 | **`canon-scan`** | Blocks credentials and obvious identifiers from entering git history |
 | **`canon-guard`** | Warns when a commit touches a note somebody else owns |
-| **Slack connector** | Ask the canon questions from Slack; read-only, cites its sources ([docs](connectors/slack/README.md)) |
+| **Chat connectors** | Ask the canon questions from **Slack** or **Discord**; read-only, cites its sources |
 
 ## Quickstart (5 minutes)
 
@@ -379,30 +379,37 @@ And the honest ceiling: this catches **credentials** well and **personal or
 health information written as ordinary prose** poorly. A regex cannot recognise a
 clinical anecdote. Convention and human review remain the real controls.
 
-## Ask it from Slack
+## Ask it from chat
 
-Not everyone will open an editor. `connectors/slack/` is an optional bot that
-answers questions from the vault and **cites the notes it used**, so an answer can
-be traced back and the note corrected.
+Not everyone will open an editor, and a knowledge base is only as useful as its
+ways in. Two optional connectors answer questions from the vault and **cite the
+notes they used**, so an answer can be traced back — and the note corrected.
+
+| | |
+|---|---|
+| **Slack** | [`connectors/slack/`](connectors/slack/README.md) — mention it, DM it, or `/canon` |
+| **Discord** | [`connectors/discord/`](connectors/discord/README.md) — `/canon`, with threaded follow-ups |
 
 ```
 @canon  what did we decide about the auth migration, and why?
   → answer, plus 📄 Decisions/2026-06-11 — ….md · Projects/Auth.md
 ```
 
-**Read-only by construction** — the agent gets `Read`, `Grep`, `Glob` and nothing
-else, with `cwd` pinned to the vault. A bot that can edit the canon can quietly
-rewrite a decision with no diff and no reviewer; writing stays where it is
-reviewable.
+**Read-only by construction.** The agent gets `Read`, `Grep`, `Glob` and nothing
+else, with `cwd` pinned to the vault. This lives once in
+[`connectors/shared/core.mjs`](connectors/shared/core.mjs) — two copies of a safety
+model is two things that can drift, and drift here means a read-only bot quietly
+becoming something else. The test suite asserts the tool list *and* asserts that no
+connector declares its own.
 
-**It bypasses your git permissions**, though, and that is the part to think about:
-git decides who can clone the vault, Slack decides who is in the channel. If those
-differ, the bot is a hole. So it **refuses to start without an allowlist**.
+**They bypass your git permissions**, and that is the part to think about: git
+decides who can clone the vault, the chat platform decides who is in the channel.
+Where those differ the bot is a hole, so both **refuse to start without an
+allowlist**. Be stricter on Discord — those servers are usually broader.
 
-Optional by design: it needs Node and two npm packages, which the core kit does
-not. Setup, the full warning, and a verification checklist are in
-[`connectors/slack/README.md`](connectors/slack/README.md). **It has not yet been
-run against live Slack tokens** — work that checklist before you announce it.
+Optional by design: they need Node and a couple of npm packages, which the core kit
+does not. **Neither has been run against live credentials yet** — each README has a
+verification checklist; treat it as acceptance criteria, not a formality.
 
 ## Ownership: not everything should be everyone's
 

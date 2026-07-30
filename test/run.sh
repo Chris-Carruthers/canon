@@ -282,23 +282,48 @@ git reset -q; cd "$V" || exit 1
 # The Slack connector is optional and needs Node, so we cannot run it here. But
 # its safety properties are static and MUST NOT regress — someone adding Bash "for
 # convenience" turns a read-only Q&A bot into a remote shell over the vault.
-section "slack connector safety (static)"
-SLK="$KIT/connectors/slack/src/app.mjs"
-if [ -f "$SLK" ]; then
+section "connector safety (static)"
+# Connectors are optional and need Node, so we cannot run them here. Their safety
+# properties are static and MUST NOT regress: someone adding Bash "for
+# convenience" turns a read-only Q&A bot into a remote shell over the vault.
+CORE="$KIT/connectors/shared/core.mjs"
+APPS="$KIT/connectors/slack/src/app.mjs $KIT/connectors/discord/src/app.mjs"
+
+if [ -f "$CORE" ]; then
   if command -v node >/dev/null 2>&1; then
-    node --check "$SLK" >/dev/null 2>&1 && ok "connector parses" || bad "connector has a syntax error"
+    parse_fail=""
+    for f in "$CORE" $APPS; do
+      node --check "$f" >/dev/null 2>&1 || parse_fail="$parse_fail $(basename "$(dirname "$(dirname "$f")")")"
+    done
+    is "core + all connectors parse" "${parse_fail:-none}" "none"
   fi
+
+  # The tool list lives in ONE place. Assert its exact contents.
   TOOLS="$(python3 -c "
-import re,sys
-s=open('$SLK').read()
-m=re.search(r'allowedTools:\s*\[([^\]]*)\]', s)
+import re
+s=open('$CORE').read()
+m=re.search(r'READ_ONLY_TOOLS\s*=\s*\[([^\]]*)\]', s)
 print(','.join(t.strip().strip(chr(34)+chr(39)) for t in m.group(1).split(',') if t.strip()) if m else 'PARSE-FAIL')")"
-  is "read-only tool list only"      "$TOOLS" "Read,Grep,Glob"
-  is "cwd pinned to the vault"       "$(grep -c 'cwd: VAULT' "$SLK")" "1"
-  if grep -q "refusing to start with no allowlist" "$SLK"; then
-    ok "fails closed without an allowlist"; else bad "no fail-closed allowlist check"; fi
-  if grep -qE '\.env$' "$KIT/connectors/slack/.gitignore" 2>/dev/null; then
-    ok ".env is gitignored"; else bad ".env is NOT gitignored — tokens could be committed"; fi
+  is "core tool list is read-only"  "$TOOLS" "Read,Grep,Glob"
+
+  # And no connector may declare its own — that is how two platforms drift apart
+  # and one of them quietly gains write access.
+  own=0
+  for f in $APPS; do
+    [ -f "$f" ] && own=$((own + $(grep -c 'allowedTools:' "$f")))
+  done
+  is "no connector declares its own tools" "$own" "0"
+
+  is "cwd pinned to the vault in core"     "$(grep -c 'cwd: vault' "$CORE")" "1"
+  if grep -q "refusing to start with no allowlist" "$CORE"; then
+    ok "fails closed without an allowlist"; else bad "no fail-closed allowlist check in core"; fi
+
+  # Tokens must never be committable.
+  miss=""
+  for d in slack discord; do
+    grep -qE '^\.env$' "$KIT/connectors/$d/.gitignore" 2>/dev/null || miss="$miss $d"
+  done
+  is ".env gitignored in every connector" "${miss:-none}" "none"
 fi
 
 # ---------------------------------------------------------------------------

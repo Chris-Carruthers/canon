@@ -8,17 +8,26 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
-- **Slack connector** (`connectors/slack/`) — ask questions of the vault from
-  Slack; answers cite the notes they came from. Socket Mode, so no public URL.
-  Optional component: needs Node and two npm packages, which the core kit does not.
+- **Chat connectors** — ask questions of the vault from **Slack**
+  (`connectors/slack/`, Socket Mode so no public URL) or **Discord**
+  (`connectors/discord/`, slash command with threaded follow-ups). Answers cite the
+  notes they came from. Optional components: they need Node and a couple of npm
+  packages, which the core kit does not.
+  - Shared logic lives in `connectors/shared/core.mjs` — vault resolution, the
+    allowlist gate, the agent call, citation extraction. The safety model is
+    defined once so two platforms cannot drift apart on it.
+  - Discord defaults to the slash command rather than mentions: answering mentions
+    needs the privileged MessageContent intent, which lets the bot read every
+    message in the server. Opt in with `CANON_DISCORD_ALLOW_MENTIONS=1`.
   - **Read-only by construction**: `allowedTools` is `Read`/`Grep`/`Glob` only and
-    `cwd` is pinned to the vault. Asserted by the test suite so it cannot regress.
+    `cwd` is pinned to the vault. The test suite asserts the list and asserts that
+    no connector declares its own, so it cannot regress or diverge.
   - **Fails closed**: refuses to start without `CANON_SLACK_ALLOW_CHANNELS` or
     `CANON_SLACK_ALLOW_USERS`, because the bot bypasses git permissions — git
     decides who can clone the vault, Slack decides who is in the channel.
-  - **Not yet run against live Slack tokens.** The design follows a working bot on
-    the same libraries, but treat `connectors/slack/README.md`'s verification list
-    as acceptance criteria rather than a formality.
+  - **Neither has been run against live credentials.** The Slack design follows a
+    working bot on the same libraries; treat each README's verification list as
+    acceptance criteria rather than a formality.
 - **Vaults bootstrap themselves.** `canon-init-vault` vendors the tooling into the
   vault's `.canon/` with a `bootstrap.sh`, so a teammate who clones only the vault
   can complete setup in one command with nothing else to download.
