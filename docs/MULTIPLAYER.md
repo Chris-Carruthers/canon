@@ -47,8 +47,12 @@ behaves when two people touch it.** Four classes, and the conflict risk of each:
 append-only, and append-only content cannot conflict. A fifteen-person team all
 running agents that write session notes generates fifteen new files a day and
 zero conflicts. The conflict surface is *only* the shared-editable layer plus any
-hand-maintained index — which is exactly why we recommend generated index tables
-over a hand-written map, and small single-concept notes over large ones.
+hand-maintained index — which is why a generated table beats a hand-written map
+for *human* dashboards, and why small single-concept notes beat large ones.
+
+One caveat on generated tables: they render from a query at view time, so they are
+invisible to an agent that greps the file. Use them for dashboards people read;
+keep anything an agent must read as literal text.
 
 Two habits keep even that surface small:
 

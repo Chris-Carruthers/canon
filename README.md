@@ -257,8 +257,15 @@ links, and that's what [Obsidian](https://obsidian.md) adds for free:
 - **Backlinks** — "what else references this?", which is how you find context you
   didn't know to ask for
 - **Graph view** — see the shape of what the team knows
-- **Bases** — auto-generated tables from frontmatter, so index notes stop being
-  hand-maintained (and stop being a merge-conflict surface)
+- **Bases** — live tables generated from frontmatter, so human dashboards stop
+  being hand-maintained (and stop being a merge-conflict surface)
+
+> [!IMPORTANT]
+> **A Bases table is rendered from a query at view time — it is not text in the
+> file.** A human sees a live table; an agent greps the file and sees a query
+> definition, not the rows. So: **Bases for human dashboards, plain text for
+> anything an agent must read.** The router note especially must stay literal
+> text, or you have built an index your agents cannot see.
 
 It's [free for commercial use](https://obsidian.md/license) — the paid Commercial
 License is optional support, not a requirement. Point it at the vault folder with
