@@ -46,6 +46,28 @@ Each pass makes the next answer better. Nobody writes the wiki layer by hand.
   automatically.
 - **Code stays out.** Link to repo paths.
 
+## Specs and handoffs
+
+Two documents per significant piece of work, kept separate on purpose:
+
+- **`Specs/<slug>.product-spec.md`** — *intent*: what and why. Five sections in a
+  fixed order (Problem → Hypothesis → Scope → Acceptance Criteria → Success
+  Metrics), with machine-checkable fenced blocks and sequential IDs. The spec is
+  the **single source of truth**; tickets and PRs point back to it by path rather
+  than restating it, because restated intent drifts out of sync silently.
+- **`Handoffs/<slug>.handoff.md`** — *state*: how and where. Branch, PR, unmerged
+  work, migrations, environment prerequisites, live incidents. It cites its spec
+  by path and mirrors the acceptance-criteria checklist with evidence.
+
+The rule of thumb: intent goes in the spec, and everything a person needs to pick
+the work up cold goes in the handoff. The handoff is the one that saves you when
+someone leaves — so write down the half-finished branch and the manual step, not
+just the clean parts.
+
+If you want machine validation of the fenced blocks, write a small validator
+against **your own frozen schema** rather than depending on an external standard
+that ships breaking changes. Templates are in `Templates/`.
+
 ## Size budgets
 
 Index notes ≤200 lines / 25 KB · detail notes <500 lines · references one level
