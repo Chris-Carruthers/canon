@@ -1,0 +1,49 @@
+# .canon-owners — who owns what in this vault.
+#
+#   <glob>   <owner-email>[,<more>]   # comment
+#
+# Matched against repo-relative paths, first matching rule wins (like
+# CODEOWNERS). A trailing /** or / covers everything beneath. Use * as the owner
+# to mean "anyone", which is useful to carve an open subtree out of a governed
+# parent.
+#
+# WHAT THIS IS: a local pre-commit warning, so an agent tidying the product
+# vision gets told to propose instead. WHAT IT IS NOT: enforcement — it runs on
+# the author's machine from a file the author can edit. Pair it with GitHub
+# CODEOWNERS + a protected branch, which is the part that actually cannot be
+# bypassed. See docs/MULTIPLAYER.md.
+#
+# Keep this list SHORT. Govern the few notes where being wrong is expensive;
+# govern everything and people will route around you.
+
+# ---------------------------------------------------------------------------
+# Leadership-owned: direction, not documentation. Propose via PR.
+# ---------------------------------------------------------------------------
+Vision/**                    lead@example.com
+
+# The router is loaded into every agent's context on every session — a careless
+# edit here changes how the whole team's agents behave.
+Vision/Agent Router.md       lead@example.com,staff@example.com
+
+# ---------------------------------------------------------------------------
+# Accepted decisions are the historical record. ADDING a new decision note is
+# open to everyone; REWRITING an accepted one is not — that is how you quietly
+# lose the reason a choice was made.
+#
+# This rule cannot distinguish "new file" from "edit" (both are staged changes),
+# so it will warn on your own new decision notes too. If that friction annoys
+# your team, delete this rule and rely on PR review for Decisions/ instead.
+# ---------------------------------------------------------------------------
+# Decisions/**               lead@example.com
+
+# ---------------------------------------------------------------------------
+# Explicitly open: the working layers. Everyone writes here, all the time.
+# Listed for clarity even though unmatched paths are open by default.
+# ---------------------------------------------------------------------------
+Sessions/**                  *
+Projects/**                  *
+Clients/**                   *
+Reference/**                 *
+Outputs/**                   *
+Sources/**                   *
+_Inbox/**                    *

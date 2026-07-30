@@ -19,6 +19,25 @@ by filename and structure long before it reads content.
 Git history is permanent. If you are unsure whether something belongs, leave it
 out and say so.
 
+## Governed paths — propose, do not edit
+
+Some notes are owned. `Vision/` in particular is direction set by leadership, not
+documentation anyone tidies. Check the vault's `.canon-owners` file before editing
+outside the working folders.
+
+If a change to a governed note seems right, **do not just make it.** Either:
+
+- write a `Decisions/` note arguing for it and link the note you'd change, or
+- make the edit on a branch and say clearly that it needs the owner's review.
+
+This matters specifically for agents: improving a document that is slightly untidy
+is a reasonable instinct almost everywhere else, and it is the wrong instinct
+here. A vision statement's phrasing is often the deliberate output of an argument
+you cannot see from the file.
+
+Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
+`Reference/`, `Outputs/`, `Sources/`, `_Inbox/`.
+
 ## Structure
 
 - **One concept per note.** Big topics get their own note; other notes link to

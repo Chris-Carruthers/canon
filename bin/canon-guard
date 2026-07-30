@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# canon-guard — warn or refuse when a commit touches a governed path.
+#
+#   canon-guard [/path/to/vault]
+#
+# Reads <vault>/.canon-owners and compares the staged file list against it. A
+# governed path is one somebody else owns: Vision/, an accepted decision, a
+# published spec — content where "anyone can edit it" is the wrong default.
+#
+# THIS IS NOT ENFORCEMENT. It runs on your machine, from a file you can edit,
+# and `--no-verify` skips it. It catches the honest mistake — an agent tidying
+# the product vision because tidying is what agents do — and tells you the right
+# move instead. Real enforcement is server-side: CODEOWNERS plus a protected
+# branch, so a change to a governed path cannot MERGE without its owner. See
+# docs/MULTIPLAYER.md.
+#
+# Exit 0 = allowed (possibly with a warning). Exit 1 = refused.
+#
+# Modes (CANON_GUARD, default `warn`):
+#   warn   — print who owns it and what to do instead; allow the commit
+#   block   — refuse the commit
+#   off     — silent
+
+set -uo pipefail
+
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+MODE="${CANON_GUARD:-warn}"
+[ "$MODE" = "off" ] && exit 0
+
+REPO="${1:-$PWD}"
+cd "$REPO" 2>/dev/null || exit 0
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+
+OWNERS="$REPO/.canon-owners"
+[ -f "$OWNERS" ] || exit 0    # ungoverned vault: nothing to check
+
+# Who am I? Git identity is the only identity a local hook has.
+ME="$(git config user.email 2>/dev/null || true)"
+
+STAGED="$(git diff --cached --name-only --diff-filter=ACMRD 2>/dev/null || true)"
+[ -n "$STAGED" ] || exit 0
+
+REPORT="$(python3 - "$OWNERS" "$ME" <<'PY'
+import fnmatch, os, re, subprocess, sys
+
+owners_file, me = sys.argv[1], (sys.argv[2] or "").strip().lower()
+
+# Format, one rule per line:   <glob>   <owner>[,<owner>...]   [# comment]
+# Globs are matched against the repo-relative path, fnmatch-style, and a
+# trailing /** or / matches everything beneath.
+rules = []
+for raw in open(owners_file, encoding="utf-8", errors="replace"):
+    line = raw.split("#", 1)[0].strip()
+    if not line: continue
+    parts = line.split()
+    if len(parts) < 2: continue
+    pattern, who = parts[0], parts[1]
+    rules.append((pattern, [w.strip().lower() for w in who.split(",") if w.strip()]))
+
+staged = subprocess.run(["git", "diff", "--cached", "--name-only",
+                         "--diff-filter=ACMRD"],
+                        capture_output=True, text=True, check=False).stdout.split()
+
+def matches(pattern, path):
+    if pattern.endswith("/**"):
+        base = pattern[:-3].rstrip("/")
+        return path == base or path.startswith(base + "/")
+    if pattern.endswith("/"):
+        return path.startswith(pattern)
+    return fnmatch.fnmatch(path, pattern)
+
+hits = []
+for path in staged:
+    for pattern, who in rules:
+        if matches(pattern, path):
+            allowed = ("*" in who) or (me and me in who)
+            if not allowed:
+                hits.append((path, pattern, who))
+            break     # first matching rule wins, like CODEOWNERS
+
+for path, pattern, who in hits:
+    print(f"{path}\t{pattern}\t{','.join(who)}")
+sys.exit(1 if hits else 0)
+PY
+)" && exit 0
+
+# --- something governed was touched -----------------------------------------
+{
+  echo
+  if [ "$MODE" = "block" ]; then
+    echo "REFUSING — this commit changes paths you do not own:"
+  else
+    echo "canon-guard: this commit changes paths owned by someone else:"
+  fi
+  echo
+  printf '%s\n' "$REPORT" | while IFS="$(printf '\t')" read -r path pattern who; do
+    printf '  %s\n' "$path"
+    printf '      owned by %s  (rule: %s)\n' "$who" "$pattern"
+  done
+  echo
+  cat <<'EOF'
+Governed content is somebody's considered position, not a wiki page. The move is
+to propose, not to edit in place:
+
+  * Open a PR and request the owner's review — CODEOWNERS will route it.
+  * Or capture the disagreement where it belongs: write a Decisions/ note
+    arguing the change, and link it. That is a durable contribution; a silent
+    edit to a vision doc is not.
+  * Unstage for now:  git restore --staged <path>
+EOF
+  [ "$MODE" = "block" ] && echo "  * Override if you are certain:  CANON_GUARD=warn git commit   (or --no-verify)"
+  echo
+  if [ -z "$ME" ]; then
+    echo "NOTE: git user.email is unset, so you match no owner rule. Set it:"
+    echo "      git config user.email you@example.com"
+    echo
+  fi
+} >&2
+
+[ "$MODE" = "block" ] && exit 1
+exit 0

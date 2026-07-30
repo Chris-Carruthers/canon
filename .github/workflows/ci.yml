@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS ships bash 3.2, Linux ships 5.x. The kit must work on both, and
+        # the 3.2 leg is the one that catches accidental bash-4-isms.
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versions
+        run: |
+          bash --version | head -1
+          git --version
+          python3 --version
+
+      - name: Test suite
+        run: ./test/run.sh
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Lint
+        run: |
+          # SC1091: can't follow non-constant source paths (by design here).
+          # SC2016: single quotes in heredocs are intentional (python payloads).
+          shellcheck --shell=bash --severity=warning --exclude=SC1091,SC2016 \
+            install.sh \
+            bin/canon-* \
+            templates/repo/.claude/hooks/*.sh \
+            test/run.sh
+
+  hygiene:
+    name: hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Executables are executable
+        run: |
+          fail=0
+          for f in install.sh bin/canon-* test/run.sh \
+                   templates/repo/.claude/hooks/*.sh; do
+            [ -x "$f" ] || { echo "not executable: $f"; fail=1; }
+          done
+          exit $fail
+
+      - name: Versions agree with VERSION
+        run: |
+          want="$(cat VERSION)"
+          fail=0
+          for f in bin/canon-* install.sh; do
+            got="$("$f" --version | awk '{print $2}')"
+            [ "$got" = "$want" ] || { echo "$f reports $got, VERSION says $want"; fail=1; }
+          done
+          exit $fail
+
+      - name: No absolute local paths leaked
+        run: |
+          if grep -rn "/Users/\|/home/[a-z]" --include='*' \
+               --exclude-dir=.git --exclude-dir=.github . ; then
+            echo "absolute local paths found"; exit 1
+          fi

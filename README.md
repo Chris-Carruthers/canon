@@ -11,8 +11,9 @@ head and one person's chat history.
 one shared, versioned, reviewable canon instead of fifteen private ones.*
 
 > Prefer your own naming? Everything is one substitution away:
-> `grep -rl canon . | xargs sed -i '' 's/canon/yourname/g; s/CANON/YOURNAME/g'`
-> then rename the `bin/canon-*` files.
+> `grep -rl canon . | xargs perl -pi -e 's/canon/yourname/g; s/CANON/YOURNAME/g'`
+> then rename the `bin/canon-*` files. (`perl -pi` rather than `sed -i`, which
+> needs different arguments on BSD and GNU.)
 
 ## What you get
 
@@ -25,6 +26,7 @@ one shared, versioned, reviewable canon instead of fifteen private ones.*
 | **Path-scoped rules** | Write conventions that load only when an agent touches vault files |
 | **`canon-sync`** | Pull, scan, commit, and — only when you ask — push |
 | **`canon-scan`** | Blocks credentials and obvious identifiers from entering git history |
+| **`canon-guard`** | Warns when a commit touches a note somebody else owns |
 
 ## Quickstart (5 minutes)
 
@@ -138,11 +140,31 @@ Two limits, stated plainly:
 lines, *all* of them inside a vendored third-party documentation mirror
 containing synthetic HL7 examples and sample JWTs. **Zero** false positives
 across ~240 human- and agent-authored notes. Exclude a vendored doc tree with
-`CANON_SCAN_EXCLUDE='(^|/)Reference/Vendor/'` rather than loosening the patterns.
+a line in the committed `.canon-scan-exclude` rather than loosening the patterns —
+committed, so the exclusion applies to the whole team instead of one shell.
 
 And the honest ceiling: this catches **credentials** well and **personal or
 health information written as ordinary prose** poorly. A regex cannot recognise a
 clinical anecdote. Convention and human review remain the real controls.
+
+## Ownership: not everything should be everyone's
+
+`Vision/` is direction from leadership; session notes are everyone's. Both live in
+one vault, so ownership is layered:
+
+1. **Rules + router** tell agents `Vision/` is owned — catches the likeliest
+   failure, which is an agent tidying a vision doc because tidying is what agents do.
+2. **`.canon-owners`** maps globs to owners; `canon-guard` warns (or blocks) at
+   commit time and says what to do instead. A seatbelt, not a lock.
+3. **`CODEOWNERS` + branch protection** is the only layer that actually enforces —
+   it runs on the server and `--no-verify` can't touch it.
+
+And the hard boundary: git cannot restrict *reading*. Write governance fits in one
+repo; if someone must not read something, that needs a second repo.
+
+**Read [`docs/MULTIPLAYER.md`](docs/MULTIPLAYER.md)** for the full model — the four
+classes of file, where conflicts actually occur, and how to choose a write model
+without accidentally requiring a PR per session note.
 
 ## Configuration
 
@@ -155,7 +177,8 @@ clinical anecdote. Convention and human review remain the real controls.
 | `CANON_AUTOCOMMIT` | `0` | `1` = commit vault changes locally at session end (never pushes) |
 | `CANON_ROUTER` | `Vision/Agent Router.md` | Which note gets injected |
 | `CANON_SESSIONS_DIR` | `Sessions` | Where session notes live |
-| `CANON_SCAN_EXCLUDE` | — | Colon-separated regexes of paths the scanner skips |
+| `CANON_SCAN_EXCLUDE` | — | Colon-separated regexes of paths the scanner skips (per-machine; prefer the committed `.canon-scan-exclude`) |
+| `CANON_GUARD` | `warn` | `block` = refuse commits to paths you don't own; `off` = disable |
 | `CANON_SKIP_SCAN` | `0` | `1` = bypass the gate. Be sure. |
 
 Auto-pull is **off by default**: a hook that mutates a git repo you didn't ask

@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TPL="$KIT_DIR/templates/repo"
 MARKER="<!-- canon:knowledge-vault -->"
@@ -20,11 +24,13 @@ MARKER="<!-- canon:knowledge-vault -->"
 TARGET=""
 VAULT=""
 DRY=0
+UNINSTALL=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --vault) VAULT="${2:-}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
+    --uninstall) UNINSTALL=1; shift ;;
     -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) TARGET="$1"; shift ;;
   esac
@@ -39,6 +45,79 @@ git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1 \
 
 say() { printf '  %s\n' "$*"; }
 run() { if [ "$DRY" = "1" ]; then say "[dry-run] $*"; else "$@"; fi; }
+
+# --- uninstall ---------------------------------------------------------------
+# Nobody trusts a tool they cannot cleanly remove. Removes only what we added:
+# our hooks, our rules, our settings entries, our CLAUDE.md block. Anything the
+# repo had before is left exactly as it was.
+if [ "$UNINSTALL" = "1" ]; then
+  echo "Removing canon from $TARGET"
+  for f in session-start.sh session-end-check.sh canon-path; do
+    [ -e "$TARGET/.claude/hooks/$f" ] && { run rm -f "$TARGET/.claude/hooks/$f"; say "removed hook: $f"; }
+  done
+  [ -e "$TARGET/.claude/rules/knowledge-vault.md" ] \
+    && { run rm -f "$TARGET/.claude/rules/knowledge-vault.md"; say "removed rules"; }
+  [ -e "$TARGET/.canon" ] && { run rm -f "$TARGET/.canon"; say "removed .canon marker"; }
+
+  SETTINGS="$TARGET/.claude/settings.json"
+  if [ -f "$SETTINGS" ] && [ "$DRY" != "1" ]; then
+    cp "$SETTINGS" "$SETTINGS.bak.$(date +%Y%m%d%H%M%S)"
+    python3 - "$SETTINGS" <<'PY'
+import json, sys
+p = sys.argv[1]
+with open(p) as f: d = json.load(f)
+
+def ours(cmd): return "canon" in (cmd or "") or "session-start.sh" in (cmd or "") \
+                   or "session-end-check.sh" in (cmd or "")
+
+hooks = d.get("hooks", {})
+for event in list(hooks):
+    groups = []
+    for g in hooks[event]:
+        keep = [h for h in g.get("hooks", []) if not ours(h.get("command"))]
+        if keep: groups.append({**{k: v for k, v in g.items() if k != "hooks"}, "hooks": keep})
+    if groups: hooks[event] = groups
+    else: del hooks[event]
+if not hooks: d.pop("hooks", None)
+
+OURS_DENY = {"Read(**/.env)", "Read(**/.env.*)", "Read(**/*.pem)",
+             "Read(**/id_rsa*)", "Read(**/credentials.json)"}
+perms = d.get("permissions", {})
+if "deny" in perms:
+    perms["deny"] = [r for r in perms["deny"] if r not in OURS_DENY]
+    if not perms["deny"]: del perms["deny"]
+if perms == {}: d.pop("permissions", None)
+
+with open(p, "w") as f:
+    json.dump(d, f, indent=2); f.write("\n")
+print("  cleaned .claude/settings.json (backup written)")
+PY
+  fi
+
+  CM="$TARGET/CLAUDE.md"
+  if [ -f "$CM" ] && grep -qF "$MARKER" "$CM" 2>/dev/null && [ "$DRY" != "1" ]; then
+    python3 - "$CM" "$MARKER" <<'PY'
+import sys
+path, marker = sys.argv[1], sys.argv[2]
+lines = open(path, encoding="utf-8").read().split("\n")
+try: i = next(n for n, l in enumerate(lines) if marker in l)
+except StopIteration: sys.exit(0)
+# Our block runs from the marker to EOF (install.sh only ever appends it).
+kept = "\n".join(lines[:i]).rstrip() + "\n"
+open(path, "w", encoding="utf-8").write("" if kept.strip() == "" else kept)
+print("  stripped the canon block from CLAUDE.md")
+PY
+  fi
+
+  # Prune directories only if we emptied them.
+  for d in "$TARGET/.claude/hooks" "$TARGET/.claude/rules"; do
+    [ -d "$d" ] && [ -z "$(ls -A "$d" 2>/dev/null)" ] && run rmdir "$d"
+  done
+
+  echo
+  echo "Done. The vault itself was not touched — remove it yourself if you want it gone."
+  exit 0
+fi
 
 echo "Installing canon into $TARGET"
 

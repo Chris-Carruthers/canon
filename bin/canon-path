@@ -15,6 +15,10 @@
 
 set -u
 
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+
 expand() {
   # Expand a leading ~ and resolve to an absolute path without requiring the
   # target to exist yet.

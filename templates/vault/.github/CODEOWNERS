@@ -1,0 +1,41 @@
+# CODEOWNERS — the part that actually enforces ownership.
+#
+# .canon-owners warns the author locally; THIS routes review on the server and,
+# with branch protection enabled, prevents a merge without the owner's approval.
+# You want both: the local one catches the honest mistake early, this one is the
+# gate that cannot be bypassed with --no-verify.
+#
+# TO MAKE THIS REAL, you must also protect the default branch:
+#   Settings → Branches (or Rules → Rulesets) → protect `main`:
+#     ✔ Require a pull request before merging
+#     ✔ Require review from Code Owners
+#     ✔ Do not allow bypassing the above settings
+#
+# Without branch protection CODEOWNERS only requests reviews — it blocks nothing.
+#
+# PLAN CAVEAT: on GitHub, branch protection / rulesets for PRIVATE repositories
+# requires a paid plan (Team or Enterprise). On a free private repo you get
+# CODEOWNERS review requests but no enforcement. Verify against your own plan
+# before relying on this; if you are on free, .canon-owners plus a social norm is
+# what you actually have.
+#
+# Syntax: <path pattern>  <@user|@org/team|email>
+# Last matching rule wins — the OPPOSITE of .canon-owners (first match wins).
+# Keep the two files in the same order to avoid surprises.
+
+# Default: no owner, anyone may merge.
+# (Deliberately absent — a catch-all owner means every session note needs review.)
+
+# Leadership-owned direction
+/Vision/                     @your-org/leadership
+
+# The router is injected into every agent's context every session
+/Vision/Agent Router.md       @your-org/leadership @your-org/staff-eng
+
+# Governance config itself must be governed, or it governs nothing
+/.canon-owners                @your-org/leadership
+/.github/CODEOWNERS           @your-org/leadership
+
+# The scan suppression files decide what secrets can slip through
+/.canon-scan-allow            @your-org/security
+/.canon-scan-exclude          @your-org/security

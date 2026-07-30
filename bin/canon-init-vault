@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TPL="$KIT_DIR/templates/vault"
 
@@ -31,7 +35,10 @@ while IFS= read -r rel; do
   else
     cp "$src" "$dst"; copied=$((copied+1)); printf '  + %s\n' "$rel"
   fi
-done < <(cd "$TPL" && find . -type f \( -name '*.md' -o -name '.gitignore' \) | sed 's|^\./||')
+  # Copy EVERY template file, not a name-filtered subset. The filtered version
+  # silently skipped .canon-owners and .github/CODEOWNERS — governance config
+  # that never arrived, which is the worst kind of missing file.
+done < <(cd "$TPL" && find . -type f ! -name '.DS_Store' | sed 's|^\./||')
 
 printf '  %d file(s) added, %d left alone\n' "$copied" "$skipped"
 

@@ -17,16 +17,25 @@
 #   * Personal/health data in PROSE: caught POORLY. A regex cannot recognise
 #     "the patient in room 4 with the Crohn's flare". Convention and human
 #     review are the real controls; this is a backstop for the obvious cases.
-#   * Suppress a known-good match by adding a regex line to
-#     <repo>/.canon-scan-allow (comments with # are ignored).
+#
+# Two suppression files, both COMMITTED so the whole team shares them:
+#   <repo>/.canon-scan-allow    — regex matched against a LINE (a legit example token)
+#   <repo>/.canon-scan-exclude  — regex matched against a PATH (a vendored doc tree)
+# Blank lines and # comments are ignored in both. CANON_SCAN_EXCLUDE adds
+# per-machine path exclusions on top.
 
 set -uo pipefail
+
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
 
 REPO="${1:-$PWD}"
 cd "$REPO" 2>/dev/null || { echo "canon-scan: not a directory: $REPO" >&2; exit 2; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "canon-scan: not a git repo: $REPO" >&2; exit 2; }
 
 ALLOW_FILE="$REPO/.canon-scan-allow"
+EXCLUDE_FILE="$REPO/.canon-scan-exclude"
 FOUND=0
 
 # ---------------------------------------------------------------------------
@@ -34,27 +43,39 @@ FOUND=0
 # and a disabled gate protects nothing.
 # ---------------------------------------------------------------------------
 scan_builtin() {
-  python3 - "$ALLOW_FILE" <<'PY'
+  python3 - "$ALLOW_FILE" "$EXCLUDE_FILE" <<'PY'
 import os, re, subprocess, sys
 
-allow_file = sys.argv[1]
-allows = []
-if os.path.exists(allow_file):
-    for line in open(allow_file, encoding="utf-8", errors="replace"):
-        line = line.strip()
-        if line and not line.startswith("#"):
-            try: allows.append(re.compile(line))
-            except re.error: pass
+def load_regexes(path):
+    """One regex per line; blank lines and # comments ignored."""
+    out = []
+    if path and os.path.exists(path):
+        for line in open(path, encoding="utf-8", errors="replace"):
+            line = line.strip()
+            if line and not line.startswith("#"):
+                try: out.append(re.compile(line))
+                except re.error: pass
+    return out
 
-# Paths that are exempt. The scanner's own source necessarily contains every
-# string it looks for, so without this it refuses every commit in any repo that
-# ships it — a self-inflicted denial of service. Extend with CANON_SCAN_EXCLUDE
-# (colon-separated regexes) for docs that legitimately show example tokens.
+allow_file, exclude_file = sys.argv[1], sys.argv[2]
+
+# Content allow-list: matched against the LINE. For a legitimate example token.
+allows = load_regexes(allow_file)
+
+# Path exclusions: matched against the FILE PATH. For vendored trees and docs
+# that legitimately contain token-shaped strings.
+#
+# Read from a COMMITTED file (.canon-scan-exclude) first, so a team shares one
+# exclusion list instead of every member setting an env var — an exclusion that
+# only exists in one person's shell is not an exclusion, it is a surprise for
+# everyone else. CANON_SCAN_EXCLUDE still works for per-machine additions.
 EXCLUDE = [
-    re.compile(r"(^|/)\.canon/"),          # bundled tooling
+    re.compile(r"(^|/)\.canon/"),             # bundled tooling
     re.compile(r"(^|/)\.canon-scan-allow$"),  # the allow-list itself
-    re.compile(r"(^|/)canon-scan$"),       # the scanner, wherever it lives
+    re.compile(r"(^|/)\.canon-scan-exclude$"),
+    re.compile(r"(^|/)canon-scan$"),          # the scanner, wherever it lives
 ]
+EXCLUDE += load_regexes(exclude_file)
 for extra in filter(None, os.environ.get("CANON_SCAN_EXCLUDE", "").split(":")):
     try: EXCLUDE.append(re.compile(extra))
     except re.error: pass
@@ -144,7 +165,9 @@ personal identifier. Git history is permanent: fix this before it is committed,
 not after.
 
   * Remove the value, then re-stage.
-  * If it is a false positive, add a regex line to .canon-scan-allow and re-run.
+  * False positive on one LINE?  add a regex to .canon-scan-allow
+  * False positive across a PATH (vendored docs)?  add a regex to .canon-scan-exclude
+    Both files are committed, so the fix applies to the whole team, not just you.
   * Bypass only if you are certain:  git commit --no-verify   (or CANON_SKIP_SCAN=1)
 
 Remember this gate reads patterns, not meaning. It will not catch personal or

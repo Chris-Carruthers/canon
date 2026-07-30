@@ -15,6 +15,10 @@
 
 set -euo pipefail
 
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 VAULT="${1:-}"
@@ -30,8 +34,10 @@ VAULT="$(cd "$VAULT" && pwd)"
 # Ship the scanner inside the vault repo so the hook has no external dependency
 # and keeps working on a fresh clone.
 mkdir -p "$VAULT/.canon"
-cp "$HERE/canon-scan" "$VAULT/.canon/canon-scan"
-chmod +x "$VAULT/.canon/canon-scan"
+for tool in canon-scan canon-guard; do
+  cp "$HERE/$tool" "$VAULT/.canon/$tool"
+  chmod +x "$VAULT/.canon/$tool"
+done
 
 HOOK="$VAULT/.git/hooks/pre-commit"
 if [ -f "$HOOK" ] && ! grep -q 'canon-scan' "$HOOK" 2>/dev/null; then
@@ -41,15 +47,32 @@ fi
 
 cat > "$HOOK" <<'EOF'
 #!/usr/bin/env bash
-# Installed by canon-install-vault-hooks. Blocks commits that look like they
-# contain credentials or personal identifiers.
+# Installed by canon-install-vault-hooks. Two checks before a vault commit:
+#   canon-scan   — credentials / obvious identifiers (blocks)
+#   canon-guard  — governed paths you do not own (warns by default)
 #
-# Bypass (be sure):  git commit --no-verify    or   CANON_SKIP_SCAN=1 git commit
+# Bypass (be sure):  git commit --no-verify
+#   or per-check:    CANON_SKIP_SCAN=1  /  CANON_GUARD=off
 set -uo pipefail
-[ "${CANON_SKIP_SCAN:-0}" = "1" ] && exit 0
 ROOT="$(git rev-parse --show-toplevel)"
-SCAN="$ROOT/.canon/canon-scan"
-[ -x "$SCAN" ] || SCAN="$(command -v canon-scan 2>/dev/null || true)"
+
+find_tool() {
+  local t="$ROOT/.canon/$1"
+  [ -x "$t" ] || t="$(command -v "$1" 2>/dev/null || true)"
+  printf '%s' "$t"
+}
+
+# Ownership first: it is advisory, and being told "you do not own this" before
+# being told "this looks like a secret" is the more useful order.
+if [ "${CANON_GUARD:-warn}" != "off" ]; then
+  GUARD="$(find_tool canon-guard)"
+  if [ -n "$GUARD" ] && [ -x "$GUARD" ]; then
+    "$GUARD" "$ROOT" || exit 1
+  fi
+fi
+
+if [ "${CANON_SKIP_SCAN:-0}" = "1" ]; then exit 0; fi
+SCAN="$(find_tool canon-scan)"
 if [ -z "$SCAN" ] || [ ! -x "$SCAN" ]; then
   echo "pre-commit: canon-scan not found — allowing commit UNGATED" >&2
   exit 0
@@ -59,7 +82,7 @@ EOF
 chmod +x "$HOOK"
 
 echo "installed: $VAULT/.git/hooks/pre-commit"
-echo "scanner:   $VAULT/.canon/canon-scan"
+echo "tools:     $VAULT/.canon/{canon-scan,canon-guard}"
 cat <<EOF
 
 Note: .git/hooks is NOT shared by cloning. Each teammate must run this once:
