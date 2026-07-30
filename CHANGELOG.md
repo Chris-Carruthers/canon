@@ -57,6 +57,9 @@ Stated here because they shape how much you should trust the tool:
 - **`.git/hooks` is not shared by cloning** — each teammate runs
   `canon-install-vault-hooks` once. Server-side push protection is the only gate
   nobody can skip.
+- **`core.hooksPath` is honoured.** When it is set, git ignores `.git/hooks`
+  completely; the installer detects it and installs into the real hooks directory,
+  chaining any hook already there.
 - **Editor sync plugins bypass git hooks on mobile only.** Obsidian Git uses
   `simple-git` (the real git binary) on desktop, so its commits DO run the gate;
   it falls back to `isomorphic-git` on mobile, which does not. Mobile should be

@@ -44,8 +44,25 @@ for tool in canon-scan canon-guard; do
   chmod +x "$VAULT/.canon/$tool"
 done
 
-HOOK="$VAULT/.git/hooks/pre-commit"
-CHAINED="$VAULT/.git/hooks/pre-commit.canon-chained"
+# WHERE do hooks actually live? If core.hooksPath is set — husky, the pre-commit
+# framework, a shared team hooks dir — git ignores .git/hooks COMPLETELY. Writing
+# there would install a gate git never looks at: silently inert, which is worse
+# than no gate at all because you believe you are covered.
+HOOKS_DIR="$(git -C "$VAULT" config core.hooksPath 2>/dev/null || true)"
+if [ -n "$HOOKS_DIR" ]; then
+  case "$HOOKS_DIR" in
+    /*) : ;;                                  # absolute, use as-is
+    *)  HOOKS_DIR="$VAULT/$HOOKS_DIR" ;;      # relative to the repo
+  esac
+  echo "  note: core.hooksPath is set — installing into $HOOKS_DIR"
+  echo "        (git ignores .git/hooks entirely when it is set)"
+  mkdir -p "$HOOKS_DIR"
+else
+  HOOKS_DIR="$VAULT/.git/hooks"
+fi
+
+HOOK="$HOOKS_DIR/pre-commit"
+CHAINED="$HOOKS_DIR/pre-commit.canon-chained"
 
 # An existing pre-commit is somebody's working check — a spec validator, a
 # formatter, a linter. Backing it up and replacing it silently disables it, which
@@ -72,7 +89,9 @@ ROOT="$(git rev-parse --show-toplevel)"
 
 # Whatever pre-commit check this repo had before canon was installed runs first
 # and keeps its veto. We are an addition, not a replacement.
-PRIOR="$ROOT/.git/hooks/pre-commit.canon-chained"
+HD="$(git config core.hooksPath 2>/dev/null || true)"
+if [ -n "$HD" ]; then case "$HD" in /*) : ;; *) HD="$ROOT/$HD" ;; esac; else HD="$ROOT/.git/hooks"; fi
+PRIOR="$HD/pre-commit.canon-chained"
 if [ -x "$PRIOR" ]; then
   "$PRIOR" "$@" || exit $?
 fi
@@ -102,7 +121,7 @@ exec "$SCAN" "$ROOT"
 EOF
 chmod +x "$HOOK"
 
-echo "installed: $VAULT/.git/hooks/pre-commit"
+echo "installed: $HOOK"
 echo "tools:     $VAULT/.canon/{canon-scan,canon-guard}"
 cat <<EOF
 

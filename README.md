@@ -220,6 +220,10 @@ Two limits, stated plainly:
 - **`.git/hooks` is not shared by cloning.** Each teammate runs
   `canon-install-vault-hooks` once. Your git host's own push protection is the
   only gate nobody can skip — turn it on.
+- **If `core.hooksPath` is set** (husky, the pre-commit framework, a shared team
+  hooks dir) git ignores `.git/hooks` entirely. The installer detects this and
+  installs into the real directory, because a gate in a directory git never reads
+  is worse than no gate — you believe you are covered. It tells you when it does.
 - **Editor sync plugins are fine on desktop, and a hole on mobile.** Obsidian Git
   ships two backends: `simple-git` (which spawns the real `git` binary) on
   desktop, and `isomorphic-git` on mobile, because a plugin cannot use a native

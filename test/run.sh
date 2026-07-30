@@ -248,6 +248,24 @@ git_q commit -qm "should be vetoed" >/dev/null 2>&1
 is "failing prior hook vetoes the commit" "$?" "1"
 git reset -q; cd "$V" || exit 1
 
+# A repo with core.hooksPath set (husky, pre-commit framework, shared hooks dir)
+# makes git ignore .git/hooks completely. Installing there = a silently inert
+# gate, which is worse than none because you believe you are covered.
+V3="$SB/vault3"
+"$KIT/bin/canon-init-vault" "$V3" >/dev/null 2>&1
+cd "$V3" || exit 1
+git_q add -A >/dev/null && git_q commit -qm init >/dev/null
+git config user.email t@example.com; git config user.name Test
+mkdir -p "$V3/myhooks"; git config core.hooksPath myhooks
+"$KIT/bin/canon-install-vault-hooks" "$V3" >/dev/null 2>&1
+is "installs into core.hooksPath, not .git/hooks" "$([ -x "$V3/myhooks/pre-commit" ] && echo y)" "y"
+is "does NOT write the ignored .git/hooks path"   "$([ -f "$V3/.git/hooks/pre-commit" ] && echo wrote || echo clean)" "clean"
+printf 'AKIA1234567890ABCDEF\n' > "$V3/Sessions/leak.md"
+git add -A >/dev/null 2>&1
+git_q commit -qm "must be blocked" >/dev/null 2>&1
+is "gate actually fires under core.hooksPath" "$?" "1"
+git reset -q; cd "$V" || exit 1
+
 # ---------------------------------------------------------------------------
 section "ownership guard"
 cat > "$V/.canon-owners" <<'EOF'
