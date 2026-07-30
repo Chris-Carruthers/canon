@@ -345,6 +345,47 @@ print(','.join(t.strip().strip(chr(34)+chr(39)) for t in m.group(1).split(',') i
   is ".env gitignored in every connector" "${miss:-none}" "none"
 fi
 
+section "provenance and trust"
+V4="$SB/vault4"
+"$KIT/bin/canon-init-vault" "$V4" >/dev/null 2>&1
+cd "$V4" || exit 1; git init -q; git config user.email chris@example.com; git config user.name Chris
+
+is "vendors canon-trust + canon-verify" \
+   "$([ -x "$V4/.canon/canon-trust" ] && [ -x "$V4/.canon/canon-verify" ] && echo y)" "y"
+is "templates carry generated:" \
+   "$(grep -l 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "4"
+
+printf -- '---\ntype: decision\ngenerated: { by: some-agent/1, at: 2026-07-30T10:00:00Z }\n---\n# x\n' > "$V4/Decisions/a.md"
+printf -- '---\ntype: reference\nverified: { by: process:ci, at: 2026-07-02T02:00:00Z }\nstale_after: 2020-01-01\n---\n# y\n' > "$V4/Reference/b.md"
+
+T="$("$KIT/bin/canon-trust" "$V4" 2>/dev/null)"
+has "reports the unverified tier"        "$T" "unverified"
+has "flags an agent-written note"        "$T" "Decisions/a.md"
+has "derives machine-confirmed"          "$T" "machine-confirmed"
+has "flags a stale note"                 "$T" "Reference/b.md"
+is  "--tier filters"                     "$("$KIT/bin/canon-trust" "$V4" --tier machine-confirmed --quiet 2>/dev/null)" "Reference/b.md"
+"$KIT/bin/canon-trust" "$V4" --strict >/dev/null 2>&1
+is  "--strict fails on rot"              "$?" "1"
+is  "excludes Templates/ from the count" "$(printf '%s' "$T" | grep -c 'Templates/')" "0"
+
+# canon-verify: adds, is idempotent per actor, promotes a bare mapping, never
+# touches generated, and refuses a note with no frontmatter.
+"$KIT/bin/canon-verify" "$V4/Decisions/a.md" >/dev/null 2>&1
+is "verify adds a human entry"    "$(grep -c 'by: human:chris' "$V4/Decisions/a.md")" "1"
+"$KIT/bin/canon-verify" "$V4/Decisions/a.md" >/dev/null 2>&1
+is "re-verify does not duplicate" "$(grep -c 'by: human:chris' "$V4/Decisions/a.md")" "1"
+"$KIT/bin/canon-verify" --actor process:ci "$V4/Decisions/a.md" >/dev/null 2>&1
+is "a second actor stacks"        "$(grep -c '^  - { by:' "$V4/Decisions/a.md")" "2"
+is "never writes a broken one-liner" "$(grep -c '^verified:  ' "$V4/Decisions/a.md")" "0"
+is "leaves generated alone"       "$(grep -c 'by: some-agent/1' "$V4/Decisions/a.md")" "1"
+has "tier becomes human-reviewed" "$("$KIT/bin/canon-trust" "$V4" --tier human-reviewed --quiet 2>/dev/null)" "Decisions/a.md"
+"$KIT/bin/canon-verify" "$V4/Reference/b.md" >/dev/null 2>&1
+is "promotes a bare mapping to a list" "$(grep -c '^  - { by:' "$V4/Reference/b.md")" "2"
+printf '# no frontmatter\n' > "$V4/Projects/none.md"
+"$KIT/bin/canon-verify" "$V4/Projects/none.md" >/dev/null 2>&1
+is "refuses a note with no frontmatter" "$?" "1"
+cd "$V" || exit 1
+
 # ---------------------------------------------------------------------------
 section "ownership guard"
 cat > "$V/.canon-owners" <<'EOF'

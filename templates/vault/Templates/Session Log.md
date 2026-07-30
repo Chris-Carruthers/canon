@@ -3,6 +3,7 @@ type: session
 date: YYYY-MM-DD
 project: "[[Project Name]]"
 repo: path/to/repo
+generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
 # Session — YYYY-MM-DD — <short title>

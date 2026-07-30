@@ -8,6 +8,27 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **Provenance and trust frontmatter** — four optional keys (`generated`,
+  `verified`, `status`, `stale_after`) that make an agent-maintained vault
+  trustable: what a note was made from, whether a human ever confirmed it, and
+  whether it is still current. Shape borrowed from the
+  [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+  so vaults stay legible to other OKF-aware tooling.
+  - **`canon-trust`** reports tiers, lifecycle and staleness across the vault, and
+    lists agent-written notes nobody has confirmed. `--tier` filters; `--strict`
+    exits non-zero on rot so CI can fail on it. Excludes `Templates/` and honours
+    the vault's committed scan exclusions.
+  - **`canon-verify <note>`** records a human review as a `verified:` entry. One
+    entry per actor (re-confirming replaces rather than stacking), promotes a bare
+    mapping to a list when a second verifier appears, and never touches
+    `generated`. It does not read or judge the note — you confirm, it records.
+  - Trust tiers are **derived, never stored**: a stored score is subjective,
+    unportable and stale on arrival. canon records signals.
+  - Agents are instructed to write `generated` and **never** `verified` for
+    themselves, in both the Claude and Cursor rule files and the router.
+  - Note templates carry the keys so they get copied by default. All keys are
+    optional; a note without them is still valid and is never rejected.
+
 - **MCP server** (`connectors/mcp/`) — exposes the vault to any MCP client: Claude
   Desktop, Cursor, VS Code via Copilot. Four read-only tools (`canon_router`,
   `canon_search`, `canon_list`, `canon_read`) and **no write tool at all**. One
@@ -61,6 +82,27 @@ public surface is the CLI flags, the config variables, and the file formats
 First release. Everything below is verified by `./test/run.sh` (51 assertions).
 
 ### Added
+
+- **Provenance and trust frontmatter** — four optional keys (`generated`,
+  `verified`, `status`, `stale_after`) that make an agent-maintained vault
+  trustable: what a note was made from, whether a human ever confirmed it, and
+  whether it is still current. Shape borrowed from the
+  [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+  so vaults stay legible to other OKF-aware tooling.
+  - **`canon-trust`** reports tiers, lifecycle and staleness across the vault, and
+    lists agent-written notes nobody has confirmed. `--tier` filters; `--strict`
+    exits non-zero on rot so CI can fail on it. Excludes `Templates/` and honours
+    the vault's committed scan exclusions.
+  - **`canon-verify <note>`** records a human review as a `verified:` entry. One
+    entry per actor (re-confirming replaces rather than stacking), promotes a bare
+    mapping to a list when a second verifier appears, and never touches
+    `generated`. It does not read or judge the note — you confirm, it records.
+  - Trust tiers are **derived, never stored**: a stored score is subjective,
+    unportable and stale on arrival. canon records signals.
+  - Agents are instructed to write `generated` and **never** `verified` for
+    themselves, in both the Claude and Cursor rule files and the router.
+  - Note templates carry the keys so they get copied by default. All keys are
+    optional; a note without them is still valid and is never rejected.
 
 - **MCP server** (`connectors/mcp/`) — exposes the vault to any MCP client: Claude
   Desktop, Cursor, VS Code via Copilot. Four read-only tools (`canon_router`,

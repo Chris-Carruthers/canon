@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# canon-trust — who wrote each note, who confirmed it, and what has gone stale.
+#
+#   canon-trust [/path/to/vault] [--tier TIER] [--strict] [--quiet]
+#
+# Once most notes are written by agents, "what does the vault say" is not enough:
+# a reader needs to know whether a human ever checked. This reports that, derived
+# from frontmatter, and never stores a verdict.
+#
+# The frontmatter it reads (all OPTIONAL — a note without any is still a valid
+# note, and this never rejects one):
+#
+#   generated:  { by: <actor>, at: <iso8601> }   how the current content was produced
+#   verified:   { by: <actor>, at: <iso8601> }   who or what confirmed it
+#               - or a list of those, for independent checks
+#   status:     draft | stable | deprecated       (absent means stable)
+#   stale_after: YYYY-MM-DD                       absolute date, not a TTL
+#
+# Actors follow the OKF convention: `human:<id>` for people, `process:<id>` for
+# automation, and `<producer>/<version>` for agents.
+#
+# TRUST TIERS ARE DERIVED, NEVER STORED:
+#   no verified key                  → unverified
+#   verified by non-human actors     → machine-confirmed
+#   verified by any human:<id>       → human-reviewed
+#
+# Storing a score instead would be subjective, unportable, and stale the moment it
+# was written. We record the signals and let the reader judge.
+#
+# Exit: 0 normally. With --strict, 1 if anything is stale or deprecated-but-linked,
+# so CI can fail on rot.
+
+set -uo pipefail
+
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+VAULT=""; TIER=""; STRICT=0; QUIET=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tier) TIER="${2:-}"; shift 2 ;;
+    --strict) STRICT=1; shift ;;
+    --quiet) QUIET=1; shift ;;
+    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    *) VAULT="$1"; shift ;;
+  esac
+done
+
+if [ -z "$VAULT" ]; then
+  HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  R="$HERE/canon-path"; [ -x "$R" ] || R="$(command -v canon-path 2>/dev/null || true)"
+  [ -n "$R" ] && [ -x "$R" ] && VAULT="$("$R" 2>/dev/null || true)"
+fi
+[ -n "$VAULT" ] && [ -d "$VAULT" ] || { echo "canon-trust: no vault found (set \$CANON_HOME)" >&2; exit 2; }
+
+EXCLUDE_FILE="$VAULT/.canon-scan-exclude"
+
+python3 - "$VAULT" "$EXCLUDE_FILE" "$TIER" "$STRICT" "$QUIET" <<'PY'
+import datetime, os, re, sys
+
+vault, exclude_file, want_tier, strict, quiet = sys.argv[1:6]
+strict, quiet = strict == "1", quiet == "1"
+today = datetime.date.today()
+
+# Reuse the vault's committed scan exclusions so a vendored documentation tree is
+# not reported as thousands of unverified notes. Same list, one place.
+# Templates/ holds blank forms, not knowledge. Counting them as unverified notes
+# makes the report noisier and every vault look worse than it is.
+excl = [re.compile(r"(^|/)\.git/"), re.compile(r"(^|/)\.canon/"),
+        re.compile(r"(^|/)Templates/")]
+if os.path.exists(exclude_file):
+    for line in open(exclude_file, encoding="utf-8", errors="replace"):
+        line = line.strip()
+        if line and not line.startswith("#"):
+            try: excl.append(re.compile(line))
+            except re.error: pass
+
+def excluded(rel):
+    return any(x.search(rel) for x in excl)
+
+# A deliberately small frontmatter reader. canon depends on python3 stdlib only, so
+# there is no yaml module; these four keys are a constrained enough subset to parse
+# by hand. Anything it cannot read is reported as unknown rather than guessed at.
+ACTOR = r"[A-Za-z0-9_.:/@+-]+"
+
+def frontmatter(text):
+    if not text.startswith("---"):
+        return None
+    end = text.find("\n---", 3)
+    return text[3:end] if end != -1 else None
+
+def parse(fm):
+    out = {"generated_by": None, "generated_at": None,
+           "verified": [], "status": None, "stale_after": None}
+    m = re.search(rf"^generated:\s*\{{[^}}]*by:\s*({ACTOR})", fm, re.M)
+    if m: out["generated_by"] = m.group(1)
+    m = re.search(r"^generated:\s*\{[^}]*at:\s*([0-9T:\-]+)", fm, re.M)
+    if m: out["generated_at"] = m.group(1)
+    m = re.search(r"^status:\s*([a-z]+)", fm, re.M)
+    if m: out["status"] = m.group(1)
+    m = re.search(r"^stale_after:\s*(\d{4}-\d{2}-\d{2})", fm, re.M)
+    if m: out["stale_after"] = m.group(1)
+
+    # verified: either a bare mapping or a list of mappings. The spec says a bare
+    # mapping MUST be read as a one-element list, so do exactly that.
+    blk = re.search(r"^verified:(.*?)(?=^\S|\Z)", fm + "\n", re.M | re.S)
+    if blk:
+        out["verified"] = re.findall(rf"by:\s*({ACTOR})", blk.group(1))
+    return out
+
+def tier(verified):
+    if not verified: return "unverified"
+    return "human-reviewed" if any(v.startswith("human:") for v in verified) else "machine-confirmed"
+
+rows, counts = [], {"unverified": 0, "machine-confirmed": 0, "human-reviewed": 0}
+no_fm = stale = deprecated = drafts = 0
+
+for root, dirs, files in os.walk(vault):
+    dirs[:] = [d for d in dirs if not excluded(os.path.relpath(os.path.join(root, d), vault) + "/")]
+    for fn in sorted(files):
+        if not fn.endswith(".md"): continue
+        rel = os.path.relpath(os.path.join(root, fn), vault)
+        if excluded(rel): continue
+        try: text = open(os.path.join(root, fn), encoding="utf-8", errors="replace").read()
+        except OSError: continue
+
+        fm = frontmatter(text)
+        if fm is None:
+            no_fm += 1
+            continue
+        d = parse(fm)
+        t = tier(d["verified"]); counts[t] += 1
+        st = d["status"] or "stable"
+        if st == "deprecated": deprecated += 1
+        if st == "draft": drafts += 1
+        is_stale = bool(d["stale_after"]) and today.isoformat() >= d["stale_after"]
+        if is_stale: stale += 1
+        rows.append({"rel": rel, "tier": t, "status": st, "stale": is_stale,
+                     "by": d["generated_by"], "at": d["generated_at"],
+                     "stale_after": d["stale_after"]})
+
+total = len(rows) + no_fm
+
+if not quiet:
+    print(f"canon-trust · {os.path.basename(vault)} · {total} note(s)\n")
+    print("  Trust tiers (derived from `verified`, never stored)")
+    for t in ("human-reviewed", "machine-confirmed", "unverified"):
+        bar = "█" * min(40, counts[t] * 40 // max(1, len(rows)))
+        print(f"    {t:<18} {counts[t]:>5}  {bar}")
+    print(f"    {'no frontmatter':<18} {no_fm:>5}")
+    print()
+    print(f"  Lifecycle:  {drafts} draft · {deprecated} deprecated · {stale} stale")
+
+    if stale:
+        print("\n  Stale — stale_after has passed:")
+        for r in rows:
+            if r["stale"]: print(f"    {r['rel']}  (stale_after {r['stale_after']})")
+
+    # The point of the report: agent-written notes nobody has ever checked.
+    unchecked = [r for r in rows if r["tier"] == "unverified" and r["by"]
+                 and not r["by"].startswith("human:")]
+    if unchecked:
+        print(f"\n  Agent-written and never confirmed ({len(unchecked)}):")
+        for r in unchecked[:20]:
+            print(f"    {r['rel']}  ← {r['by']}")
+        if len(unchecked) > 20: print(f"    … and {len(unchecked) - 20} more")
+        print("\n  Confirm one after reading it:  canon-verify <path>")
+
+    if no_fm and not rows:
+        print("\n  No note carries trust frontmatter yet. See the templates in Templates/,")
+        print("  or add to a note you trust:")
+        print("    generated: { by: <actor>, at: <iso8601> }")
+
+if want_tier:
+    for r in rows:
+        if r["tier"] == want_tier: print(r["rel"])
+
+if strict and (stale or deprecated):
+    sys.exit(1)
+PY

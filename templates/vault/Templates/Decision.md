@@ -2,6 +2,7 @@
 type: decision
 status: accepted
 date: YYYY-MM-DD
+generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
 # Decision: <title>

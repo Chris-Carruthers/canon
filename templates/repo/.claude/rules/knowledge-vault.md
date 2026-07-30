@@ -49,6 +49,24 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
 - **Link generously** with `[[wikilinks]]`. A link to a note that does not exist
   yet is a feature — it marks something worth writing.
 
+## Stamp what you write
+
+Any note you create or meaningfully rewrite gets provenance in its frontmatter, so
+a reader can tell an agent draft from something a human checked:
+
+```yaml
+generated: { by: <your-model-id>, at: <ISO 8601 UTC> }
+```
+
+Use `human:<id>` for people and `process:<id>` for automation. **Do not add a
+`verified:` entry for yourself** — that field means *a human confirmed this*, and
+it is theirs to add with `canon-verify`. Writing it on your own behalf produces
+exactly the false confidence the field exists to prevent.
+
+Optional, when they apply: `status: draft|stable|deprecated`, and `stale_after:
+YYYY-MM-DD` for anything with a known shelf life (a quarterly plan, a pricing
+sheet, a dependency version). Absolute dates, not durations.
+
 ## Size budgets
 
 Mirroring the limits real agent runtimes impose on index files:

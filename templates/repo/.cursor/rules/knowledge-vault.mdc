@@ -31,6 +31,12 @@ Write a dated note to the vault's `Sessions/`: goal, what changed with
 project. If a real choice was made, add a `Decisions/` note too. Skip this for
 trivial questions; use judgment.
 
+## Stamp what you write
+
+Any note you create or meaningfully rewrite gets `generated: { by: <your-model-id>,
+at: <ISO 8601 UTC> }` in its frontmatter. **Never add a `verified:` entry for
+yourself** — that field means a human confirmed the content and is theirs to add.
+
 ## Rules — non-negotiable
 
 - **Never write personal data, patient data, secrets, keys, tokens, or `.env`

@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# canon-verify — record that a human read a note and stands behind it.
+#
+#   canon-verify <note> [<note>...]        stamp as human-reviewed
+#   canon-verify --actor process:nightly <note>
+#   canon-verify --stale-after 2026-12-01 <note>
+#
+# Appends a verification event to the note's frontmatter:
+#
+#   verified:
+#     - { by: human:chris, at: 2026-07-30T22:15:00Z }
+#
+# WHY THIS EXISTS. "A human reviews it before it counts" is a convention until it
+# leaves a trace. This is the trace. It turns review from something people say they
+# do into a fact a reader — or a script — can check.
+#
+# It deliberately does NOT read the note for you, judge it, or verify anything
+# itself. You confirm; this records that you did. A tool that stamped notes
+# automatically would produce exactly the false confidence the field exists to
+# prevent.
+#
+# `generated` is left alone: who wrote a note is not who confirmed it, and
+# collapsing the two loses the only interesting thing about the distinction.
+
+set -euo pipefail
+
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+ACTOR=""; STALE_AFTER=""; FILES=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --actor) ACTOR="${2:-}"; shift 2 ;;
+    --stale-after) STALE_AFTER="${2:-}"; shift 2 ;;
+    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    *) FILES+=("$1"); shift ;;
+  esac
+done
+
+[ "${#FILES[@]}" -gt 0 ] || { echo "usage: canon-verify <note> [<note>...]" >&2; exit 2; }
+
+# Identity from git, so it matches what canon-guard checks and what shows up in the
+# commit that carries this change.
+if [ -z "$ACTOR" ]; then
+  ACTOR="${CANON_ACTOR:-}"
+fi
+if [ -z "$ACTOR" ]; then
+  email="$(git config user.email 2>/dev/null || true)"
+  [ -n "$email" ] || {
+    echo "canon-verify: cannot tell who you are." >&2
+    echo "  Set one:  git config user.email you@example.com" >&2
+    echo "  or pass:  --actor human:<your-id>" >&2
+    exit 2
+  }
+  ACTOR="human:${email%%@*}"
+fi
+
+NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+for f in "${FILES[@]}"; do
+  [ -f "$f" ] || { echo "canon-verify: no such file: $f" >&2; exit 2; }
+  python3 - "$f" "$ACTOR" "$NOW" "$STALE_AFTER" <<'PY'
+import re, sys
+
+path, actor, now, stale_after = sys.argv[1:5]
+text = open(path, encoding="utf-8").read()
+
+if not text.startswith("---"):
+    sys.exit(f"canon-verify: {path} has no frontmatter — add one before verifying:\n"
+             f"  ---\n  type: reference\n  ---")
+end = text.find("\n---", 3)
+if end == -1:
+    sys.exit(f"canon-verify: {path} has an unterminated frontmatter block")
+
+fm, rest = text[3:end], text[end:]
+
+# Parse the existing entries, update, then emit a canonical block.
+#
+# The earlier version patched the block with a regex and mangled it: the leading
+# newline got eaten and the first entry ended up on the same line as `verified:`.
+# Rebuilding from parsed values makes the output identical every time and cannot
+# produce that class of bug at all.
+block = re.search(r"^verified:(.*?)(?=^\S|\Z)", fm + "\n", re.M | re.S)
+entries, action = [], "added"
+
+if block:
+    body = block.group(1)
+    entries = [{"by": b, "at": a} for b, a in
+               re.findall(r"by:\s*([A-Za-z0-9_.:/@+-]+)\s*,\s*at:\s*([^\s}]+)", body)]
+    if any(e["by"] == actor for e in entries):
+        action = "re-confirmed"
+
+# One entry per actor: "how recently did this actor check" should have a single
+# answer, not a pile of timestamps to scan.
+entries = [e for e in entries if e["by"] != actor]
+entries.append({"by": actor, "at": now})
+
+rendered = "verified:\n" + "".join(f"  - {{ by: {e['by']}, at: {e['at']} }}\n" for e in entries)
+
+if block:
+    fm = fm[:block.start(0)] + rendered + fm[block.end(1):]
+else:
+    fm = fm.rstrip("\n") + "\n" + rendered
+
+if stale_after:
+    if re.search(r"^stale_after:", fm, re.M):
+        fm = re.sub(r"^stale_after:.*$", f"stale_after: {stale_after}", fm, count=1, flags=re.M)
+    else:
+        fm = fm.rstrip("\n") + f"\nstale_after: {stale_after}\n"
+
+open(path, "w", encoding="utf-8").write(
+    "---" + fm.rstrip("\n") + "\n" + rest.lstrip("\n"))
+print(f"  {action}: {actor} @ {now}  →  {path}")
+PY
+done
+
+cat <<EOF
+
+Recorded. This is a claim that you read it and stand behind it — nothing checked
+the content. Commit it so the trace travels:
+  git add -A && git commit -m "verify: reviewed \$(basename "${FILES[0]}")"
+
+See the whole picture:  canon-trust
+EOF

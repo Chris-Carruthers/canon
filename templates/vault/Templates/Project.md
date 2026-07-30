@@ -2,6 +2,7 @@
 type: project
 status: active
 updated: YYYY-MM-DD
+generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
 # <Project Name>

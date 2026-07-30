@@ -44,6 +44,8 @@ map, not a manual.
   change via a `Decisions/` note or a reviewed branch — do not edit it in place.
   See `.canon-owners` for who owns what. Freely writable: `Sessions/`,
   `Projects/`, `Clients/`, `Reference/`, `Outputs/`, `Sources/`, `_Inbox/`.
+- **Stamp what you write:** `generated: { by: <your-model-id>, at: <ISO 8601> }`.
+  Never write a `verified:` entry for yourself — that means a *human* confirmed it.
 - **Never** PHI, personal data, secrets, keys, tokens, or `.env` contents. This
   is a git repo; history is permanent.
 - **No source code** — link `repo/path.ts:42` instead.
