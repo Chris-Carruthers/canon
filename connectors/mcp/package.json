@@ -1,0 +1,16 @@
+{
+  "name": "canon-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Expose your team's knowledge canon to any MCP client. Read-only.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "bin": { "canon-mcp": "src/server.mjs" },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "check": "node --check src/server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

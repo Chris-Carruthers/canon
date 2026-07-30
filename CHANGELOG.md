@@ -8,14 +8,31 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **MCP server** (`connectors/mcp/`) — exposes the vault to any MCP client: Claude
+  Desktop, Cursor, VS Code via Copilot. Four read-only tools (`canon_router`,
+  `canon_search`, `canon_list`, `canon_read`) and **no write tool at all**. One
+  connector rather than one plugin per editor, and it needs no model client or API
+  key: it returns notes, the host's model reasons.
+  - Every caller-supplied path goes through `safeResolve()`, which resolves
+    symlinks before comparing and refuses anything outside the vault.
+    `test/paths.test.mjs` covers 10 cases and runs with plain `node`, no install —
+    a security check that needs a network fetch is one that stops being run.
+- **`AGENTS.md` and Cursor rules.** `install.sh` now writes the same instruction
+  block into both `CLAUDE.md` and `AGENTS.md` from one template, and installs
+  `.cursor/rules/knowledge-vault.mdc`. The test suite asserts the two blocks are
+  byte-identical. This makes "works with your agent too" true rather than a claim
+  the hero image made and the code did not back.
+
 - **Chat connectors** — ask questions of the vault from **Slack**
   (`connectors/slack/`, Socket Mode so no public URL) or **Discord**
   (`connectors/discord/`, slash command with threaded follow-ups). Answers cite the
   notes they came from. Optional components: they need Node and a couple of npm
   packages, which the core kit does not.
-  - Shared logic lives in `connectors/shared/core.mjs` — vault resolution, the
-    allowlist gate, the agent call, citation extraction. The safety model is
-    defined once so two platforms cannot drift apart on it.
+  - Shared logic is split by dependency: `connectors/shared/vault.mjs` (locating,
+    gating, safe reads — **dependency-free**, asserted by tests) and
+    `connectors/shared/agent.mjs` (the model call). That split is what lets the MCP
+    server avoid a model client it has no use for, and lets the path-safety tests
+    run without installing anything.
   - Discord defaults to the slash command rather than mentions: answering mentions
     needs the privileged MessageContent intent, which lets the bot read every
     message in the server. Opt in with `CANON_DISCORD_ALLOW_MENTIONS=1`.
@@ -44,6 +61,21 @@ public surface is the CLI flags, the config variables, and the file formats
 First release. Everything below is verified by `./test/run.sh` (51 assertions).
 
 ### Added
+
+- **MCP server** (`connectors/mcp/`) — exposes the vault to any MCP client: Claude
+  Desktop, Cursor, VS Code via Copilot. Four read-only tools (`canon_router`,
+  `canon_search`, `canon_list`, `canon_read`) and **no write tool at all**. One
+  connector rather than one plugin per editor, and it needs no model client or API
+  key: it returns notes, the host's model reasons.
+  - Every caller-supplied path goes through `safeResolve()`, which resolves
+    symlinks before comparing and refuses anything outside the vault.
+    `test/paths.test.mjs` covers 10 cases and runs with plain `node`, no install —
+    a security check that needs a network fetch is one that stops being run.
+- **`AGENTS.md` and Cursor rules.** `install.sh` now writes the same instruction
+  block into both `CLAUDE.md` and `AGENTS.md` from one template, and installs
+  `.cursor/rules/knowledge-vault.mdc`. The test suite asserts the two blocks are
+  byte-identical. This makes "works with your agent too" true rather than a claim
+  the hero image made and the code did not back.
 
 - **Vault resolution** — `canon-path` resolves `$CANON_HOME` → `<repo>/.canon` →
   `~/.config/canon/path` → `~/canon`. An explicitly-set but invalid `$CANON_HOME`

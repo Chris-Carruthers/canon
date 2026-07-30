@@ -1,31 +1,13 @@
 /**
- * core.mjs — everything a chat connector needs, minus the chat platform.
+ * agent.mjs — asking a question of the vault with a model.
  *
- * Slack and Discord differ only in how messages arrive and how you post them.
- * The parts that matter — where the vault is, who may ask, what the agent is
- * allowed to touch, how sources get cited — live HERE, once.
- *
- * That is deliberate. The safety model is the thing most likely to drift if it
- * were copy-pasted per platform, and drift in this particular code means a
- * read-only bot quietly becoming something else. One definition, one test.
+ * This is the only part of the connector stack that needs the Agent SDK. Keeping
+ * it separate means the MCP server and the path-safety tests do not.
  */
 
-import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
-import { execFileSync } from "node:child_process";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
-/**
- * The safety model, in one constant.
- *
- * Read and search. Nothing that writes, executes, or reaches the network. A chat
- * bot that can edit the canon can rewrite a decision with no diff and no
- * reviewer; writing stays where it is reviewable — a commit, a diff, a PR.
- *
- * If you are about to add "Bash" or "Write" here for convenience, that is the
- * moment to stop. The test suite asserts this list for exactly that reason.
- */
 export const READ_ONLY_TOOLS = ["Read", "Grep", "Glob"];
 
 export function die(msg) {
@@ -173,22 +155,3 @@ export async function askVault({
   return { answer, sources: [...consulted].slice(0, 8), failed: false };
 }
 
-/** Chat platforms cap message length; truncate visibly rather than getting cut off. */
-export function clip(s, limit) {
-  if (!s) return "";
-  return s.length > limit ? `${s.slice(0, limit - 20)}\n\n_…truncated._` : s;
-}
-
-/** A tiny JSON thread→session store. Losing it costs conversation continuity, nothing more. */
-export function makeStore(file) {
-  let data = {};
-  try { data = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* first run */ }
-  return {
-    get: (k) => data[k],
-    set(k, v) {
-      data[k] = { ...(data[k] || {}), ...v };
-      try { fs.writeFileSync(file, JSON.stringify(data, null, 2)); } catch { /* non-fatal */ }
-    },
-    has: (k) => Object.prototype.hasOwnProperty.call(data, k),
-  };
-}

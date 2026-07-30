@@ -204,6 +204,7 @@ flowchart LR
 | **`canon-scan`** | Blocks credentials and obvious identifiers from entering git history |
 | **`canon-guard`** | Warns when a commit touches a note somebody else owns |
 | **Chat connectors** | Ask the canon questions from **Slack** or **Discord**; read-only, cites its sources |
+| **MCP server** | Exposes the vault to **any MCP client** — Claude Desktop, Cursor, VS Code. One connector, not one per editor |
 
 ## Quickstart (5 minutes)
 
@@ -389,6 +390,7 @@ notes they used**, so an answer can be traced back — and the note corrected.
 |---|---|
 | **Slack** | [`connectors/slack/`](connectors/slack/README.md) — mention it, DM it, or `/canon` |
 | **Discord** | [`connectors/discord/`](connectors/discord/README.md) — `/canon`, with threaded follow-ups |
+| **MCP** | [`connectors/mcp/`](connectors/mcp/README.md) — any MCP client: Claude Desktop, Cursor, VS Code via Copilot |
 
 ```
 @canon  what did we decide about the auth migration, and why?
@@ -407,9 +409,26 @@ decides who can clone the vault, the chat platform decides who is in the channel
 Where those differ the bot is a hole, so both **refuse to start without an
 allowlist**. Be stricter on Discord — those servers are usually broader.
 
+**Prefer one protocol over N integrations.** The MCP server is the answer to
+"can we have a VS Code extension?" — it serves every MCP host for a fraction of the
+code, needs no API key (the host's model reasons; the server just returns notes),
+and unlike the Obsidian MCP servers it does not require Obsidian to be running.
+
 Optional by design: they need Node and a couple of npm packages, which the core kit
-does not. **Neither has been run against live credentials yet** — each README has a
+does not. **None has been run against live credentials yet** — each README has a
 verification checklist; treat it as acceptance criteria, not a formality.
+
+## Works with agents other than Claude
+
+`install.sh` writes the same instruction block into **`CLAUDE.md`** *and*
+**`AGENTS.md`**, and drops a Cursor rule at `.cursor/rules/knowledge-vault.mdc`.
+[AGENTS.md](https://github.com/agentsmd/agents.md) is the cross-tool convention
+other coding agents read, so Codex, Cursor and friends get the vault contract
+without extra work.
+
+Both files are generated from one template and the test suite asserts their blocks
+are **byte-identical**, because two hand-maintained copies of the same instructions
+is a guarantee they will disagree within a month.
 
 ## Ownership: not everything should be everyone's
 

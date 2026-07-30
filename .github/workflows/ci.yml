@@ -63,9 +63,14 @@ jobs:
 
       - name: Connectors parse
         run: |
-          node --check connectors/shared/core.mjs
+          node --check connectors/shared/vault.mjs
+          node --check connectors/shared/agent.mjs
           node --check connectors/slack/src/app.mjs
           node --check connectors/discord/src/app.mjs
+          node --check connectors/mcp/src/server.mjs
+
+      - name: MCP path-traversal boundary
+        run: node test/paths.test.mjs
 
       - name: Versions agree with VERSION
         run: |

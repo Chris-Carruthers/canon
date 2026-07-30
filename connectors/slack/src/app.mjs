@@ -5,7 +5,7 @@
  * Mention the bot, DM it, or use /canon. It answers from the vault and cites the
  * notes it used, so anybody can go read the source.
  *
- * Read-only and fail-closed; both live in ../../shared/core.mjs so Slack and
+ * Read-only and fail-closed; both live in ../../shared/vault.mjs so Slack and
  * Discord cannot drift apart on the parts that matter.
  *
  * ⚠️  This connector BYPASSES git permissions. Git decides who can clone the
@@ -21,9 +21,8 @@ import path from "node:path";
 import os from "node:os";
 import { App, LogLevel } from "@slack/bolt";
 import "dotenv/config";
-import {
-  resolveVault, makeGate, askVault, clip, list, die, makeStore,
-} from "../../shared/core.mjs";
+import { resolveVault, makeGate, clip, list, die, makeStore } from "../../shared/vault.mjs";
+import { askVault } from "../../shared/agent.mjs";
 
 const MODEL = process.env.CANON_SLACK_MODEL || "claude-sonnet-5";
 const ROUTER = process.env.CANON_ROUTER || "Vision/Agent Router.md";

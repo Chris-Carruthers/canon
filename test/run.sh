@@ -104,6 +104,11 @@ has "preserves existing hook" "$(cat "$S")" "keep-me"
 has "preserves existing allow" "$(cat "$S")" "Bash(npm test)"
 has "adds our SessionStart"    "$(cat "$S")" "session-start.sh"
 has "preserves CLAUDE.md body" "$(cat CLAUDE.md)" "npm test"
+has "also writes AGENTS.md"    "$(cat AGENTS.md 2>/dev/null)" "Shared knowledge vault"
+is  "installs cursor rules"    "$([ -f "$R2/.cursor/rules/knowledge-vault.mdc" ] && echo y)" "y"
+CB="$(grep -A200 'canon:knowledge-vault' CLAUDE.md | tail -n +2)"
+AB="$(grep -A200 'canon:knowledge-vault' AGENTS.md | tail -n +2)"
+is  "CLAUDE.md and AGENTS.md blocks are identical" "$([ "$CB" = "$AB" ] && echo same || echo DRIFTED)" "same"
 L1="$(wc -l < CLAUDE.md)"; H1="$(python3 -c "
 import json;d=json.load(open('$S'));print(sum(len(g['hooks']) for e in d['hooks'].values() for g in e))")"
 "$KIT/install.sh" "$R2" --vault "$V" >/dev/null 2>&1
@@ -286,13 +291,15 @@ section "connector safety (static)"
 # Connectors are optional and need Node, so we cannot run them here. Their safety
 # properties are static and MUST NOT regress: someone adding Bash "for
 # convenience" turns a read-only Q&A bot into a remote shell over the vault.
-CORE="$KIT/connectors/shared/core.mjs"
-APPS="$KIT/connectors/slack/src/app.mjs $KIT/connectors/discord/src/app.mjs"
+CORE="$KIT/connectors/shared/agent.mjs"
+VAULTMOD="$KIT/connectors/shared/vault.mjs"
+MCP="$KIT/connectors/mcp/src/server.mjs"
+APPS="$KIT/connectors/slack/src/app.mjs $KIT/connectors/discord/src/app.mjs $MCP"
 
 if [ -f "$CORE" ]; then
   if command -v node >/dev/null 2>&1; then
     parse_fail=""
-    for f in "$CORE" $APPS; do
+    for f in "$CORE" "$VAULTMOD" $APPS; do
       node --check "$f" >/dev/null 2>&1 || parse_fail="$parse_fail $(basename "$(dirname "$(dirname "$f")")")"
     done
     is "core + all connectors parse" "${parse_fail:-none}" "none"
@@ -315,12 +322,24 @@ print(','.join(t.strip().strip(chr(34)+chr(39)) for t in m.group(1).split(',') i
   is "no connector declares its own tools" "$own" "0"
 
   is "cwd pinned to the vault in core"     "$(grep -c 'cwd: vault' "$CORE")" "1"
+
+  # vault.mjs must stay dependency-free, or the MCP server needs a model client it
+  # does not use and the path-safety test stops being runnable without a network.
+  is "vault.mjs has no external imports" "$(grep -cE '^import .* from "[^n.]' "$VAULTMOD")" "0"
+  # The MCP server must expose no write tool. Not one that refuses — none at all.
+  if grep -qE 'canon_(write|edit|delete|create)' "$MCP"; then
+    bad "MCP server exposes a write tool"; else ok "MCP server has no write tool"; fi
+  if command -v node >/dev/null 2>&1; then
+    node "$KIT/test/paths.test.mjs" >/dev/null 2>&1 \
+      && ok "MCP path-traversal boundary holds (10 cases)" \
+      || bad "MCP path-traversal tests FAILED — run test/paths.test.mjs"
+  fi
   if grep -q "refusing to start with no allowlist" "$CORE"; then
     ok "fails closed without an allowlist"; else bad "no fail-closed allowlist check in core"; fi
 
   # Tokens must never be committable.
   miss=""
-  for d in slack discord; do
+  for d in slack discord mcp; do
     grep -qE '^\.env$' "$KIT/connectors/$d/.gitignore" 2>/dev/null || miss="$miss $d"
   done
   is ".env gitignored in every connector" "${miss:-none}" "none"
@@ -364,6 +383,9 @@ git reset -q
 section "uninstall"
 "$KIT/install.sh" "$R2" --uninstall >/dev/null 2>&1
 is "removes our hooks"        "$([ -f "$R2/.claude/hooks/session-start.sh" ] && echo present || echo gone)" "gone"
+is "removes cursor rules"     "$([ -f "$R2/.cursor/rules/knowledge-vault.mdc" ] && echo present || echo gone)" "gone"
+if grep -q "canon:knowledge-vault" "$R2/AGENTS.md" 2>/dev/null; then
+  bad "strips the AGENTS.md block"; else ok "strips the AGENTS.md block"; fi
 has "leaves foreign hooks alone" "$(cat "$R2/.claude/settings.json")" "keep-me"
 has "leaves CLAUDE.md body"      "$(cat "$R2/CLAUDE.md")" "npm test"
 if grep -q "canon:knowledge-vault" "$R2/CLAUDE.md" 2>/dev/null; then

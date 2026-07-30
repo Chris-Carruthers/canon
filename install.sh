@@ -94,7 +94,8 @@ print("  cleaned .claude/settings.json (backup written)")
 PY
   fi
 
-  CM="$TARGET/CLAUDE.md"
+  for name in CLAUDE.md AGENTS.md; do
+  CM="$TARGET/$name"
   if [ -f "$CM" ] && grep -qF "$MARKER" "$CM" 2>/dev/null && [ "$DRY" != "1" ]; then
     python3 - "$CM" "$MARKER" <<'PY'
 import sys
@@ -105,12 +106,16 @@ except StopIteration: sys.exit(0)
 # Our block runs from the marker to EOF (install.sh only ever appends it).
 kept = "\n".join(lines[:i]).rstrip() + "\n"
 open(path, "w", encoding="utf-8").write("" if kept.strip() == "" else kept)
-print("  stripped the canon block from CLAUDE.md")
+print(f"  stripped the canon block from {path.rsplit('/', 1)[-1]}")
 PY
   fi
+  done
+
+  [ -e "$TARGET/.cursor/rules/knowledge-vault.mdc" ] \
+    && { run rm -f "$TARGET/.cursor/rules/knowledge-vault.mdc"; say "removed cursor rules"; }
 
   # Prune directories only if we emptied them.
-  for d in "$TARGET/.claude/hooks" "$TARGET/.claude/rules"; do
+  for d in "$TARGET/.claude/hooks" "$TARGET/.claude/rules" "$TARGET/.cursor/rules" "$TARGET/.cursor"; do
     [ -d "$d" ] && [ -z "$(ls -A "$d" 2>/dev/null)" ] && run rmdir "$d"
   done
 
@@ -135,6 +140,11 @@ say "resolver: .claude/hooks/canon-path"
 # --- path-scoped rules -------------------------------------------------------
 run cp "$TPL/.claude/rules/knowledge-vault.md" "$TARGET/.claude/rules/knowledge-vault.md"
 say "rules: .claude/rules/knowledge-vault.md"
+
+# --- Cursor rules ------------------------------------------------------------
+run mkdir -p "$TARGET/.cursor/rules"
+run cp "$TPL/.cursor/rules/knowledge-vault.mdc" "$TARGET/.cursor/rules/knowledge-vault.mdc"
+say "rules: .cursor/rules/knowledge-vault.mdc"
 
 # --- settings.json (merge, never clobber) ------------------------------------
 SETTINGS="$TARGET/.claude/settings.json"
@@ -179,19 +189,26 @@ else
   say "created .claude/settings.json"
 fi
 
-# --- CLAUDE.md (append once, never overwrite) --------------------------------
-CM="$TARGET/CLAUDE.md"
-if [ "$DRY" = "1" ]; then
-  say "[dry-run] ensure CLAUDE.md vault block"
-elif [ ! -f "$CM" ]; then
-  { printf '%s\n' "$MARKER"; cat "$TPL/CLAUDE.md"; } > "$CM"
-  say "created CLAUDE.md"
-elif grep -qF "$MARKER" "$CM" 2>/dev/null; then
-  say "CLAUDE.md already has the vault block — left alone"
-else
-  { printf '\n\n%s\n' "$MARKER"; cat "$TPL/CLAUDE.md"; } >> "$CM"
-  say "appended vault block to existing CLAUDE.md"
-fi
+# --- CLAUDE.md + AGENTS.md (append once each, never overwrite) ---------------
+# One body, written into both. AGENTS.md is the cross-tool convention other coding
+# agents read; CLAUDE.md is what Claude Code picks up automatically. Installing the
+# identical block into both is what makes "works with your agent too" true rather
+# than aspirational — and generating both from one template is what stops them
+# drifting apart later.
+for name in CLAUDE.md AGENTS.md; do
+  CM="$TARGET/$name"
+  if [ "$DRY" = "1" ]; then
+    say "[dry-run] ensure $name vault block"
+  elif [ ! -f "$CM" ]; then
+    { printf '%s\n' "$MARKER"; cat "$TPL/agent-instructions.md"; } > "$CM"
+    say "created $name"
+  elif grep -qF "$MARKER" "$CM" 2>/dev/null; then
+    say "$name already has the vault block — left alone"
+  else
+    { printf '\n\n%s\n' "$MARKER"; cat "$TPL/agent-instructions.md"; } >> "$CM"
+    say "appended vault block to existing $name"
+  fi
+done
 
 # --- .canon marker -----------------------------------------------------------
 if [ -n "$VAULT" ]; then

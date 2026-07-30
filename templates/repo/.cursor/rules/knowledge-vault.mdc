@@ -1,0 +1,45 @@
+---
+description: This team keeps durable context in a shared knowledge vault outside the repo. Read it before non-trivial work; write a session note after.
+alwaysApply: true
+---
+
+# Shared knowledge vault
+
+Durable team context — decisions, project status, domain knowledge, specs, and a
+log of past work — lives in a **shared knowledge vault** outside this repo. It is
+plain markdown in git.
+
+Find its path by running `.claude/hooks/canon-path` (prints the path, exits 1 if
+unconfigured). Failing that, check `$CANON_HOME` or `~/.config/canon/path`.
+
+## Before non-trivial work
+
+Read from the vault:
+
+- `Vision/Agent Router.md` — the map: what lives where and how to search it
+- `Projects/<name>.md` — what the workstream is and where it stands
+- the newest `Sessions/` note linked from that project — what happened last
+
+Reach vault content **on demand** with glob and grep against the vault path. Do
+not try to load the vault; it is far larger than a context window. Filenames are
+the primary index — glob before you grep.
+
+## After meaningful work
+
+Write a dated note to the vault's `Sessions/`: goal, what changed with
+`repo-path:line` references, decisions made, open follow-ups — linked to its
+project. If a real choice was made, add a `Decisions/` note too. Skip this for
+trivial questions; use judgment.
+
+## Rules — non-negotiable
+
+- **Never write personal data, patient data, secrets, keys, tokens, or `.env`
+  contents into the vault.** It is a git repo; history is permanent.
+- **No source code in the vault.** Link `repo/path.ts:42` instead.
+- **`Vision/` is owned, not open.** It is direction, not documentation. Propose a
+  change via a `Decisions/` note or a reviewed branch rather than editing it in
+  place. Check `.canon-owners` in the vault for who owns what.
+- Do not commit or push the vault on someone's behalf unless asked.
+
+Freely writable: `Sessions/`, `Projects/`, `Clients/`, `Reference/`, `Outputs/`,
+`Sources/`, `_Inbox/`.
