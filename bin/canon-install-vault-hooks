@@ -45,9 +45,18 @@ for tool in canon-scan canon-guard; do
 done
 
 HOOK="$VAULT/.git/hooks/pre-commit"
+CHAINED="$VAULT/.git/hooks/pre-commit.canon-chained"
+
+# An existing pre-commit is somebody's working check — a spec validator, a
+# formatter, a linter. Backing it up and replacing it silently disables it, which
+# is exactly the clobbering this kit refuses to do elsewhere. So we CHAIN: move it
+# aside and call it first from ours. If it fails, we stop and never reach our own
+# checks, which is the correct precedence for a check the repo already had.
 if [ -f "$HOOK" ] && ! grep -q 'canon-scan' "$HOOK" 2>/dev/null; then
   cp "$HOOK" "$HOOK.bak.$(date +%Y%m%d%H%M%S)"
-  echo "  existing pre-commit backed up"
+  mv "$HOOK" "$CHAINED"
+  chmod +x "$CHAINED"
+  echo "  existing pre-commit preserved and chained (runs first)"
 fi
 
 cat > "$HOOK" <<'EOF'
@@ -60,6 +69,13 @@ cat > "$HOOK" <<'EOF'
 #   or per-check:    CANON_SKIP_SCAN=1  /  CANON_GUARD=off
 set -uo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
+
+# Whatever pre-commit check this repo had before canon was installed runs first
+# and keeps its veto. We are an addition, not a replacement.
+PRIOR="$ROOT/.git/hooks/pre-commit.canon-chained"
+if [ -x "$PRIOR" ]; then
+  "$PRIOR" "$@" || exit $?
+fi
 
 find_tool() {
   local t="$ROOT/.canon/$1"

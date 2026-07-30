@@ -224,6 +224,31 @@ if grep -q -- "pull --rebase" "$R/.claude/hooks/session-start.sh"; then
   bad "hook still rebases unattended"; else ok "hook never rebases unattended"; fi
 
 # ---------------------------------------------------------------------------
+section "an existing pre-commit hook survives install"
+V2="$SB/vault2"
+"$KIT/bin/canon-init-vault" "$V2" >/dev/null 2>&1
+cd "$V2" && git_q add -A >/dev/null && git_q commit -qm init >/dev/null
+git config user.email t@example.com; git config user.name Test
+# a pre-existing check the repo already relied on
+printf '#!/usr/bin/env bash\necho "PRIOR HOOK RAN"\nexit 0\n' > "$V2/.git/hooks/pre-commit"
+chmod +x "$V2/.git/hooks/pre-commit"
+"$KIT/bin/canon-install-vault-hooks" "$V2" >/dev/null 2>&1
+is "prior hook is chained, not deleted" "$([ -x "$V2/.git/hooks/pre-commit.canon-chained" ] && echo y)" "y"
+printf -- '---\ntype: session\n---\nok\n' > "$V2/Sessions/a.md"
+cd "$V2" && git add -A >/dev/null 2>&1
+OUTH="$(git_q commit -m "chained" 2>&1)"
+has "prior hook still executes"  "$OUTH" "PRIOR HOOK RAN"
+has "canon checks also execute"  "$OUTH" "canon-scan"
+
+# a failing prior hook must veto the commit before canon's checks run
+printf '#!/usr/bin/env bash\necho "PRIOR SAYS NO"\nexit 1\n' > "$V2/.git/hooks/pre-commit.canon-chained"
+chmod +x "$V2/.git/hooks/pre-commit.canon-chained"
+printf -- 'x\n' > "$V2/Sessions/b.md"; git add -A >/dev/null 2>&1
+git_q commit -qm "should be vetoed" >/dev/null 2>&1
+is "failing prior hook vetoes the commit" "$?" "1"
+git reset -q; cd "$V" || exit 1
+
+# ---------------------------------------------------------------------------
 section "ownership guard"
 cat > "$V/.canon-owners" <<'EOF'
 Vision/**      lead@example.com
