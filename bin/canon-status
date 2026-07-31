@@ -51,9 +51,15 @@ git -C "$VAULT" rev-parse --verify --quiet "origin/$BRANCH" >/dev/null 2>&1 \
 DAYS=""
 FH="$VAULT/.git/FETCH_HEAD"
 if [ -f "$FH" ]; then
-  now="$(date +%s)"
-  mt="$(stat -f %m "$FH" 2>/dev/null || stat -c %Y "$FH" 2>/dev/null || echo "$now")"
-  DAYS=$(( (now - mt) / 86400 ))
+  # python3 rather than stat. `stat -f %m` is BSD and `stat -c %Y` is GNU, and the
+  # obvious fallback chain is WRONG: on GNU, -f means --file-system, so it succeeds
+  # with filesystem info instead of failing, and the || never fires. That passed on
+  # macOS and broke on Linux. python3 is already a hard dependency and behaves the
+  # same everywhere, so use it and stop guessing at coreutils dialects.
+  DAYS="$(python3 -c '
+import os, sys, time
+try: print(int((time.time() - os.path.getmtime(sys.argv[1])) // 86400))
+except Exception: print("")' "$FH" 2>/dev/null || echo "")"
 fi
 
 REASONS=""
