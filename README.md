@@ -17,6 +17,24 @@
   <em>Every session makes the team smarter.</em>
 </p>
 
+**Two ways in.** New to the idea? Start with the plain-English walkthrough below.
+Here to install it? Jump to **[Quickstart](#quickstart)** — everything before it is
+explanation, not setup.
+
+<details>
+<summary><strong>Contents</strong></summary>
+
+- [New here? Read this first](#new-here-read-this-first) — the plain-English version
+- [How it works](#how-it-works) — the two diagrams
+- [What you get](#what-you-get) · [Quickstart](#quickstart) · [How it finds the vault](#how-it-finds-the-vault)
+- [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
+- [Design, and why](#design-and-why) — the limits that shaped it
+- [Sync](#sync-automatic-inbound-deliberate-outbound) · [The gate](#the-gate) · [Trust](#trust-telling-an-agent-draft-from-a-checked-fact) · [Ownership](#ownership-not-everything-should-be-everyones)
+- [Ask it from chat](#ask-it-from-chat) — Slack, Discord, MCP
+- [Configuration](#configuration) · [Before you roll this out](#before-you-roll-this-out-to-a-team) · [Status](#status)
+
+</details>
+
 ---
 
 ## New here? Read this first
@@ -208,34 +226,40 @@ flowchart LR
 | **Chat connectors** | Ask the canon questions from **Slack** or **Discord**; read-only, cites its sources |
 | **MCP server** | Exposes the vault to **any MCP client** — Claude Desktop, Cursor, VS Code. One connector, not one per editor |
 
-## Quickstart (5 minutes)
+## Quickstart
+
+*About five minutes. Nothing to install beyond `bash`, `git` and `python3`.*
 
 ```bash
-git clone <this-repo> canon-kit && cd canon-kit
+git clone https://github.com/Chris-Carruthers/canon && cd canon
 
-# 1. Create the vault (or point at an existing folder of notes)
+# 1. Create the vault — or point this at a folder of notes you already have
 ./bin/canon-init-vault ~/team-vault
 
-# 2. Tell this machine where it lives
-mkdir -p ~/.config/canon && echo "$HOME/team-vault" > ~/.config/canon/path
+# 2. Set it up: records the path for this machine, installs the commit safety check
+cd ~/team-vault && ./.canon/bootstrap.sh && cd -
 
-# 3. Wire up a repo — safe on repos that already have a CLAUDE.md
+# 3. Wire up a code repo — safe on repos that already have a CLAUDE.md
 ./install.sh /path/to/your/repo
 
-# 4. Put the secret gate in front of every commit to the vault
-./bin/canon-install-vault-hooks ~/team-vault
-
-# 5. Confirm
+# 4. Confirm it resolves
 /path/to/your/repo/.claude/hooks/canon-path     # prints the vault path
-./bin/canon-sync --status                       # what would sync, changes nothing
+./bin/canon-sync --status                       # what would sync; changes nothing
 ```
 
 Then open a Claude Code session in that repo and ask *"what does the team
 knowledge vault say about how we work?"* If the wiring is live, it answers from
 the router note without being told where to look.
 
-Commit `.claude/` and `CLAUDE.md` so teammates inherit the setup by cloning.
-Each teammate only does step 2.
+Commit `.claude/` and `CLAUDE.md` so teammates inherit the repo wiring by cloning.
+
+**Joining a vault that already exists** is shorter — clone it and run its bootstrap;
+everything it needs is committed inside:
+
+```bash
+git clone <your-vault-repo> ~/team-vault
+cd ~/team-vault && ./.canon/bootstrap.sh
+```
 
 ## How it finds the vault
 
@@ -251,7 +275,7 @@ An explicitly-set `$CANON_HOME` that points nowhere **fails loudly instead of
 falling back** — silently loading a different vault than you asked for is worse
 than loading none.
 
-## Reading it as a human — Obsidian, optional but recommended
+## Reading it as a human (Obsidian, optional)
 
 The vault is plain markdown, so any editor works and `grep` works. Your agents
 never touch Obsidian; they read files. But humans navigate knowledge by following

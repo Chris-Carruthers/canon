@@ -90,6 +90,9 @@ jobs:
             echo "README badge says $badge tests, suite runs $actual"; exit 1; }
           echo "badge matches: $actual"
 
+      - name: Markdown links and anchors resolve
+        run: node test/links.test.mjs
+
       - name: No references to deleted modules
         run: |
           if grep -rn "shared/core\.mjs" --include='*.md' --include='*.mjs' \

@@ -330,6 +330,9 @@ print(','.join(t.strip().strip(chr(34)+chr(39)) for t in m.group(1).split(',') i
   if grep -qE 'canon_(write|edit|delete|create)' "$MCP"; then
     bad "MCP server exposes a write tool"; else ok "MCP server has no write tool"; fi
   if command -v node >/dev/null 2>&1; then
+    (cd "$KIT" && node test/links.test.mjs >/dev/null 2>&1) \
+      && ok "markdown links and anchors resolve" \
+      || bad "broken link or anchor — run: node test/links.test.mjs"
     node "$KIT/test/paths.test.mjs" >/dev/null 2>&1 \
       && ok "MCP path-traversal boundary holds (10 cases)" \
       || bad "MCP path-traversal tests FAILED — run test/paths.test.mjs"
