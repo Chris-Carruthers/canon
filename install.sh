@@ -52,7 +52,7 @@ run() { if [ "$DRY" = "1" ]; then say "[dry-run] $*"; else "$@"; fi; }
 # repo had before is left exactly as it was.
 if [ "$UNINSTALL" = "1" ]; then
   echo "Removing canon from $TARGET"
-  for f in session-start.sh session-end-check.sh canon-path; do
+  for f in session-start.sh session-end-check.sh canon-path canon-status; do
     [ -e "$TARGET/.claude/hooks/$f" ] && { run rm -f "$TARGET/.claude/hooks/$f"; say "removed hook: $f"; }
   done
   [ -e "$TARGET/.claude/rules/knowledge-vault.md" ] \
@@ -133,9 +133,11 @@ for f in session-start.sh session-end-check.sh; do
   run chmod +x "$TARGET/.claude/hooks/$f"
   say "hook: .claude/hooks/$f"
 done
-run cp "$KIT_DIR/bin/canon-path" "$TARGET/.claude/hooks/canon-path"
-run chmod +x "$TARGET/.claude/hooks/canon-path"
-say "resolver: .claude/hooks/canon-path"
+for tool in canon-path canon-status; do
+  run cp "$KIT_DIR/bin/$tool" "$TARGET/.claude/hooks/$tool"
+  run chmod +x "$TARGET/.claude/hooks/$tool"
+  say "tool: .claude/hooks/$tool"
+done
 
 # --- path-scoped rules -------------------------------------------------------
 run cp "$TPL/.claude/rules/knowledge-vault.md" "$TARGET/.claude/rules/knowledge-vault.md"

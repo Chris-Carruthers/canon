@@ -348,6 +348,37 @@ print(','.join(t.strip().strip(chr(34)+chr(39)) for t in m.group(1).split(',') i
   is ".env gitignored in every connector" "${miss:-none}" "none"
 fi
 
+section "sync reminders"
+V5="$SB/vault5"
+"$KIT/bin/canon-init-vault" "$V5" >/dev/null 2>&1
+cd "$V5" || exit 1; git init -q; git config user.email t@t; git config user.name Test
+git add -A >/dev/null; git commit -qm init >/dev/null
+
+is "vendors canon-status"          "$([ -x "$V5/.canon/canon-status" ] && echo y)" "y"
+# No remote and never fetched: it should say something, not crash.
+has "flags a vault never pulled"   "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "never pulled"
+"$KIT/bin/canon-status" "$V5" >/dev/null 2>&1
+is "exits 1 when action is needed" "$?" "1"
+
+# Uncommitted work must be reported.
+echo scratch > "$V5/Projects/x.md"
+has "flags uncommitted files"      "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "uncommitted"
+has "suggests the push command"    "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "canon-sync --push"
+rm -f "$V5/Projects/x.md"
+
+# A clean, freshly fetched vault must be SILENT — a reminder that always fires is
+# a reminder people learn to ignore.
+: > "$V5/.git/FETCH_HEAD"
+OUTQ="$("$KIT/bin/canon-status" "$V5" 2>/dev/null)"
+is "silent when nothing to do"     "${OUTQ:-silent}" "silent"
+"$KIT/bin/canon-status" "$V5" >/dev/null 2>&1
+is "exits 0 when in step"          "$?" "0"
+
+# No network call, or a session start on a bad connection hangs.
+is "makes no network call"          "$(grep -cE '^[^#]*git (-C [^ ]+ )?(fetch|ls-remote)' "$KIT/bin/canon-status")" "0"
+cd "$V" || exit 1
+
+# ---------------------------------------------------------------------------
 section "provenance and trust"
 V4="$SB/vault4"
 "$KIT/bin/canon-init-vault" "$V4" >/dev/null 2>&1

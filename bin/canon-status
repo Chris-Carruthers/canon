@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# canon-status — is the vault in step with the team? One line, or silence.
+#
+#   canon-status [/path/to/vault] [--quiet]
+#
+# Prints nothing and exits 0 when everything is in step, so it is safe to call from
+# a hook or a shell prompt without adding noise. Exits 1 when something wants doing.
+#
+# DELIBERATELY NO NETWORK CALL. Two of the three signals are purely local:
+#
+#   uncommitted files   git status         instant
+#   unpushed commits    origin/main..HEAD  instant, uses the local ref
+#   staleness           mtime of .git/FETCH_HEAD — how long since anyone checked
+#                       for updates. A real "behind origin" count needs git fetch,
+#                       which in a session-start hook means a network round trip that
+#                       is slow on a bad connection and hangs offline. The proxy is
+#                       honest about what it is and costs nothing.
+#
+# Why this is on by default when auto-pull and auto-commit are not: those MUTATE a
+# repository the user did not ask you to touch. This only tells them something true.
+
+set -uo pipefail
+
+CANON_VERSION="0.1.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+VAULT=""; QUIET=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --quiet) QUIET=1; shift ;;
+    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+    *) VAULT="$1"; shift ;;
+  esac
+done
+
+if [ -z "$VAULT" ]; then
+  HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  R="$HERE/canon-path"; [ -x "$R" ] || R="$(command -v canon-path 2>/dev/null || true)"
+  [ -n "$R" ] && [ -x "$R" ] && VAULT="$("$R" 2>/dev/null || true)"
+fi
+[ -n "$VAULT" ] && [ -d "$VAULT/.git" ] || exit 0    # no vault, nothing to say
+
+STALE_DAYS="${CANON_STALE_DAYS:-2}"
+
+DIRTY="$(git -C "$VAULT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+BRANCH="$(git -C "$VAULT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+AHEAD=0
+git -C "$VAULT" rev-parse --verify --quiet "origin/$BRANCH" >/dev/null 2>&1 \
+  && AHEAD="$(git -C "$VAULT" rev-list --count "origin/$BRANCH..HEAD" 2>/dev/null || echo 0)"
+
+DAYS=""
+FH="$VAULT/.git/FETCH_HEAD"
+if [ -f "$FH" ]; then
+  now="$(date +%s)"
+  mt="$(stat -f %m "$FH" 2>/dev/null || stat -c %Y "$FH" 2>/dev/null || echo "$now")"
+  DAYS=$(( (now - mt) / 86400 ))
+fi
+
+REASONS=""
+add() { REASONS="${REASONS}${REASONS:+ · }$1"; }
+
+[ "$DIRTY" -gt 0 ] && add "$DIRTY uncommitted file(s)"
+[ "$AHEAD" -gt 0 ] && add "$AHEAD commit(s) not shared with the team"
+[ -n "$DAYS" ] && [ "$DAYS" -ge "$STALE_DAYS" ] && add "last checked for teammates' updates ${DAYS}d ago"
+[ -z "$DAYS" ] && add "never pulled from the team"
+
+[ -z "$REASONS" ] && exit 0
+[ "$QUIET" = "1" ] && exit 1
+
+printf 'Knowledge vault: %s\n' "$REASONS"
+if [ "$DIRTY" -gt 0 ] || [ "$AHEAD" -gt 0 ]; then
+  printf '  Share your work:  canon-sync --push\n'
+else
+  printf '  Get up to date:   canon-sync\n'
+fi
+exit 1

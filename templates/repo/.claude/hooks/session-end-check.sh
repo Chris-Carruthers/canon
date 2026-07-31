@@ -103,6 +103,18 @@ RECENT="$(find "$VAULT/$SESSIONS_DIR" -type f -name '*.md' \
 REPO_NAME="$(basename "$REPO")"
 MSG="This session changed files in ${REPO_NAME} but no note was written to ${SESSIONS_DIR}/ in the vault (${VAULT}). Per the team knowledge conventions, meaningful work ends with a dated session note: goal, what changed with repo-path:line refs, decisions, open follow-ups, linked to its project. Write it now, or state explicitly that this session did not warrant one."
 
+# Unshared notes are the failure that quietly kills a shared vault: everyone writes
+# locally, nobody pushes, and the shared copy becomes a set of private ones. Worth
+# saying at the moment someone is finishing up and can act on it.
+SH="$REPO/.claude/hooks/canon-status"
+[ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"
+if [ -n "$SH" ] && [ -x "$SH" ]; then
+  SYNC="$("$SH" "$VAULT" 2>/dev/null || true)"
+  [ -n "$SYNC" ] && MSG="$MSG
+
+Also: $SYNC"
+fi
+
 if [ "$MODE" = "block" ]; then
   python3 - "$MSG" <<'PY' 2>/dev/null || true
 import json, sys

@@ -82,10 +82,23 @@ fi
 BODY="$(head -c "$CAP" "$ROUTER" 2>/dev/null || true)"
 [ -n "$BODY" ] || exit 0
 
+# Is the vault in step with the team? Purely local checks — no network call, so this
+# cannot slow down or hang a session start. Silent when everything is current.
+STATUS=""
+SH="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/canon-status"
+[ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"
+if [ -n "$SH" ] && [ -x "$SH" ]; then
+  STATUS="$("$SH" "$VAULT" 2>/dev/null || true)"
+fi
+[ -n "$STATUS" ] && STATUS="
+
+NOTE ON FRESHNESS — tell the user if it matters to their question:
+$STATUS"
+
 emit "Shared knowledge vault is at: $VAULT
 The team's conventions and index follow. Reach vault content on demand with glob/grep/Read against that path — do not attempt to load the whole vault.
 
 --- BEGIN $ROUTER_REL ---
 $BODY
---- END $ROUTER_REL ---"
+--- END $ROUTER_REL ---$STATUS"
 exit 0

@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-100%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-108%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -228,6 +228,7 @@ flowchart LR
 | **`canon-sync`** | Pull, scan, commit, and — only when you ask — push |
 | **`canon-scan`** | Blocks credentials and obvious identifiers from entering git history |
 | **`canon-guard`** | Warns when a commit touches a note somebody else owns |
+| **`canon-status`** | Are you in step with the team? Silent when you are |
 | **`canon-trust`** | Who wrote each note, who confirmed it, what has gone stale |
 | **`canon-verify`** | Records that a human read a note and stands behind it |
 | **Chat connectors** | Ask the canon questions from **Slack** or **Discord**; read-only, cites its sources |
@@ -372,6 +373,26 @@ canon-sync --status     # what would happen, changes nothing
 If your team isn't handling regulated or sensitive data, this asymmetry is
 probably more caution than you need — install a git plugin, auto-sync every ten
 minutes, move on. The gate below is what buys you the right to automate more.
+
+### Being reminded, since push is manual
+
+Making push deliberate creates its own failure: everyone writes locally, nobody
+shares, and the "shared" vault quietly becomes a set of private ones. So both hooks
+call `canon-status`, which reports uncommitted work, commits the team has not seen,
+and how long since anyone pulled — then says which command to run.
+
+- **At session start** it rides along with the router, so your agent knows the vault
+  may be stale and can caveat an answer instead of stating a stale fact confidently.
+- **At session end**, when you are finishing up and can act on it.
+
+Two things make it a reminder rather than nagging. **It is silent when you are in
+step** — a notification that always fires is one people learn to ignore. And **it
+makes no network call**: unpushed commits and uncommitted files are local facts, and
+staleness comes from the timestamp on the last fetch, so a session start never waits
+on the network or hangs offline.
+
+Run it yourself any time with `canon-status`. On by default — unlike auto-pull and
+auto-commit, it changes nothing.
 
 ## The gate
 
