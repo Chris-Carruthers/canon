@@ -17,14 +17,16 @@
   <em>Every session makes the team smarter.</em>
 </p>
 
-**Two ways in.** New to the idea? Start with the plain-English walkthrough below.
-Here to install it? Jump to **[Quickstart](#quickstart)** — everything before it is
-explanation, not setup.
+**Three ways in.** New to the idea? Start with the plain-English walkthrough below.
+Here to install it? Jump to **[Quickstart](#quickstart)**. Don't use a terminal?
+**[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)** gets you
+reading the vault with two apps and no commands.
 
 <details>
 <summary><strong>Contents</strong></summary>
 
 - [New here? Read this first](#new-here-read-this-first) — the plain-English version
+- **[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)** — GitHub Desktop + Obsidian, no commands
 - [How it works](#how-it-works) — the two diagrams
 - [What you get](#what-you-get) · [Quickstart](#quickstart) · [How it finds the vault](#how-it-finds-the-vault)
 - [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
@@ -121,6 +123,11 @@ permission.
 3. Tell their machine where it lives — one line, once.
 
 Then they can read everything the team knows, and so can their AI assistant.
+
+**Not everyone uses a terminal**, and reading the vault does not require one — the
+setup steps a reader can skip are only needed to commit. Hand those teammates
+**[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)**: GitHub
+Desktop plus Obsidian, click to clone, click to get updates, no commands at all.
 
 ### Which assistants this works with
 
@@ -298,6 +305,10 @@ links, and that's what [Obsidian](https://obsidian.md) adds for free:
 It's [free for commercial use](https://obsidian.md/license) — the paid Commercial
 License is optional support, not a requirement. Point it at the vault folder with
 *Open folder as vault*.
+
+Sharing this with someone who does not use a terminal? Give them
+[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md) instead of this
+README.
 
 **What you lose without it:** `[[wikilinks]]` render as literal text elsewhere, so
 you get a searchable folder rather than a connected one. Everything is still
