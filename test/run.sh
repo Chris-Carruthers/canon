@@ -147,7 +147,17 @@ echo change > work.txt
 has "reminds when nothing was written" "$(stop s2)" "systemMessage"
 is "fires once per session" "$(stop s2)" ""
 printf -- '---\ntype: session\n---\n# n\n' > "$V/Sessions/note.md"
-is "silent once a note exists" "$(stop s4)" ""
+
+# The note exists but is still on this laptop. Writing it and sharing it are two
+# different failures; the hook must still say something, and must not block.
+OUTN="$(stop s4)"
+has "nudges when the note is unshared" "$OUTN" "canon-sync --push"
+case "$OUTN" in *'"decision"'*) bad "the unshared nudge never blocks" ;; *) ok "the unshared nudge never blocks" ;; esac
+
+# Note written AND shared — the fully-good session. Silence is the whole point.
+git_q -C "$V" add -A >/dev/null 2>&1; git_q -C "$V" commit -qm notes >/dev/null 2>&1
+: > "$V/.git/FETCH_HEAD"
+is "silent once a note exists and is shared" "$(stop s5)" ""
 rm -f "$V/Sessions/note.md"
 has "block mode emits a decision" "$(CANON_ENFORCE_SESSION_NOTE=block CLAUDE_PROJECT_DIR="$R" bash "$SEC" <<< '{"session_id":"s5"}' 2>/dev/null)" '"block"'
 is "off mode is silent" "$(CANON_ENFORCE_SESSION_NOTE=off CLAUDE_PROJECT_DIR="$R" bash "$SEC" <<< '{"session_id":"s6"}' 2>/dev/null)" ""

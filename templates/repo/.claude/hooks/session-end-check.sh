@@ -91,11 +91,40 @@ if git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1; then
 fi
 [ "$CHANGES" = "1" ] || exit 0
 
+# --- is the vault out of step with the team? ---------------------------------
+# Computed BEFORE the "was a note written" early return, on purpose. Writing the
+# note and sharing it are two different failures, and the second one outlives the
+# first: everyone writes locally, nobody pushes, and a shared vault silently
+# decays into a set of private ones. The well-behaved session — agent writes the
+# note, autocommit commits it — is exactly the one that used to exit here without
+# ever mentioning that the note is still sitting on this laptop.
+SH="$REPO/.claude/hooks/canon-status"
+[ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"
+SYNC=""
+if [ -n "$SH" ] && [ -x "$SH" ]; then
+  SYNC="$("$SH" "$VAULT" 2>/dev/null || true)"
+fi
+
 # --- was a session note written recently? ------------------------------------
 WINDOW_MIN="${CANON_SESSION_NOTE_WINDOW_MIN:-720}"   # default 12h
 RECENT="$(find "$VAULT/$SESSIONS_DIR" -type f -name '*.md' \
             -newermt "-${WINDOW_MIN} minutes" 2>/dev/null | head -1)"
-[ -n "$RECENT" ] && exit 0
+
+if [ -n "$RECENT" ]; then
+  # The note exists. Nothing to demand — but if it has not reached the team yet,
+  # say so once. Never blocks: the work is done, this is a nudge, not a gate.
+  [ -z "$SYNC" ] && exit 0
+  : > "$GUARD" 2>/dev/null || true
+  python3 - "$SYNC" <<'PY' 2>/dev/null || true
+import json, sys
+print(json.dumps({"systemMessage":
+  "A session note was written, but it has not reached the team yet.\n\n"
+  + sys.argv[1]
+  + "\n\nUntil this is pushed, teammates cannot see it and their agents will not "
+    "read it. Offer to run it if the user wants their work shared."}))
+PY
+  exit 0
+fi
 
 # --- nothing written: remind or block ----------------------------------------
 : > "$GUARD" 2>/dev/null || true
@@ -103,17 +132,9 @@ RECENT="$(find "$VAULT/$SESSIONS_DIR" -type f -name '*.md' \
 REPO_NAME="$(basename "$REPO")"
 MSG="This session changed files in ${REPO_NAME} but no note was written to ${SESSIONS_DIR}/ in the vault (${VAULT}). Per the team knowledge conventions, meaningful work ends with a dated session note: goal, what changed with repo-path:line refs, decisions, open follow-ups, linked to its project. Write it now, or state explicitly that this session did not warrant one."
 
-# Unshared notes are the failure that quietly kills a shared vault: everyone writes
-# locally, nobody pushes, and the shared copy becomes a set of private ones. Worth
-# saying at the moment someone is finishing up and can act on it.
-SH="$REPO/.claude/hooks/canon-status"
-[ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"
-if [ -n "$SH" ] && [ -x "$SH" ]; then
-  SYNC="$("$SH" "$VAULT" 2>/dev/null || true)"
-  [ -n "$SYNC" ] && MSG="$MSG
+[ -n "$SYNC" ] && MSG="$MSG
 
 Also: $SYNC"
-fi
 
 if [ "$MODE" = "block" ]; then
   python3 - "$MSG" <<'PY' 2>/dev/null || true
