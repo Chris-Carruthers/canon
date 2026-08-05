@@ -120,7 +120,11 @@ if [ "$DO_PUSH" = "1" ]; then
     echo "no remote configured — commit is local only"
     exit 0
   fi
-  echo "pushing to origin/$BRANCH…"
+  # Braced on purpose. bash 3.2 (stock macOS) folds the UTF-8 bytes of the
+  # trailing ellipsis into the variable name, so the unbraced form dies under
+  # set -u with "BRANCH<junk>: unbound variable" — after the commit, before the
+  # push. test/run.sh lints for this.
+  echo "pushing to origin/${BRANCH}…"
   if git push --quiet; then echo "  pushed"; else echo "  push failed" >&2; exit 1; fi
 else
   echo

@@ -51,6 +51,18 @@ else
   ok "bash 3.2 compatible (no bash 4+ constructs)"
 fi
 
+# Unbraced "$VAR" followed by a multibyte character. bash 3.2 folds the UTF-8
+# bytes into the variable name, so "origin/$BRANCH…" dies under set -u as
+# "BRANCH<junk>: unbound variable". bash -n cannot see it — it is a runtime
+# failure, and this kit is full of prose-y echoes with ellipses and em dashes.
+if LC_ALL=C grep -n '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' \
+     "$KIT"/bin/canon-* "$KIT"/install.sh \
+     "$KIT"/templates/repo/.claude/hooks/*.sh 2>/dev/null; then
+  bad "no unbraced \$VAR before a multibyte char" "brace it: \${VAR}…"
+else
+  ok "no unbraced \$VAR before a multibyte char"
+fi
+
 # ---------------------------------------------------------------------------
 section "vault scaffold"
 SB="$(mktemp -d)"; V="$SB/vault"; R="$SB/repo"
