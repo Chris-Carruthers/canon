@@ -26,10 +26,12 @@ the primary index — glob before you grep.
 
 ## After meaningful work
 
-Write a dated note to the vault's `Sessions/`: goal, what changed with
-`repo-path:line` references, decisions made, open follow-ups — linked to its
-project. If a real choice was made, add a `Decisions/` note too. Skip this for
-trivial questions; use judgment.
+Write a dated note to the vault's `Sessions/`, named
+`YYYY-MM-DD — <title> (<initials>).md`: goal, what changed with `repo-path:line`
+references, decisions made, open follow-ups — linked to its project. The author's
+initials in the filename mean two people writing about the same thing on the same
+day get two files, not a collision. If a real choice was made, add a `Decisions/`
+note too. Skip this for trivial questions; use judgment.
 
 ## Stamp what you write
 

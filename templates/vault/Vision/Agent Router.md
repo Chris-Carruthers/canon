@@ -21,7 +21,7 @@ map, not a manual.
 | Durable facts, schemas, APIs, pricing | `Reference/` |
 | Intent for a feature (what & why) | `Specs/` |
 | Ops state to pick work up cold | `Handoffs/` |
-| What happened in past sessions | `Sessions/YYYY-MM-DD — <title>.md` |
+| What happened in past sessions | `Sessions/YYYY-MM-DD — <title> (<initials>).md` |
 | Generated reports and decks | `Outputs/` |
 | Raw, un-compiled source material | `Sources/` |
 
@@ -57,7 +57,7 @@ map, not a manual.
   Project / Client / Decision / Reference notes.
 - **Size budgets:** index notes ≤200 lines / 25 KB · detail notes <500 lines ·
   references one level deep · TOC over 100 lines.
-- **End of meaningful work:** write `Sessions/YYYY-MM-DD — <title>.md` with
+- **End of meaningful work:** write `Sessions/YYYY-MM-DD — <title> (<initials>).md` with
   goal, what changed (`repo-path:line`), decisions, open follow-ups, and links
   to its `[[Project]]`.
 

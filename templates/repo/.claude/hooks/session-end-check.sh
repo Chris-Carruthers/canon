@@ -89,20 +89,41 @@ if git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1; then
     CHANGES=1
   fi
 fi
-[ "$CHANGES" = "1" ] || exit 0
 
 # --- is the vault out of step with the team? ---------------------------------
-# Computed BEFORE the "was a note written" early return, on purpose. Writing the
-# note and sharing it are two different failures, and the second one outlives the
-# first: everyone writes locally, nobody pushes, and a shared vault silently
-# decays into a set of private ones. The well-behaved session — agent writes the
-# note, autocommit commits it — is exactly the one that used to exit here without
-# ever mentioning that the note is still sitting on this laptop.
+# Checked BEFORE both the repo-changes gate and the "was a note written" return,
+# on purpose. Writing the note and sharing it are two different failures, and the
+# second outlives the first: everyone writes locally, nobody pushes, and a shared
+# vault decays into a set of private ones. The two sessions that used to slip
+# through are the well-behaved ones — agent writes the note and autocommit commits
+# it, or the session only ever touched the vault and left the repo clean.
+#
+# Safe to run unconditionally because canon-status is SILENT when in step, so this
+# speaks only when there is genuinely unshared work. No new noise on a read-only
+# session with a clean vault.
 SH="$REPO/.claude/hooks/canon-status"
 [ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"
 SYNC=""
 if [ -n "$SH" ] && [ -x "$SH" ]; then
   SYNC="$("$SH" "$VAULT" 2>/dev/null || true)"
+fi
+
+# Nothing happened in the repo: the only thing still worth saying is that earlier
+# vault work has not been shared. Never demand a note for a session that changed
+# no code.
+if [ "$CHANGES" != "1" ]; then
+  [ -z "$SYNC" ] && exit 0
+  : > "$GUARD" 2>/dev/null || true
+  python3 - "$SYNC" <<'PY' 2>/dev/null || true
+import json, sys
+print(json.dumps({"systemMessage":
+  "The knowledge vault is out of step with the team.\n\n"
+  + sys.argv[1]
+  + "\n\nA vault only stays shared if this happens: unpushed notes are invisible "
+    "to teammates, and unpulled ones mean this session read a stale picture. Run "
+    "the command above if the user wants to sync."}))
+PY
+  exit 0
 fi
 
 # --- was a session note written recently? ------------------------------------
@@ -118,10 +139,10 @@ if [ -n "$RECENT" ]; then
   python3 - "$SYNC" <<'PY' 2>/dev/null || true
 import json, sys
 print(json.dumps({"systemMessage":
-  "A session note was written, but it has not reached the team yet.\n\n"
+  "A session note was written, but the vault is out of step with the team.\n\n"
   + sys.argv[1]
-  + "\n\nUntil this is pushed, teammates cannot see it and their agents will not "
-    "read it. Offer to run it if the user wants their work shared."}))
+  + "\n\nThe note is not shared until it is pushed. Run the command above if the "
+    "user wants their work to reach teammates."}))
 PY
   exit 0
 fi

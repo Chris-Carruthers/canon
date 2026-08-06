@@ -21,7 +21,7 @@
 
 set -uo pipefail
 
-CANON_VERSION="0.1.0"
+CANON_VERSION="0.2.0"
 case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
 
 VAULT=""; QUIET=0
@@ -65,8 +65,15 @@ fi
 REASONS=""
 add() { REASONS="${REASONS}${REASONS:+ · }$1"; }
 
+ONBRANCH=0
+case "$BRANCH" in canon/*) ONBRANCH=1 ;; esac
+
 [ "$DIRTY" -gt 0 ] && add "$DIRTY uncommitted file(s)"
 [ "$AHEAD" -gt 0 ] && add "$AHEAD commit(s) not shared with the team"
+# A pushed review branch is AHEAD=0 and DIRTY=0, so every other signal here says
+# "in step" — while the notes are sitting in an unmerged pull request that nobody
+# else's vault contains. Same failure as an unpushed commit, one step further out.
+[ "$ONBRANCH" = "1" ] && add "on review branch $BRANCH, not merged into the shared vault"
 [ -n "$DAYS" ] && [ "$DAYS" -ge "$STALE_DAYS" ] && add "last checked for teammates' updates ${DAYS}d ago"
 [ -z "$DAYS" ] && add "never pulled from the team"
 
@@ -74,7 +81,9 @@ add() { REASONS="${REASONS}${REASONS:+ · }$1"; }
 [ "$QUIET" = "1" ] && exit 1
 
 printf 'Knowledge vault: %s\n' "$REASONS"
-if [ "$DIRTY" -gt 0 ] || [ "$AHEAD" -gt 0 ]; then
+if [ "$ONBRANCH" = "1" ]; then
+  printf '  Get it reviewed:  open the pull request for %s\n' "$BRANCH"
+elif [ "$DIRTY" -gt 0 ] || [ "$AHEAD" -gt 0 ]; then
   printf '  Share your work:  canon-sync --push\n'
 else
   printf '  Get up to date:   canon-sync\n'

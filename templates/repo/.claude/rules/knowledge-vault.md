@@ -43,7 +43,10 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
 - **One concept per note.** Big topics get their own note; other notes link to
   them rather than restating them.
 - **Name notes for their concept**, because filenames are the primary retrieval
-  signal. Sessions and dated artifacts: `YYYY-MM-DD — <short title>.md`.
+  signal. Sessions and dated artifacts: `YYYY-MM-DD — <short title> (<initials>).md`.
+  The initials are the author's, and they are not decoration: two people writing
+  about the same thing on the same day produce two files instead of a collision.
+  Take them from the git `user.email` local part if nobody has told you otherwise.
 - **Frontmatter** on Project / Client / Decision / Reference notes:
   `type:`, `status:`, `updated:`.
 - **Link generously** with `[[wikilinks]]`. A link to a note that does not exist
@@ -82,7 +85,7 @@ If a note outgrows its budget, split it and link — do not let it sprawl.
 
 ## Session notes
 
-At the end of meaningful work, write `Sessions/YYYY-MM-DD — <title>.md`:
+At the end of meaningful work, write `Sessions/YYYY-MM-DD — <title> (<initials>).md`:
 
 - **Goal** — what we set out to do
 - **What changed** — `repo-path:line` references and why

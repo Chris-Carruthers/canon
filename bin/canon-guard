@@ -2,6 +2,9 @@
 # canon-guard — warn or refuse when a commit touches a governed path.
 #
 #   canon-guard [/path/to/vault]
+#   canon-guard --check [/path/to/vault]    silent; exit 1 if governed paths are
+#                                           staged. This is how canon-sync decides
+#                                           whether a change needs a review branch.
 #
 # Reads <vault>/.canon-owners and compares the staged file list against it. A
 # governed path is one somebody else owns: Vision/, an accepted decision, a
@@ -23,11 +26,14 @@
 
 set -uo pipefail
 
-CANON_VERSION="0.1.0"
+CANON_VERSION="0.2.0"
 case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
 
 MODE="${CANON_GUARD:-warn}"
 [ "$MODE" = "off" ] && exit 0
+
+CHECK=0
+[ "${1:-}" = "--check" ] && { CHECK=1; shift; }
 
 REPO="${1:-$PWD}"
 cd "$REPO" 2>/dev/null || exit 0
@@ -84,7 +90,14 @@ for path, pattern, who in hits:
     print(f"{path}\t{pattern}\t{','.join(who)}")
 sys.exit(1 if hits else 0)
 PY
-)" && exit 0
+)"
+HITS=$?
+
+# --check is the machine-readable form: no output, exit status is the answer.
+# canon-sync calls it to pick trunk vs a review branch, and a chatty detector
+# would print the "you touched somebody's file" lecture twice per sync.
+[ "$CHECK" = "1" ] && exit "$HITS"
+[ "$HITS" = "0" ] && exit 0
 
 # --- something governed was touched -----------------------------------------
 {

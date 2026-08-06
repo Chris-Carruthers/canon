@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-CANON_VERSION="0.1.0"
+CANON_VERSION="0.2.0"
 case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
 
 

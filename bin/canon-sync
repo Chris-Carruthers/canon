@@ -6,6 +6,8 @@
 #   canon-sync --status           show what would happen, change nothing
 #   canon-sync -m "message"       custom commit message
 #   canon-sync --no-pull          skip the pull
+#   canon-sync --branch           put this change on a branch for review
+#   canon-sync --trunk            push straight to the shared branch
 #
 # Asymmetric by design:
 #   pull  — safe, automatic where possible: you always read fresh context
@@ -14,26 +16,56 @@
 #
 # Push is never implied. Once a note is on a remote it may be cached or indexed
 # even if you delete it later.
+#
+# BRANCHING — CANON_BRANCH_MODE, default `auto`:
+#
+#   trunk    always commit and push to the shared branch
+#   auto     trunk, EXCEPT when the change touches a path somebody else owns —
+#            those go to a branch and a pull request, because that is the only
+#            shape in which an owner can actually review them
+#   branch   always use a branch and a pull request
+#
+# Trunk is the default for ordinary notes on purpose, and it is the part people
+# expect to be wrong. A vault is overwhelmingly APPEND-ONLY: one new file per
+# session, per decision, per spec. Two new files with different names cannot
+# conflict, no matter how many people write them at once. A pull request per
+# session note therefore prevents no conflict that was ever going to happen — it
+# just adds a review step to the one habit that is already hardest to sustain,
+# and teams that add it stop writing the notes.
+#
+# What actually causes lost work on a shared vault is not the absence of
+# branches, it is the PUSH RACE: you pull, you scan, you commit, and in those few
+# seconds a teammate lands a commit, so your push is refused as non-fast-forward
+# and your work sits on your laptop. That is handled below by rebasing and
+# retrying rather than by branching.
 
 set -uo pipefail
 
-CANON_VERSION="0.1.0"
+CANON_VERSION="0.2.0"
 case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
 
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DO_PULL=1; DO_PUSH=0; STATUS_ONLY=0; MSG=""
+MODE="${CANON_BRANCH_MODE:-auto}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --push) DO_PUSH=1; shift ;;
     --no-pull) DO_PULL=0; shift ;;
     --status) STATUS_ONLY=1; shift ;;
+    --branch) MODE=branch; shift ;;
+    --trunk) MODE=trunk; shift ;;
     -m|--message) MSG="${2:-}"; shift 2 ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "canon-sync: unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+case "$MODE" in
+  trunk|auto|branch) ;;
+  *) echo "canon-sync: CANON_BRANCH_MODE must be trunk, auto or branch (got: $MODE)" >&2; exit 2 ;;
+esac
 
 # --- locate the vault --------------------------------------------------------
 RESOLVER="$HERE/canon-path"
@@ -56,6 +88,7 @@ HAS_REMOTE=0; git remote get-url origin >/dev/null 2>&1 && HAS_REMOTE=1
 
 if [ "$STATUS_ONLY" = "1" ]; then
   echo "branch: $BRANCH   local changes: $CHANGED   remote: $([ "$HAS_REMOTE" = 1 ] && git remote get-url origin || echo 'none')"
+  echo "branch mode: $MODE"
   [ "$CHANGED" != "0" ] && git status --short | head -30
   if [ "$HAS_REMOTE" = 1 ]; then
     git fetch --quiet origin "$BRANCH" 2>/dev/null || true
@@ -66,10 +99,69 @@ if [ "$STATUS_ONLY" = "1" ]; then
   exit 0
 fi
 
+# --- push helpers -------------------------------------------------------------
+# The remote is a moving target, and the window between our pull and our push is
+# wide enough to lose a race in: the scan reads every staged line, and a big
+# import can hold it open for a while. When a teammate lands a commit in that
+# window git refuses ours as non-fast-forward — which, untreated, produces the
+# exact state this tool exists to prevent: work committed, nothing shared, and a
+# bare "push failed" for the user to decode.
+#
+# So rebase onto what arrived and try again. Bounded, because an unbounded retry
+# against a genuinely busy remote is a spin. Notes are near-append-only, so the
+# rebase is almost always a fast-forward of somebody else's new files past ours.
+canon_push() {
+  TARGET="$1"; ATTEMPT=1
+  while :; do
+    if OUT="$(git push --quiet --set-upstream origin "$TARGET" 2>&1)"; then
+      echo "  pushed"; return 0
+    fi
+    case "$OUT" in
+      *non-fast-forward*|*"fetch first"*|*"Updates were rejected"*|*"cannot lock ref"*) ;;
+      *)
+        # Auth, network, a protected branch refusing us — retrying cannot help,
+        # and a retry loop would bury the message that says what is actually wrong.
+        printf '%s\n' "$OUT" >&2; echo "  push failed" >&2; return 1 ;;
+    esac
+    if [ "$ATTEMPT" -ge 3 ]; then
+      echo "  gave up after 3 attempts — the remote is moving faster than we can rebase" >&2
+      echo "  your commit is intact; re-run: canon-sync --push" >&2
+      return 1
+    fi
+    echo "  a teammate pushed first — rebasing onto origin/${TARGET} and retrying (${ATTEMPT}/3)"
+    if ! git pull --rebase --autostash --quiet origin "$TARGET" >/dev/null 2>&1; then
+      git rebase --abort >/dev/null 2>&1 || true
+      echo "  that rebase hit a real conflict: two people edited the same lines." >&2
+      echo "  Nothing was pushed and your commit is intact. Resolve it in the vault:" >&2
+      echo "    git -C \"$VAULT\" pull --rebase" >&2
+      echo "  Prefer keeping both statements and reconciling in prose." >&2
+      return 1
+    fi
+    ATTEMPT=$((ATTEMPT + 1))
+  done
+}
+
+# Where a human goes to review a branch. Best-effort: unknown hosts just get no URL.
+pr_url() {
+  U="$(git remote get-url origin 2>/dev/null || true)"
+  case "$U" in
+    git@github.com:*)     SLUG="${U#git@github.com:}" ;;
+    https://github.com/*) SLUG="${U#https://github.com/}" ;;
+    *) return 1 ;;
+  esac
+  SLUG="${SLUG%.git}"
+  printf 'https://github.com/%s/compare/%s...%s?expand=1' "$SLUG" "$1" "$2"
+}
+
 # --- pull --------------------------------------------------------------------
 if [ "$DO_PULL" = "1" ] && [ "$HAS_REMOTE" = 1 ]; then
   echo "pulling…"
-  if git pull --rebase --autostash --quiet 2>/dev/null; then
+  if ! git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+    # A branch created locally and never pushed has no upstream, and `git pull`
+    # with no arguments fails on it. That is not an error worth aborting over —
+    # there is nothing upstream to be behind.
+    echo "  $BRANCH has no upstream yet — nothing to pull"
+  elif git pull --rebase --autostash --quiet 2>/dev/null; then
     echo "  up to date with origin/$BRANCH"
   else
     echo "  pull failed or left a conflict — resolve it in the vault, then re-run" >&2
@@ -81,7 +173,10 @@ fi
 # --- nothing to do? ----------------------------------------------------------
 if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard | head -1)" ]; then
   echo "no local changes to commit"
-  [ "$DO_PUSH" = "1" ] && [ "$HAS_REMOTE" = 1 ] && { echo "pushing existing commits…"; git push --quiet && echo "  pushed"; }
+  if [ "$DO_PUSH" = "1" ] && [ "$HAS_REMOTE" = 1 ]; then
+    echo "pushing existing commits…"
+    canon_push "$BRANCH" || exit 1
+  fi
   exit 0
 fi
 
@@ -104,6 +199,53 @@ else
   fi
 fi
 
+# --- trunk, or a branch and a review? -----------------------------------------
+# Decided AFTER staging, because the answer depends on WHAT is staged, not on who
+# is running the command. The same person writing a session note and amending the
+# product vision should get a straight push for one and a pull request for the
+# other.
+BASE="$BRANCH"
+case "$BRANCH" in
+  canon/*)
+    # Already parked on a review branch. Adding to it is the only correct move:
+    # the commits are already here, so "switch to trunk" would either strand them
+    # or need a cherry-pick nobody asked for. Keep stacking onto the same PR.
+    if [ "$MODE" = "trunk" ]; then
+      echo "note: --trunk ignored — you are on review branch $BRANCH"
+      echo "      merge or abandon it first if you want to push to the shared branch"
+    fi
+    MODE=branch
+    BASE="$(git config --get "branch.${BRANCH}.canonBase" 2>/dev/null || echo main)"
+    echo "branch: $BRANCH (continuing — same pull request)"
+    ;;
+  *)
+    if [ "$MODE" = "auto" ]; then
+      GUARDER="$HERE/canon-guard"
+      [ -x "$GUARDER" ] || GUARDER="$(command -v canon-guard 2>/dev/null || true)"
+      if [ -n "$GUARDER" ] && [ -x "$GUARDER" ] && ! "$GUARDER" --check "$VAULT" >/dev/null 2>&1; then
+        MODE=branch
+        echo
+        echo "this change touches a path somebody else owns — routing it to a review branch"
+      else
+        MODE=trunk
+      fi
+    fi
+    if [ "$MODE" = "branch" ]; then
+      WHO="$(git config user.email 2>/dev/null | sed 's/@.*//' | tr -cd 'a-zA-Z0-9._-')"
+      [ -n "$WHO" ] || WHO="anon"
+      NEWB="canon/$WHO/$(date +%Y%m%d-%H%M%S)"
+      if git checkout -q -b "$NEWB" 2>/dev/null; then
+        git config "branch.${NEWB}.canonBase" "$BASE"
+        BRANCH="$NEWB"
+        echo "branch: $NEWB (from $BASE)"
+      else
+        echo "could not create branch $NEWB — leaving the change staged" >&2
+        exit 1
+      fi
+    fi
+    ;;
+esac
+
 # --- commit ------------------------------------------------------------------
 if [ -z "$MSG" ]; then
   N="$(git diff --cached --name-only | wc -l | tr -d ' ')"
@@ -125,7 +267,20 @@ if [ "$DO_PUSH" = "1" ]; then
   # set -u with "BRANCH<junk>: unbound variable" — after the commit, before the
   # push. test/run.sh lints for this.
   echo "pushing to origin/${BRANCH}…"
-  if git push --quiet; then echo "  pushed"; else echo "  push failed" >&2; exit 1; fi
+  canon_push "$BRANCH" || exit 1
+
+  if [ "$MODE" = "branch" ]; then
+    echo
+    echo "This is on a review branch, not on $BASE — an owner has to approve it."
+    if URL="$(pr_url "$BASE" "$BRANCH")"; then
+      echo "  Open the pull request:  $URL"
+    fi
+    command -v gh >/dev/null 2>&1 && echo "  Or from here:           gh pr create --fill --base $BASE"
+    echo
+    echo "Your notes stay on this branch until it merges — that is why they are still"
+    echo "on disk. Keep working; canon-sync adds to the same pull request. Once it is"
+    echo "merged:  git -C \"$VAULT\" checkout $BASE && git pull"
+  fi
 else
   echo
   echo "committed locally. Nothing has left this machine."

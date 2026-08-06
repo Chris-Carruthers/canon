@@ -8,6 +8,60 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **Push-race recovery in `canon-sync`.** When a teammate lands a commit between
+  our pull and our push, git refuses ours as non-fast-forward. It now rebases
+  onto what arrived and retries, up to three times, saying so once per attempt.
+  Previously this printed `push failed` and left the user committed-but-unshared
+  — the exact failure the tool exists to prevent, triggered by nothing worse than
+  two people working at the same time. A genuine same-lines conflict stops with
+  the commit intact and **no half-finished rebase**; a failure that is not a race
+  (auth, network, protected branch) fails immediately with git's own message
+  instead of retrying against a wall.
+
+- **Branch modes — `CANON_BRANCH_MODE`, default `auto`.** `auto` pushes ordinary
+  notes straight to the shared branch and routes changes that touch a governed
+  path onto `canon/<you>/<timestamp>` with a pull-request link. The decision is
+  made from **what is staged, not who is running it**, so the same person gets a
+  direct push for a session note and a review branch for a vision edit without
+  choosing. `--branch` and `--trunk` override per-run; `trunk` and `branch` force
+  one shape for everything.
+  - The working tree **stays on the review branch**, so notes do not vanish from
+    the editor while a PR is open.
+  - A second sync **continues the same pull request** instead of opening one per
+    session.
+  - `canon-status` now counts an unmerged review branch as unshared work. Pushed
+    to a branch is not shared, and every other signal would have read as in step.
+  - This is cooperative, not enforcement — `--trunk` bypasses it. Its job is to
+    stop people hitting a server-side ruleset by accident. See `docs/MULTIPLAYER.md`.
+- **`canon-guard --check`** — silent detection mode; exit status is the answer.
+  How `canon-sync` decides trunk vs branch without printing the ownership lecture
+  twice.
+
+### Changed
+
+- **Session-note filenames are author-scoped in the agent-facing rules:**
+  `YYYY-MM-DD — <title> (<initials>).md`. The convention was already documented in
+  `docs/MULTIPLAYER.md` and the router, but the two rule files an agent actually
+  reads every session specified the unscoped form — so agents never applied it,
+  and two people writing about the same thing on the same day collided on a
+  filename for no reason. All four now agree.
+- The Stop hook reports unshared vault work even when the repo tree is clean. A
+  session that only ever touched the vault used to slip through the
+  "did real work happen here" gate silently. It still never demands a session
+  note for a session that changed no code.
+
+### Fixed
+
+- **`canon-sync --push` aborted before pushing on stock macOS.** `"origin/$BRANCH…"`
+  — bash 3.2 folds the UTF-8 ellipsis bytes into the variable name, so under
+  `set -u` it died with `BRANCH<junk>: unbound variable` after the commit and
+  before the push. `test/run.sh` now lints for unbraced `$VAR` before any
+  non-ASCII byte, which `bash -n` cannot catch.
+- `canon-sync` no longer treats "this branch has no upstream yet" as a failed
+  pull. On a freshly created branch it said `pull failed` and exited 1.
+
+### Added (earlier in this cycle)
+
 - **Provenance and trust frontmatter** — four optional keys (`generated`,
   `verified`, `status`, `stale_after`) that make an agent-maintained vault
   trustable: what a note was made from, whether a human ever confirmed it, and

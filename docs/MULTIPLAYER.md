@@ -58,7 +58,8 @@ Two habits keep even that surface small:
 
 - **Author-scope filenames** in append-only folders: `2026-07-30 — thing (cc).md`.
   Two people writing about the same thing on the same day produce two files, not
-  a collision.
+  a collision. This is in the agent-facing rules, so agents do it unprompted —
+  which matters, because agents are what generate most of the volume.
 - **One concept per note.** Git merges non-adjacent changes in the same file
   automatically. Conflicts only happen when two people edit the *same lines* —
   which large sprawling notes make likely and small notes make rare.
@@ -140,13 +141,63 @@ If leadership has genuinely confidential material, it goes in a separate private
 repo mounted as a second vault root — not in a subfolder with a stern README.
 A subfolder is a convention; a separate repo is a boundary.
 
-## Choosing your write model
+## Branching
+
+The instinct, arriving from application code, is that more writers means more
+branches. For a knowledge vault that instinct is backwards, and following it
+makes the vault worse while feeling responsible.
+
+**Branches do not reduce conflicts. They relocate them.** Two people editing the
+same lines of the same note conflict at merge time whether they were on branches
+or not — the branch just moves the collision from the moment it happened, when
+both people remember what they meant, to a merge days later when one of them is
+resolving somebody else's prose from memory. And the content where conflicts
+*could* happen is the minority: as the table above says, a vault is
+overwhelmingly append-only, and two new files with different names cannot collide
+no matter how many people write them at the same instant.
+
+What branches genuinely buy is **review** — a place for an owner to say no before
+a change lands. That is worth having for the vision doc. It is actively harmful
+for a session note, because a pull request per note adds a step to the one habit
+that is already the hardest to sustain, and the notes simply stop being written.
+
+So canon's default (`CANON_BRANCH_MODE=auto`) is:
+
+| Change touches | Where it goes |
+|---|---|
+| Only open paths — `Sessions/`, `Projects/`, `Reference/`, … | straight to the shared branch |
+| Any path owned by someone else in `.canon-owners` | a `canon/<you>/<timestamp>` branch and a pull request |
+
+The decision is made from **what you staged, not who you are** — the same person
+writing a session note and amending the product vision gets a direct push for one
+and a pull request for the other, in the same working day, without choosing.
+
+`canon-sync --branch` forces a review branch for a change that would not
+otherwise need one; `--trunk` forces a direct push. `CANON_BRANCH_MODE=branch`
+makes review the rule for everything, which is the right setting for a vault of
+regulated content and the wrong one for most teams.
+
+Three properties worth knowing, because each is a place a naive implementation
+goes wrong:
+
+- **Your files stay on disk.** A review branch keeps the notes checked out. The
+  obvious implementation — commit to a branch, switch back to trunk — makes your
+  new notes vanish from Obsidian while the PR is open, which is the kind of
+  surprise that ends trust in a tool.
+- **A second sync continues the same pull request** rather than opening a new one
+  per session. Being parked on a review branch is sticky on purpose.
+- **`canon-status` counts an unmerged review branch as unshared work.** Pushed to
+  a branch is not the same as shared, and every other signal — clean tree, zero
+  unpushed commits — would otherwise report you as in step while your notes sit
+  in a PR nobody has looked at.
+
+### Choosing your write model
 
 | Model | Session notes | Governed content | Good for |
 |---|---|---|---|
 | **Direct push** | automatic, instant | unprotected | small trusted teams, non-sensitive content |
-| **Direct push + guard** | automatic, instant | warned locally | the default this kit ships |
-| **Path-restricted ruleset** | automatic, instant | PR-only | the target state for most teams |
+| **Direct push + guard** | automatic, instant | warned locally | ungoverned vaults with no `.canon-owners` |
+| **Path-restricted ruleset** | automatic, instant | PR-only | **the default this kit ships** (`auto`) |
 | **PR for everything** | needs a PR per note | PR-only | regulated content, external contributors |
 
 "PR for everything" is where teams instinctively go and it is usually wrong:
@@ -154,6 +205,26 @@ requiring review for an auto-written session note means the notes stop being
 written. Govern the few files where being wrong is expensive; leave the working
 layers open. **If you govern everything, people route around the vault entirely** —
 and a vault nobody writes to is worth less than no vault at all.
+
+Note the division of labour with Layer 3. `auto` routes governed changes into the
+shape a reviewer needs, on the author's machine, cooperatively. It is a
+convenience, not a control — the same seatbelt-not-a-lock caveat as `canon-guard`
+applies, because a determined author can pass `--trunk`. The server-side ruleset
+is what makes it binding. Running both is the point: the ruleset refuses the
+direct push, and `auto` means nobody ever hits that refusal by accident.
+
+### The conflict that actually costs you
+
+Not branches. The **push race**: you pull, the scanner reads every staged line,
+you commit, and in those seconds a teammate lands a commit — so your push is
+rejected as non-fast-forward. On a busy vault this is routine, and the naive
+handling of it ("push failed", exit) leaves your work committed and unshared,
+which is the failure the whole tool is pointed at.
+
+`canon-sync` rebases onto what arrived and retries, three times, and tells you it
+happened. It stops on a genuine same-lines conflict with your commit intact and
+no half-finished rebase, and it does not retry failures that aren't races. This
+one loop does more for a multi-writer vault than any branching policy.
 
 ## Pulling while an editor has the vault open
 

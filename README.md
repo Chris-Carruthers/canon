@@ -368,7 +368,26 @@ risk.
 canon-sync              # pull, scan, commit locally
 canon-sync --push       # ...and push, only if the scan passed
 canon-sync --status     # what would happen, changes nothing
+canon-sync --branch     # put it on a branch for review instead of on trunk
 ```
+
+### What happens when two people push at once
+
+They will. A fifteen-person vault is fifteen agents writing notes, and the window
+between your pull and your push is as long as the scan takes.
+
+If a teammate lands a commit in that window, git refuses yours as
+non-fast-forward. Untreated that produces the precise failure this tool exists to
+prevent — *"committed"*, then *"push failed"*, and your notes still on your
+laptop. So `canon-sync` **rebases onto what arrived and pushes again**, up to
+three times. Notes are near-append-only, so that rebase is almost always somebody
+else's new files sliding past yours, and you see one line about it.
+
+When the rebase hits a genuine conflict — two people editing the same lines of
+the same note — it stops, aborts the rebase, leaves your commit intact, and says
+so. It never leaves you in a half-finished rebase to discover later. A failure
+that is *not* a race (auth, network, a protected branch) fails immediately with
+git's own message rather than retrying against a wall.
 
 If your team isn't handling regulated or sensitive data, this asymmetry is
 probably more caution than you need — install a git plugin, auto-sync every ten
@@ -566,6 +585,7 @@ without accidentally requiring a PR per session note.
 | `CANON_SESSIONS_DIR` | `Sessions` | Where session notes live |
 | `CANON_SCAN_EXCLUDE` | — | Colon-separated regexes of paths the scanner skips (per-machine; prefer the committed `.canon-scan-exclude`) |
 | `CANON_GUARD` | `warn` | `block` = refuse commits to paths you don't own; `off` = disable |
+| `CANON_BRANCH_MODE` | `auto` | `trunk` = always push direct; `branch` = always open a PR; `auto` = direct, except for governed paths |
 | `CANON_SKIP_SCAN` | `0` | `1` = bypass the gate. Be sure. |
 
 Auto-pull is **off by default**: a hook that mutates a git repo you didn't ask

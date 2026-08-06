@@ -154,7 +154,25 @@ stop() { CLAUDE_PROJECT_DIR="$R" bash "$SEC" <<< "{\"session_id\":\"$1\"}" 2>/de
 # CLAUDE.md so teammates inherit them. Without this the repo has the installer's
 # own files uncommitted, which correctly reads as "work happened".
 cd "$R" && git_q add -A >/dev/null 2>&1 && git_q commit -qm "install canon" >/dev/null 2>&1
-is "silent on a clean tree" "$(stop s1)" ""
+
+# Put the vault in step first. The hook now checks sync status before the
+# repo-changes gate, so "silent" only means anything once there is nothing to say.
+git_q -C "$V" add -A >/dev/null 2>&1; git_q -C "$V" commit -qm base >/dev/null 2>&1
+: > "$V/.git/FETCH_HEAD"
+is "silent on a clean tree, vault in step" "$(stop s1)" ""
+
+# Clean repo, unshared vault work: worth saying, but never worth demanding a
+# session note for — this session did not change any code.
+echo stray > "$V/Projects/stray.md"
+OUTV="$(stop s1b)"
+# Asserted on behaviour, not on wording — the prose here gets revised, the
+# contract does not: say something, name the command, demand nothing.
+has "flags unshared vault work on a clean tree" "$OUTV" "systemMessage"
+has "and names the command to fix it"           "$OUTV" "canon-sync"
+case "$OUTV" in *"no note was written"*) bad "demands no note on a clean tree" ;; *) ok "demands no note on a clean tree" ;; esac
+git_q -C "$V" add -A >/dev/null 2>&1; git_q -C "$V" commit -qm stray >/dev/null 2>&1
+
+cd "$R" || exit 1
 echo change > work.txt
 has "reminds when nothing was written" "$(stop s2)" "systemMessage"
 is "fires once per session" "$(stop s2)" ""
@@ -475,6 +493,121 @@ CANON_GUARD=block "$G" "$V" >/dev/null 2>&1
 is "the owner may edit it" "$?" "0"
 git config user.email t@example.com
 git reset -q
+
+# ---------------------------------------------------------------------------
+section "concurrent writers"
+# Two people and one shared branch, which is the whole point of a team vault.
+
+SY="$KIT/bin/canon-sync"
+RMT="$SB/team.git"; git init -q --bare "$RMT"
+V6="$SB/vault6"                       # "us"
+"$KIT/bin/canon-init-vault" "$V6" >/dev/null 2>&1
+cd "$V6" || exit 1
+git init -q; git config user.email us@t; git config user.name Us
+git remote add origin "$RMT"
+git add -A >/dev/null; git commit -qm init >/dev/null; git branch -M main
+git push -q -u origin main
+
+MATE="$SB/mate"                       # the teammate
+git clone -q "$RMT" "$MATE"
+git -C "$MATE" config user.email mate@t; git -C "$MATE" config user.name Mate
+mate_pushes() {  # land a commit on the shared branch, the way a teammate would
+  printf '%s\n' "$2" > "$MATE/$1"
+  git -C "$MATE" add -A >/dev/null; git -C "$MATE" commit -qm "mate: $1" >/dev/null
+  git -C "$MATE" push -q
+}
+
+# THE case this section exists for: our push is refused because someone landed
+# work between our pull and our push. It must still end up shared.
+mate_pushes "Sessions/mate-1.md" "theirs"
+echo ours > "$V6/Sessions/ours-1.md"
+OUT6="$(CANON_HOME="$V6" "$SY" --push --no-pull -m "ours 1" 2>&1)"
+has "retries after losing a push race" "$OUT6" "a teammate pushed first"
+has "and lands the work"               "$OUT6" "pushed"
+is  "nothing left unshared"            "$(git -C "$V6" rev-list --count origin/main..HEAD)" "0"
+is  "the teammate's work survived"     "$(git -C "$V6" cat-file -e origin/main:Sessions/mate-1.md 2>/dev/null && echo y)" "y"
+is  "ours is on the shared branch"     "$(git -C "$MATE" fetch -q origin && git -C "$MATE" cat-file -e origin/main:Sessions/ours-1.md 2>/dev/null && echo y)" "y"
+
+# A real conflict — same file, same line — must stop, keep the commit, and leave
+# no half-finished rebase behind for the next command to trip over.
+printf 'shared\n' > "$V6/Projects/hot.md"
+git -C "$V6" add -A >/dev/null; git -C "$V6" commit -qm base >/dev/null; git -C "$V6" push -q
+git -C "$MATE" pull -q --rebase
+mate_pushes "Projects/hot.md" "their version"
+printf 'our version\n' > "$V6/Projects/hot.md"
+OUT7="$(CANON_HOME="$V6" "$SY" --push --no-pull -m "ours 2" 2>&1)"
+has "explains a genuine conflict" "$OUT7" "two people edited the same lines"
+is  "leaves no rebase in progress" "$([ -d "$V6/.git/rebase-merge" ] || [ -d "$V6/.git/rebase-apply" ] && echo stuck || echo clean)" "clean"
+is  "keeps our commit"             "$(git -C "$V6" log -1 --format=%s)" "ours 2"
+git -C "$V6" rebase --abort >/dev/null 2>&1
+git -C "$V6" reset -q --hard origin/main; git -C "$V6" clean -qfd
+
+# A failure that is NOT a race must fail fast and say what git said, not spin.
+git -C "$V6" remote set-url origin "$SB/nope.git"
+OUT8="$(CANON_HOME="$V6" "$SY" --push --no-pull -m x 2>&1; true)"
+case "$OUT8" in *"a teammate pushed first"*) bad "does not retry a non-race failure" ;; *) ok "does not retry a non-race failure" ;; esac
+git -C "$V6" remote set-url origin "$RMT"
+
+# ---------------------------------------------------------------------------
+section "branch mode"
+# Baseline the owner's world: a governed glob and a vision doc already on trunk.
+printf 'Vision/**  boss@t\n' > "$V6/.canon-owners"
+mkdir -p "$V6/Vision"; echo y > "$V6/Vision/Product Vision.md"
+git -C "$V6" add -A >/dev/null; git -C "$V6" commit -qm owners >/dev/null; git -C "$V6" push -q
+
+G6="$KIT/bin/canon-guard"
+echo x > "$V6/Sessions/plain.md"; git -C "$V6" add -A >/dev/null
+CANON_GUARD=warn "$G6" --check "$V6" >/dev/null 2>&1
+is "--check passes an open path" "$?" "0"
+OUTC="$(CANON_GUARD=warn "$G6" --check "$V6" 2>&1)"
+is "--check is silent"           "${OUTC:-silent}" "silent"
+echo edited > "$V6/Vision/Product Vision.md"; git -C "$V6" add -A >/dev/null
+CANON_GUARD=warn "$G6" --check "$V6" >/dev/null 2>&1
+is "--check flags a governed path" "$?" "1"
+git -C "$V6" reset -q; git -C "$V6" checkout -q -- "Vision/Product Vision.md"
+
+# auto: an ordinary note goes straight to the shared branch.
+CANON_HOME="$V6" CANON_BRANCH_MODE=auto "$SY" --push -m "a note" >/dev/null 2>&1
+is "auto pushes a plain note to trunk" "$(git -C "$V6" rev-parse --abbrev-ref HEAD)" "main"
+
+# auto: a governed change routes to a review branch instead, and trunk stays clean.
+echo changed > "$V6/Vision/Product Vision.md"
+OUT9="$(CANON_HOME="$V6" CANON_BRANCH_MODE=auto "$SY" --push -m "vision edit" 2>&1)"
+BR6="$(git -C "$V6" rev-parse --abbrev-ref HEAD)"
+case "$BR6" in canon/*) ok "auto routes a governed change to a branch" ;; *) bad "auto routes a governed change to a branch" "on $BR6" ;; esac
+has "names the base branch"   "$OUT9" "from main"
+has "points at the pull request" "$OUT9" "review"
+is  "trunk did not get the governed edit" \
+    "$(git -C "$V6" show origin/main:Vision/Product\ Vision.md 2>/dev/null)" "y"
+is  "the branch reached the remote" "$(git -C "$V6" rev-list --count "origin/$BR6..HEAD" 2>/dev/null || echo ?)" "0"
+
+# The notes must still be on disk — a vault whose files vanish into a branch is
+# a vault someone will stop trusting.
+is "the edit is still on disk" "$(cat "$V6/Vision/Product Vision.md")" "changed"
+
+# canon-status must not call a parked review branch "in step".
+: > "$V6/.git/FETCH_HEAD"
+has "status flags a parked review branch" "$("$KIT/bin/canon-status" "$V6" 2>&1)" "review branch"
+
+# A second sync from the branch continues the same PR rather than stacking a new one.
+echo more > "$V6/Vision/Product Vision.md"
+OUT10="$(CANON_HOME="$V6" "$SY" --push -m "vision edit 2" 2>&1)"
+has "continues the same review branch" "$OUT10" "continuing"
+is  "and creates no second branch" "$(git -C "$V6" rev-parse --abbrev-ref HEAD)" "$BR6"
+has "--trunk cannot strand commits on a branch" \
+    "$(echo z > "$V6/Vision/Product Vision.md"; CANON_HOME="$V6" "$SY" --push --trunk -m z 2>&1)" \
+    "--trunk ignored"
+
+git -C "$V6" checkout -q main
+is "an unpushed branch does not break the pull" \
+   "$(git -C "$V6" checkout -q -b canon/us/fresh; CANON_HOME="$V6" "$SY" --status >/dev/null 2>&1; \
+      echo hi > "$V6/Sessions/fresh.md"; CANON_HOME="$V6" "$SY" -m fresh 2>&1 | grep -c 'pull failed')" "0"
+git -C "$V6" checkout -q main
+
+is "rejects an unknown branch mode" \
+   "$(CANON_HOME="$V6" CANON_BRANCH_MODE=nonsense "$SY" --status >/dev/null 2>&1; echo $?)" "2"
+
+cd "$V" || exit 1
 
 # ---------------------------------------------------------------------------
 section "uninstall"
