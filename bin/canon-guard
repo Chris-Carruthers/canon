@@ -65,9 +65,14 @@ for raw in open(owners_file, encoding="utf-8", errors="replace"):
     pattern, who = parts[0], parts[1]
     rules.append((pattern, [w.strip().lower() for w in who.split(",") if w.strip()]))
 
-staged = subprocess.run(["git", "diff", "--cached", "--name-only",
-                         "--diff-filter=ACMRD"],
-                        capture_output=True, text=True, check=False).stdout.split()
+# -z and split on NUL, not whitespace. Vault filenames have spaces in them by
+# convention — "2026-08-07 — thing (cc).md" — and .split() turned one path into
+# several fragments, which mislabelled the report and could match a glob against
+# a fragment instead of the real path. Without -z git would also quote-escape
+# those names, which is the same bug wearing a different hat.
+staged = [p for p in subprocess.run(
+    ["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=ACMRD"],
+    capture_output=True, text=True, check=False).stdout.split("\0") if p]
 
 def matches(pattern, path):
     if pattern.endswith("/**"):

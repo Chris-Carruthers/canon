@@ -90,10 +90,17 @@ SH="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/canon-status"
 if [ -n "$SH" ] && [ -x "$SH" ]; then
   STATUS="$("$SH" "$VAULT" 2>/dev/null || true)"
 fi
+# Say it plainly rather than leaving the agent to judge relevance. "Mention if it
+# matters" reliably becomes "do not mention" — and the whole point is that drifting
+# out of step is invisible precisely when nobody thinks to check.
 [ -n "$STATUS" ] && STATUS="
 
-NOTE ON FRESHNESS — tell the user if it matters to their question:
-$STATUS"
+SYNC STATE — the vault on this machine is NOT in step with the team:
+$STATUS
+Mention this to the user in your first reply. Two consequences worth stating: what
+you read may be stale, and anything written this session stays invisible to
+teammates until it is pushed. Offer to run the command above. If they decline, drop
+it for the rest of the session."
 
 emit "Shared knowledge vault is at: $VAULT
 The team's conventions and index follow. Reach vault content on demand with glob/grep/Read against that path — do not attempt to load the whole vault.

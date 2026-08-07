@@ -564,6 +564,10 @@ is "--check is silent"           "${OUTC:-silent}" "silent"
 echo edited > "$V6/Vision/Product Vision.md"; git -C "$V6" add -A >/dev/null
 CANON_GUARD=warn "$G6" --check "$V6" >/dev/null 2>&1
 is "--check flags a governed path" "$?" "1"
+# Vault filenames have spaces by convention, so a whitespace-split path list
+# reports fragments and can match a glob against the wrong string.
+has "reports the whole filename, spaces and all" \
+    "$(CANON_GUARD=warn "$G6" "$V6" 2>&1)" "Vision/Product Vision.md"
 git -C "$V6" reset -q; git -C "$V6" checkout -q -- "Vision/Product Vision.md"
 
 # auto: an ordinary note goes straight to the shared branch.

@@ -55,17 +55,52 @@ living in one person's head and one person's chat history.
 and why, what each project is and where it stands, background on customers or
 domains, and a dated log of every work session.
 
-**2. Your code folders, untouched.** Code never goes in the notes. Notes point at
-code by location instead — *"the bug was in `auth.ts`, line 42."*
-
-**3. A standing instruction for your AI assistant.** A small config file telling
+**2. A standing instruction for your AI assistant.** A small config file telling
 it: *before real work, read the notes; after real work, write down what happened.*
 It applies everywhere you work, so you don't have to remember to ask.
+
+**3. Nothing else.** In particular, **you do not need a code repository.** If you
+have one the notes sit alongside it and stay out of it — code never goes in the
+notes, they point at it by location instead (*"the bug was in `auth.ts`, line
+42"*). If you don't have one, nothing here changes. See
+[Two ways to set it up](#two-ways-to-set-it-up).
 
 A useful way to picture it: the notes folder is the **team's shared notebook**.
 Everyone keeps a copy on their own desk, and a master copy lives online that the
 copies get matched against. Nobody edits a live document at the same time as
 anybody else — you change your copy, then send it up.
+
+### Two ways to set it up
+
+The examples in this README wire canon into a code repository, and that has misled
+people into reading it as a tool for engineers. It isn't. **A code repository is
+one place to put the standing instruction, not a requirement.** Pick whichever
+line describes your work:
+
+| Your work is… | Point your assistant at | Setup |
+|---|---|---|
+| Meetings, decisions, research, customers, strategy | **the vault itself** | `install.sh /path/to/vault` |
+| Changing code in a repo, and you want the notes next to it | **the code repo** | `install.sh /path/to/repo` |
+
+Both give you the same vault, the same commands and the same automatic reading of
+context. You can do both — engineers usually do, because they want the notes
+loaded while they work in the repo.
+
+**Why the choice exists at all**, since it is not obvious: the end-of-session
+prompt that asks *"you did real work — write it down"* decides whether real work
+happened by looking for **changed files in the folder your assistant is working
+in.** That is a good signal for a code repo and no signal at all for a folder that
+isn't one. If your work is meetings and decisions rather than commits, make the
+vault the working folder — then the files you changed *are* the notes you wrote,
+and the prompt fires exactly when it should. Point a non-engineering session at
+some unrelated folder and you get the reading half of the loop but never the
+writing half, which is the half worth having.
+
+**You may not need an assistant runtime at all.** Reading the vault, contributing
+notes by hand, and asking questions of it from Slack, Discord or Claude Desktop
+all work without ever installing canon into a folder. See
+[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md) and
+[Ask it from chat](#ask-it-from-chat).
 
 ### What happens in a normal work session
 
@@ -154,7 +189,7 @@ flowchart TB
     R["Agent Router · ~40 lines<br/>in context, every session"]
     A["Your agent"]
     V[("Vault on disk · thousands of notes<br/>never loaded whole")]
-    W["Work happens in the code repo"]
+    W["Work happens in your working folder<br/>a code repo, or the vault itself"]
     S(["Stop hook"])
     Q{"Session note<br/>written?"}
     N["Remind — or block"]
@@ -247,19 +282,22 @@ git clone https://github.com/Chris-Carruthers/canon && cd canon
 # 2. Set it up: records the path for this machine, installs the commit safety check
 cd ~/team-vault && ./.canon/bootstrap.sh && cd -
 
-# 3. Wire up a code repo — safe on repos that already have a CLAUDE.md
-./install.sh /path/to/your/repo
+# 3. Wire up the folder you work in. Pick ONE — see "Two ways to set it up".
+./install.sh ~/team-vault            # a. no code repo: the vault IS your workspace
+./install.sh /path/to/your/repo      # b. a code repo — safe if it already has a CLAUDE.md
 
 # 4. Confirm it resolves
-/path/to/your/repo/.claude/hooks/canon-path     # prints the vault path
+~/team-vault/.claude/hooks/canon-path           # prints the vault path
 ./bin/canon-sync --status                       # what would sync; changes nothing
 ```
 
-Then open a Claude Code session in that repo and ask *"what does the team
+Then open a Claude Code session in that folder and ask *"what does the team
 knowledge vault say about how we work?"* If the wiring is live, it answers from
 the router note without being told where to look.
 
-Commit `.claude/` and `CLAUDE.md` so teammates inherit the repo wiring by cloning.
+In case (b), commit `.claude/` and `CLAUDE.md` so teammates inherit the repo
+wiring by cloning. In case (a) they are already in the vault, so cloning the vault
+is all a teammate needs.
 
 **Joining a vault that already exists** is shorter — clone it and run its bootstrap;
 everything it needs is committed inside:
@@ -282,6 +320,12 @@ Nothing hardcodes a path. `canon-path` resolves, first hit wins:
 An explicitly-set `$CANON_HOME` that points nowhere **fails loudly instead of
 falling back** — silently loading a different vault than you asked for is worse
 than loading none.
+
+Rule 2 is a **file**. Inside a vault, `.canon` is a *directory* of vendored
+tooling, so a vault used as its own workspace does not match rule 2 and resolves
+by rule 3 instead. That is why step 2 of the Quickstart matters: `bootstrap.sh`
+writes the path into `~/.config/canon/path`. Nothing breaks if you skip it, but
+the commands will not find the vault.
 
 ## Reading it as a human (Obsidian, optional)
 
@@ -617,9 +661,21 @@ Obsidian is **recommended, not required**: it is the nicest way for a human to
 read a linked vault, and nothing in the kit depends on it. Requirements stay
 `bash`, `git`, `python3`.
 
+**Not a tool for engineers**, despite the examples. The vault is a git repository
+because git is a good way to share a folder of text between fifteen laptops with
+history and no server — not because the content is code. Product, clinical, ops
+and strategy notes are the common case. What *is* engineering-shaped is the
+end-of-session prompt, which infers "real work happened" from changed files in
+your working folder; [Two ways to set it up](#two-ways-to-set-it-up) is how you
+make that fire for work that isn't commits.
+
 ## Requirements
 
 `bash`, `git`, `python3`. No package installs, no daemons, no network calls.
+
+**Not required:** a code repository, an IDE, a terminal (for readers and
+contributors — see [Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)),
+or any particular AI assistant.
 
 ## Status
 

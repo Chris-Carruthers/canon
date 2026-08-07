@@ -157,5 +157,23 @@ finds it, you may not have pulled recently — try Step 5.
 
 ---
 
-Curious how it works, or want your AI assistant reading the vault too? That's the
-[main README](../README.md) — but you don't need any of it to read and contribute notes.
+## Want your AI assistant reading the vault too?
+
+Optional, and **not just for engineers** — the main README's examples install canon
+into a code repository, which makes it look that way. You don't need one. If your
+work is meetings, decisions, research or customers rather than code, the setup is
+to point your assistant at **the vault folder itself**, and everything works the
+same: it reads the team's context before answering, and writes the session note at
+the end.
+
+Two routes, both fine:
+
+- **No terminal, still.** The [MCP server](../README.md#ask-it-from-chat) puts the
+  vault inside Claude Desktop, and there are Slack and Discord bots that answer
+  questions from the vault and cite the notes they used. Ask whoever set this up.
+- **One command.** `install.sh /path/to/your-vault-folder`, then open your
+  assistant with that folder. See
+  [Two ways to set it up](../README.md#two-ways-to-set-it-up).
+
+Neither is needed to read or contribute notes. Everything above this line works on
+its own.

@@ -39,6 +39,24 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Changed
 
+- **The docs no longer read as a tool for engineers.** Every setup example wired
+  canon into a code repository, so readers whose work is meetings, decisions and
+  research concluded it was not for them. A code repo was never required — three
+  of the four vault-resolution paths do not involve one, and `install.sh` works on
+  a folder that is not even a git repo. New **"Two ways to set it up"** section,
+  Quickstart shows both, and the no-terminal guide now ends with the non-engineer
+  route instead of handing readers to a repo-shaped README.
+  - Documents the reason the choice exists: the end-of-session prompt infers "real
+    work happened" from **changed files in the working folder**, which is no
+    signal at all outside a repo. Pointing a non-engineering session at the vault
+    itself makes "files changed here" mean "notes you wrote", and the loop closes.
+    Pointed anywhere else you get the reading half and never the writing half.
+  - `install.sh` says the same thing when the target is not a git repo — a
+    supported setup with one specific consequence, rather than a bare "warning".
+  - Documents that a vault used as its own workspace resolves by
+    `~/.config/canon/path`, not by rule 2: inside a vault `.canon` is a directory
+    of vendored tooling, not the marker file.
+
 - **Session-note filenames are author-scoped in the agent-facing rules:**
   `YYYY-MM-DD — <title> (<initials>).md`. The convention was already documented in
   `docs/MULTIPLAYER.md` and the router, but the two rule files an agent actually
@@ -59,6 +77,13 @@ public surface is the CLI flags, the config variables, and the file formats
   non-ASCII byte, which `bash -n` cannot catch.
 - `canon-sync` no longer treats "this branch has no upstream yet" as a failed
   pull. On a freshly created branch it said `pull failed` and exited 1.
+- **`canon-guard` split staged paths on whitespace**, so a filename with a space
+  in it became several fragments — it reported `Vision/Agent` for
+  `Vision/Agent Router.md`, and matched globs against the fragment rather than the
+  path. Vault filenames have spaces *by convention*
+  (`2026-08-07 — thing (cc).md`), so this was wrong for the naming scheme canon
+  itself prescribes, and `--check` inherited it, making `auto` branch mode's
+  routing unreliable. Now reads `-z` NUL-delimited output.
 
 ### Added (earlier in this cycle)
 

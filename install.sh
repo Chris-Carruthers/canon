@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
-# install.sh — wire a repo up to the team knowledge vault.
+# install.sh — wire a working folder up to the team knowledge vault.
 #
-#   ./install.sh /path/to/repo [--vault /path/to/vault] [--dry-run]
+#   ./install.sh /path/to/folder [--vault /path/to/vault] [--dry-run]
+#
+# The folder is wherever your assistant works. Two normal answers:
+#
+#   a code repo    notes load while you work in it, and stay out of it
+#   the vault      when your work is meetings and decisions, not commits —
+#                  then "files changed here" means "notes you wrote", which is
+#                  what the end-of-session prompt keys off
 #
 # Idempotent and non-destructive:
 #   * never overwrites an existing CLAUDE.md — appends one marked block, once
@@ -31,17 +38,24 @@ while [ $# -gt 0 ]; do
     --vault) VAULT="${2:-}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     *) TARGET="$1"; shift ;;
   esac
 done
 
-[ -n "$TARGET" ] || { echo "usage: install.sh /path/to/repo [--vault PATH]" >&2; exit 2; }
+[ -n "$TARGET" ] || { echo "usage: install.sh /path/to/folder [--vault PATH]" >&2; exit 2; }
 [ -d "$TARGET" ] || { echo "error: not a directory: $TARGET" >&2; exit 2; }
 TARGET="$(cd "$TARGET" && pwd)"
 
-git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1 \
-  || echo "warning: $TARGET is not a git repo — hooks will still work, but team sharing needs one" >&2
+# Not a git repo is a supported setup, not a mistake — but say what it costs,
+# because the end-of-session prompt infers "real work happened" from changed
+# files here and a non-repo folder can never report any.
+git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1 || {
+  echo "note: $TARGET is not a git repo." >&2
+  echo "      Everything works except the end-of-session 'write a session note'" >&2
+  echo "      prompt, which needs changed files to detect that work happened." >&2
+  echo "      If your work is notes rather than code, install into the vault itself." >&2
+}
 
 say() { printf '  %s\n' "$*"; }
 run() { if [ "$DRY" = "1" ]; then say "[dry-run] $*"; else "$@"; fi; }
