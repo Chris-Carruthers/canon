@@ -17,6 +17,14 @@
   <em>Every session makes the team smarter.</em>
 </p>
 
+<p align="center">
+  <strong>For everyone on a team building with AI</strong> — product, design, research,
+  program and project management,<br>support, clinical, ops, strategy, leadership,
+  engineering. Not an engineering tool.<br>
+  <em>It pays off most when the team is cross-functional: a decision recorded by one
+  discipline<br>becomes context for an assistant working in another.</em>
+</p>
+
 **Three ways in.** New to the idea? Start with the plain-English walkthrough below.
 Here to install it? Jump to **[Quickstart](#quickstart)**. Don't use a terminal?
 **[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)** gets you
@@ -73,13 +81,22 @@ anybody else — you change your copy, then send it up.
 ### Two ways to set it up
 
 The examples in this README wire canon into a code repository, and that has misled
-people into reading it as a tool for engineers. It isn't. **A code repository is
-one place to put the standing instruction, not a requirement.** Pick whichever
-line describes your work:
+people into reading it as an engineering tool. **It is for everyone on a team
+building with AI** — product, design, research, program and project management,
+support, clinical, strategy, leadership, and engineering. Engineers are very much
+included; they are just not the point. Whoever on your team is asking an assistant
+to do real work is who this is for, and the value compounds precisely when those
+people are *not* all in the same discipline: a decision recorded by product is
+context engineering needed, and a constraint discovered in code is context product
+needed.
+
+**A code repository is one place to put the standing instruction, not a
+requirement.** Pick whichever line describes your work:
 
 | Your work is… | Point your assistant at | Setup |
 |---|---|---|
-| Meetings, decisions, research, customers, strategy | **the vault itself** | `install.sh /path/to/vault` |
+| Meetings, decisions, research, customers, roadmap, strategy | **the vault itself** | `install.sh /path/to/vault` |
+| Designs, specs, tickets, plans — anything not in a code repo | **the vault itself** | `install.sh /path/to/vault` |
 | Changing code in a repo, and you want the notes next to it | **the code repo** | `install.sh /path/to/repo` |
 
 Both give you the same vault, the same commands and the same automatic reading of
@@ -661,13 +678,21 @@ Obsidian is **recommended, not required**: it is the nicest way for a human to
 read a linked vault, and nothing in the kit depends on it. Requirements stay
 `bash`, `git`, `python3`.
 
-**Not a tool for engineers**, despite the examples. The vault is a git repository
-because git is a good way to share a folder of text between fifteen laptops with
-history and no server — not because the content is code. Product, clinical, ops
-and strategy notes are the common case. What *is* engineering-shaped is the
-end-of-session prompt, which infers "real work happened" from changed files in
-your working folder; [Two ways to set it up](#two-ways-to-set-it-up) is how you
-make that fire for work that isn't commits.
+**Not an engineering-only tool**, despite the examples. It is for whole teams
+building with AI — product, design, research, program and project management,
+support, clinical, ops, strategy, leadership, engineering. The vault is a git
+repository because git is a good way to share a folder of text between fifteen
+laptops with history and no server, *not* because the content is code. Product,
+clinical, ops and strategy notes are the common case, and a cross-functional team
+is where this pays off most: the whole point is that a decision made in one
+discipline is available to an assistant working in another.
+
+One thing genuinely *is* engineering-shaped and worth knowing about: the
+end-of-session prompt infers "real work happened" from changed files in your
+working folder, which is a good signal in a code repo and no signal in a folder
+that isn't one. [Two ways to set it up](#two-ways-to-set-it-up) is how you make it
+fire for work that isn't commits — point it at the vault, and the files you
+changed *are* the notes you wrote.
 
 ## Requirements
 

@@ -59,7 +59,36 @@ SESSIONS_DIR="${CANON_SESSIONS_DIR:-Sessions}"
 #
 # Runs the scanner first via the vault's pre-commit hook, so a credential in a
 # generated note stops the commit instead of entering history.
+#
+# REFUSES TO RUN WITHOUT THE GATE. Git never copies hooks on clone, so a vault can
+# be perfectly usable and completely ungated, with nothing saying so. Committing by
+# hand in that state is the user's own risk, taken knowingly. Automating it is not:
+# it silently turns "I forgot to run bootstrap" into "an agent wrote my API key into
+# permanent history." Verified: with no pre-commit hook, an autocommit will commit a
+# planted AWS key without a word. So check first, and say something useful instead.
 if [ "${CANON_AUTOCOMMIT:-0}" = "1" ] && [ -d "$VAULT/.git" ]; then
+  HOOKS_DIR="$(git -C "$VAULT" config --get core.hooksPath 2>/dev/null || true)"
+  if [ -n "$HOOKS_DIR" ]; then
+    case "$HOOKS_DIR" in /*) : ;; *) HOOKS_DIR="$VAULT/$HOOKS_DIR" ;; esac
+  else
+    HOOKS_DIR="$VAULT/.git/hooks"
+  fi
+  if ! grep -qs 'canon' "$HOOKS_DIR/pre-commit" 2>/dev/null; then
+    if [ -n "$(git -C "$VAULT" status --porcelain 2>/dev/null | head -1)" ]; then
+      : > "$GUARD" 2>/dev/null || true
+      python3 - "$VAULT" <<'PY' 2>/dev/null || true
+import json, sys
+print(json.dumps({"systemMessage":
+  "Vault auto-commit is enabled but the pre-commit secret gate is NOT installed, so "
+  "nothing was committed. This is deliberate: committing automatically without the "
+  "gate is how a credential ends up in permanent history with nobody noticing.\n\n"
+  f"Fix it once, and it stays fixed:  cd '{sys.argv[1]}' && ./.canon/bootstrap.sh\n\n"
+  "Git never copies hooks when you clone, so this is per-machine. Until then commit "
+  "the vault by hand, so a person is looking."}))
+PY
+    fi
+    exit 0
+  fi
   if [ -n "$(git -C "$VAULT" status --porcelain 2>/dev/null | head -1)" ]; then
     git -C "$VAULT" add -A >/dev/null 2>&1 || true
     n="$(git -C "$VAULT" diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')"
