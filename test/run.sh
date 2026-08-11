@@ -499,7 +499,12 @@ section "concurrent writers"
 # Two people and one shared branch, which is the whole point of a team vault.
 
 SY="$KIT/bin/canon-sync"
-RMT="$SB/team.git"; git init -q --bare "$RMT"
+# Pin the bare repo's HEAD instead of inheriting init.defaultBranch. Without this
+# the fixture passes on a machine that defaults to `main` and fails on one that
+# defaults to `master`: the clone below finds no matching branch, checks nothing
+# out, and the teammate can never push — so the race these tests assert on never
+# happens. symbolic-ref rather than `init -b`, which needs git >= 2.28.
+RMT="$SB/team.git"; git init -q --bare "$RMT"; git -C "$RMT" symbolic-ref HEAD refs/heads/main
 V6="$SB/vault6"                       # "us"
 "$KIT/bin/canon-init-vault" "$V6" >/dev/null 2>&1
 cd "$V6" || exit 1
