@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-153%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-177%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -284,6 +284,7 @@ flowchart LR
 | **`canon-status`** | Are you in step with the team? Silent when you are |
 | **`canon-trust`** | Who wrote each note, who confirmed it, what has gone stale |
 | **`canon-verify`** | Records that a human read a note and stands behind it |
+| **`canon-design-audit`** | Does the code match the design canon? Derives violations and coverage every run; never compares token values |
 | **Chat connectors** | Ask the canon questions from **Slack** or **Discord**; read-only, cites its sources |
 | **MCP server** | Exposes the vault to **any MCP client** — Claude Desktop, Cursor, VS Code. One connector, not one per editor |
 
@@ -614,6 +615,82 @@ Every key is optional and nothing is ever rejected for lacking them — absence 
 carries meaning. The shape follows the
 [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md),
 so a canon vault stays legible to other OKF-aware tooling.
+
+## The design canon: names and pointers, never values
+
+A design system is mostly code, and code stays out of the vault. So
+`Reference/Design/` holds the part that isn't code — and the split is sharper than
+it first looks:
+
+> A token **name** is API surface, like a schema field name, and `Reference/` is for
+> schemas. A token **value** is source. It has a format, it belongs to a cascade, and
+> any tool can read it from the repo when asked.
+
+Copy values into the vault and you have built a second source of truth that drifts
+silently while reading as authoritative.
+
+**For coding agents, the useful part is that assets resolve deterministically.** Two
+frozen fenced blocks — `design-tokens` and `design-components` — give a three-rung
+ladder, and *every rung's absence is detectable*:
+
+| Rung | Field | Needs |
+|---|---|---|
+| Exported image | `image: Attachments/Design/<slug>--<variant>--<state>@<theme>.png` | nothing |
+| Figma node | `figma: { file: <key>, node: <dash-form-id> }` | Figma MCP or an authed fetch |
+| Implementation | `impl: repo/path[:line]` | the repo |
+
+Filenames are **constructible**, so an agent derives the expected path from the slug
+and checks whether it exists rather than guessing. **Omit a key you do not have —
+never `TODO`.** Absence is the signal, and coverage is derived from it. `status:
+absent` is a legitimate row: *"there is no shared `PageHeader`"* stops an agent
+hunting for one and stops it silently inventing a fourth.
+
+### `canon-design-audit`
+
+```
+$ canon-design-audit ~/code/web-app
+canon-design-audit 0.2.0
+  scanned 695 file(s) in 1 repo(s)
+  canon: 5 vocabular(ies), 24 component(s)
+
+  VIOLATION DS-PALETTE-UTILITY     14054
+              web-app/src/Page.tsx:31  bg-blue-500
+              … and 14049 more
+  VIOLATION DS-COLOR-LITERAL       551
+  GAP       DS-FORMAT-SPLIT        19
+              --primary  declared in app-shell, optimize, tenant-hub across
+                         formats hsl-triplet, oklch
+
+  coverage: image 0/24 · figma 6/24 · impl 20/24 · absent 4
+```
+
+Two claims worth being precise about, because they are why the thing is usable:
+
+**Derived, never stored.** It reads the contract from the vault and the facts from
+the code and recomputes on every run. No frontmatter caches a verdict, no note holds
+a score, and there is no scorecard to keep current. `--report` writes one dated
+`Outputs/` note carrying `stale_after: +30d`, so `canon-trust --strict` fails on an
+audit nobody re-ran.
+
+**It never compares two token values.** Deciding whether `var(--foreground)` equals
+`222 47% 11%` is a CSS resolution problem — aliases, `calc()`, colour spaces, the
+cascade, shadow-root scoping — and a regex cannot solve it. So it compares **name
+sets and format labels** and leaves value equivalence to the browser. This is a
+direct lesson from a real token-parity script that reports nine false results out of
+twenty-six and is consequently read by nobody.
+
+Everything else follows from the same instinct: **VIOLATION** is a fact you can check
+by opening the cited line, **GAP** is a judgement call and can never fail a build,
+the Tailwind rule uses a **closed list** of the default palette so `bg-primary` is
+structurally unmatchable, the skip-list is **learned from the canon** so declaring a
+vocabulary silences its own false positives, and `--strict` compares against a
+`.canon-design-baseline` rather than zero — on a repo with fourteen thousand existing
+violations the only useful signal is *did it get worse*.
+
+It is **read-only in every repo it scans**, asserted by a test. And it is not in any
+pre-commit hook: it scans code repos, not the vault. It measures. Enforcement is
+CODEOWNERS on the token files plus branch protection, in the repos where those files
+live.
 
 ## Ownership: not everything should be everyone's
 

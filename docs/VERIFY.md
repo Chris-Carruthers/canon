@@ -103,6 +103,47 @@ Preventers leak; detectors tell you *how much*. Weekly, check the vault for:
 
 Assign this to a person, not a process. An unowned knowledge base decays quietly.
 
+## Calibrate `canon-design-audit` before you trust it
+
+A detector whose first run does not match a number you measured independently is a
+detector nobody will believe — and there is a cautionary example in the wild: a
+token-parity script that reports nine false results out of twenty-six and is
+therefore read by nobody. So calibrate rather than assume.
+
+1. **Measure one rule by hand first.** Pick a repo and count palette utilities with
+   your own grep. Note the number.
+2. **Run the audit and reconcile the difference.** It scans more prefixes than a
+   quick grep, so expect it to report *more* — and expect to be able to say exactly
+   why. If you cannot explain the gap, do not trust the tool yet.
+   ```bash
+   canon-design-audit --vault /path/to/vault --quiet /path/to/repo
+   ```
+3. **Check the false-positive guards actually fire.** Findings inside a file the
+   canon declares as a `source:` or `catalog:` must be **zero** — that skip-list is
+   learned from the canon, not hardcoded. And no finding should name a
+   project-specific utility like `bg-primary`.
+   ```bash
+   canon-design-audit --vault /path/to/vault --json /path/to/repo \
+     | python3 -c "import json,sys;d=json.load(sys.stdin);\
+print(sum(1 for f in d['findings'] if 'tokens.css' in f['location']))"
+   ```
+4. **Confirm it wrote nothing.** It is read-only in every repo it scans; the only
+   file it ever writes is the report.
+   ```bash
+   git -C /path/to/repo status --porcelain    # must be empty
+   ```
+5. **Check the report stores no verdict.** Counts are facts with locations; a grade
+   would be a stored judgement that is wrong the next day.
+   ```bash
+   grep -cE '^(compliance_score|design_coverage|a11y_grade|score):' \
+     /path/to/vault/Outputs/*Design*Audit*.md    # must be 0
+   ```
+
+Then set a baseline, because zero is not the useful threshold on an existing
+codebase: `canon-design-audit --baseline-write <repo> > <repo>/.canon-design-baseline`.
+After that `--strict` fails only on a regression. Lower the numbers as you clean up —
+that is the whole point of the file.
+
 ---
 
 ## Verification record

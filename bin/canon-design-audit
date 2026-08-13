@@ -1,0 +1,606 @@
+#!/usr/bin/env bash
+# canon-design-audit — does the code match the design canon?
+#
+#   canon-design-audit <repo> [<repo>...]
+#
+#   --vault PATH       vault to read the canon from (default: via canon-path)
+#   --report           write a dated report into <vault>/Outputs/
+#   --strict           exit 1 when a VIOLATION count exceeds its baseline
+#   --json             machine-readable findings on stdout
+#   --baseline-write   print a .canon-design-baseline for redirection
+#   --quiet            counts only
+#
+# It reads the CONTRACT from the vault — the design-tokens and design-components
+# blocks under Reference/Design/ — and the FACTS from your code repos, and
+# recomputes everything on every run. Nothing is cached in frontmatter, no score
+# is stored, and there is no scorecard note to keep current.
+#
+# READ-ONLY in every repo it scans. The single file it ever writes is the report,
+# and only with --report.
+#
+# WHAT IT DELIBERATELY DOES NOT DO: compare two token values.
+#
+# That is not an omission, it is the design. Deciding whether `var(--foreground)`
+# in one file equals `222 47% 11%` in another is a CSS resolution problem —
+# aliases, calc(), colour spaces, the cascade, shadow-root scoping — and a regex
+# cannot solve it. A tool that tries produces confident false results, and a
+# report with known-false lines in it is a report nobody reads. So this compares
+# NAME SETS and FORMAT LABELS, and leaves value equivalence to the browser.
+#
+# Two severities, and only one can fail a build:
+#   VIOLATION  a fact you can verify by opening the cited file at the cited line
+#   GAP        a judgement call. Never fails anything, even with --strict.
+
+set -uo pipefail
+
+CANON_VERSION="0.2.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VAULT=""; MODE="text"; DO_REPORT=0; STRICT=0; QUIET=0; BASELINE_WRITE=0
+# An indexed array, not a newline-joined string piped on stdin: the python body
+# arrives via `python3 - <<'PY'`, which IS stdin, so anything piped in is
+# swallowed by the heredoc and the repo list silently arrives empty.
+REPOS=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --vault) VAULT="${2:-}"; shift 2 ;;
+    --report) DO_REPORT=1; shift ;;
+    --strict) STRICT=1; shift ;;
+    --json) MODE="json"; shift ;;
+    --baseline-write) BASELINE_WRITE=1; shift ;;
+    --quiet) QUIET=1; shift ;;
+    -h|--help) sed -n '2,34p' "$0"; exit 0 ;;
+    -*) echo "canon-design-audit: unknown option: $1" >&2; exit 2 ;;
+    *) REPOS[${#REPOS[@]}]="$1"; shift ;;
+  esac
+done
+
+if [ "${#REPOS[@]}" -eq 0 ]; then
+  echo "canon-design-audit: name at least one repo to scan" >&2
+  echo "usage: canon-design-audit [options] <repo> [<repo>...]" >&2
+  exit 2
+fi
+
+# --- locate the vault --------------------------------------------------------
+if [ -z "$VAULT" ]; then
+  R="$HERE/canon-path"; [ -x "$R" ] || R="$(command -v canon-path 2>/dev/null || true)"
+  [ -n "$R" ] && [ -x "$R" ] && VAULT="$("$R" 2>/dev/null || true)"
+fi
+[ -n "$VAULT" ] || { echo "canon-design-audit: no vault configured (set \$CANON_HOME or pass --vault)" >&2; exit 2; }
+[ -d "$VAULT" ] || { echo "canon-design-audit: not a directory: ${VAULT}" >&2; exit 2; }
+
+python3 - \
+  "$VAULT" "$MODE" "$DO_REPORT" "$STRICT" "$QUIET" "$BASELINE_WRITE" "$CANON_VERSION" \
+  "${REPOS[@]}" <<'PY'
+import datetime, json, os, re, sys
+
+vault, mode, do_report, strict, quiet, baseline_write, version = (
+    sys.argv[1], sys.argv[2], sys.argv[3] == "1", sys.argv[4] == "1",
+    sys.argv[5] == "1", sys.argv[6] == "1", sys.argv[7])
+repos = [os.path.abspath(p) for p in sys.argv[8:] if p.strip()]
+
+# ---------------------------------------------------------------------------
+# FROZEN key sets. These must match templates/vault/Templates/Design System.md.
+# The kit already carries one scar from letting a template and its validator
+# drift: a Product Spec template whose fence names never matched the validator
+# written against it, so every file made from the template failed the check.
+# ---------------------------------------------------------------------------
+TOKEN_KEYS = {"vocabulary", "source", "format", "scope", "catalog", "names",
+              "status", "of"}
+COMP_KEYS = {"slug", "name", "vocabulary", "figma", "image", "impl", "tokens",
+             "status", "note"}
+FORMATS = {"hsl-triplet", "oklch", "hex", "rgb-triplet", "named"}
+
+# Tailwind's default palette, enumerated on purpose. A pattern like
+# `bg-[a-z]+-[0-9]+` would also match bg-primary-500 and every project's own
+# scale, and a rule with false positives in it is a rule people switch off.
+TW_COLORS = ("slate gray zinc neutral stone red orange amber yellow lime green "
+             "emerald teal cyan sky blue indigo violet purple fuchsia pink rose").split()
+TW_STEPS = "50 100 200 300 400 500 600 700 800 900 950".split()
+TW_PREFIX = ("bg text border ring fill stroke from to via outline decoration "
+             "shadow accent caret divide placeholder").split()
+RE_PALETTE = re.compile(
+    r"\b(?:%s)-(?:%s)-(?:%s)\b" % ("|".join(TW_PREFIX), "|".join(TW_COLORS),
+                                   "|".join(TW_STEPS)))
+
+# Hex heuristic, documented because it is a heuristic: 6- and 8-digit forms are
+# taken as colours; 3- and 4-digit forms only when they contain a hex letter, so
+# an issue reference like #1234 is not reported as a colour.
+RE_HEX = re.compile(r"#(?:[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|[0-9a-fA-F]{3,4})\b")
+RE_FUNC = re.compile(r"\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\s*\(")
+RE_TW_ARBITRARY = re.compile(r"-\[#(?:[0-9a-fA-F]{3,8})\]")
+RE_DECL = re.compile(r"(--[a-zA-Z][a-zA-Z0-9-]*)\s*:")
+RE_NODE = re.compile(r"^[0-9]+-[0-9]+$")
+RE_FILEKEY = re.compile(r"^[A-Za-z0-9]{20,25}$")
+
+SCAN_EXT = {".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs", ".css", ".scss",
+            ".sass", ".less", ".html", ".vue", ".svelte", ".astro"}
+SKIP_DIR = {".git", "node_modules", "dist", "build", "out", ".next", ".nuxt",
+            ".output", "coverage", "vendor", "target", ".turbo", ".cache",
+            "__pycache__", ".venv"}
+
+
+def strip_comments(text, ext):
+    """Kill commented-out colours before matching. Not a parser, and does not
+    pretend to be — it removes the one class of false positive that actually
+    shows up, which is a hex value someone commented out rather than deleted."""
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    if ext in (".html", ".vue", ".svelte", ".astro"):
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    # `//` only when not preceded by a colon or word char, so https:// survives.
+    text = re.sub(r"(?<![:\w])//[^\n]*", "", text)
+    return text
+
+
+def read_text(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def records(body):
+    """Split a fenced block into `- key: value` records. Same shape the kit's
+    other fenced blocks use: one record starts at a `- ` in column zero."""
+    out, cur = [], None
+    for raw in body.split("\n"):
+        if raw.startswith("- "):
+            if cur is not None:
+                out.append(cur)
+            cur = [raw[2:]]
+        elif cur is not None and raw.strip():
+            cur.append(raw.strip())
+    if cur is not None:
+        out.append(cur)
+    parsed = []
+    for rec in out:
+        d = {}
+        for line in rec:
+            if ":" not in line:
+                continue
+            k, v = line.split(":", 1)
+            d[k.strip()] = v.strip()
+        parsed.append(d)
+    return parsed
+
+
+def listval(v):
+    v = v.strip()
+    if v.startswith("[") and v.endswith("]"):
+        v = v[1:-1]
+    return [x.strip() for x in v.split(",") if x.strip()]
+
+
+def mapval(v):
+    """Parse `{ file: abc, node: 1-2 }` — the same inline-mapping shape the kit
+    already uses for `generated: { by:, at: }`."""
+    v = v.strip().lstrip("{").rstrip("}")
+    d = {}
+    for part in v.split(","):
+        if ":" in part:
+            k, val = part.split(":", 1)
+            d[k.strip()] = val.strip()
+    return d
+
+
+findings = []       # (severity, rule, location, detail)
+
+
+def add(sev, rule, loc, detail):
+    findings.append((sev, rule, loc, detail))
+
+
+# ---------------------------------------------------------------------------
+# 1. Read the contract out of the vault.
+#    Globbed, not a fixed filename, so a block can move to a sibling note when
+#    the index note outgrows its 200-line budget.
+# ---------------------------------------------------------------------------
+design_dir = os.path.join(vault, "Reference", "Design")
+canon_files = []
+for root, dirs, files in os.walk(design_dir):
+    dirs[:] = sorted(d for d in dirs if d not in SKIP_DIR)
+    for f in sorted(files):
+        if f.endswith(".md"):
+            canon_files.append(os.path.join(root, f))
+
+vocabs, comps = {}, []
+for path in canon_files:
+    rel = os.path.relpath(path, vault)
+    text = read_text(path)
+    for kind, body in re.findall(r"```(design-tokens|design-components)\n(.*?)```",
+                                text, flags=re.S):
+        for rec in records(body):
+            unknown = sorted(set(rec) - (TOKEN_KEYS if kind == "design-tokens"
+                                         else COMP_KEYS))
+            if unknown:
+                add("VIOLATION", "DS-BLOCK-MALFORMED", rel,
+                    "unknown key(s) in %s: %s" % (kind, ", ".join(unknown)))
+            if kind == "design-tokens":
+                slug = rec.get("vocabulary")
+                if not slug:
+                    add("VIOLATION", "DS-BLOCK-MALFORMED", rel,
+                        "design-tokens record with no vocabulary")
+                    continue
+                if slug in vocabs:
+                    add("VIOLATION", "DS-BLOCK-MALFORMED", rel,
+                        "duplicate vocabulary: %s" % slug)
+                fmt = rec.get("format")
+                if fmt and fmt not in FORMATS:
+                    add("VIOLATION", "DS-BLOCK-MALFORMED", rel,
+                        "unknown format %r for %s" % (fmt, slug))
+                rec["_note"] = rel
+                vocabs[slug] = rec
+            else:
+                if not rec.get("slug") or not rec.get("name"):
+                    add("VIOLATION", "DS-BLOCK-MALFORMED", rel,
+                        "design-components record missing slug or name")
+                    continue
+                rec["_note"] = rel
+                comps.append(rec)
+
+seen = set()
+for c in comps:
+    if c["slug"] in seen:
+        add("VIOLATION", "DS-BLOCK-MALFORMED", c["_note"],
+            "duplicate component slug: %s" % c["slug"])
+    seen.add(c["slug"])
+
+# Placeholder text defeats the whole design: absence is the signal, and coverage
+# is derived from it, so a TODO reports as complete-but-broken.
+PLACEHOLDER = {"todo", "tbd", "?", "n/a", "na", "-", "none", "xxx", "fixme"}
+# Checked on pointer and enum keys only. `name` and `note` are free text, and a
+# component legitimately called "Todo" or a note titled "None of the above" is not
+# a placeholder — flagging it would be the tool's own first false positive.
+PLACEHOLDER_KEYS = {"vocabulary", "source", "format", "scope", "catalog", "names",
+                    "status", "of", "slug", "figma", "image", "impl", "tokens"}
+for rec in list(vocabs.values()) + comps:
+    for k, v in sorted(rec.items()):
+        if k.startswith("_") or k not in PLACEHOLDER_KEYS:
+            continue
+        if v.strip().lower() in PLACEHOLDER:
+            add("VIOLATION", "DS-BLOCK-MALFORMED", rec["_note"],
+                "%s: %r — omit the key instead; absence is the signal"
+                % (k, v.strip()))
+
+# ---------------------------------------------------------------------------
+# 2. Resolve repo-prefixed pointers.
+#    `dexhive-prod-frontend/src/x.css` resolves against a scanned repo whose
+#    basename matches the first segment. If that repo was NOT scanned we report
+#    nothing — an unscanned repo is unverifiable, not broken. Calling it dead
+#    would be the tool's first false positive.
+# ---------------------------------------------------------------------------
+repo_by_name = {}
+for p in repos:
+    repo_by_name[os.path.basename(p.rstrip("/"))] = p
+
+unverifiable = []
+
+
+def resolve(pointer):
+    p = pointer.split(":", 1)[0].strip()
+    parts = p.split("/", 1)
+    if len(parts) != 2:
+        return None, False
+    name, rest = parts
+    root = repo_by_name.get(name)
+    if root is None:
+        return None, False        # repo not scanned → unverifiable
+    return os.path.join(root, rest), True
+
+
+declared_token_files = set()
+for slug, rec in sorted(vocabs.items()):
+    for key in ("source", "catalog"):
+        ptr = rec.get(key)
+        if not ptr:
+            continue
+        abspath, checkable = resolve(ptr)
+        if not checkable:
+            unverifiable.append("%s (%s of %s)" % (ptr, key, slug))
+            continue
+        declared_token_files.add(os.path.realpath(abspath))
+        if not os.path.exists(abspath):
+            add("VIOLATION", "DS-POINTER-DEAD", ptr,
+                "%s of vocabulary %s does not exist" % (key, slug))
+
+for c in comps:
+    ptr = c.get("impl")
+    if ptr:
+        abspath, checkable = resolve(ptr)
+        if not checkable:
+            unverifiable.append("%s (impl of %s)" % (ptr, c["slug"]))
+        elif not os.path.exists(abspath):
+            add("VIOLATION", "DS-POINTER-DEAD", ptr,
+                "impl of component %s does not exist" % c["slug"])
+    img = c.get("image")
+    if img and not os.path.exists(os.path.join(vault, img)):
+        add("VIOLATION", "DS-ASSET-MISSING", img,
+            "image for %s is not in the vault" % c["slug"])
+    fig = c.get("figma")
+    if fig:
+        m = mapval(fig)
+        raw = fig.lower()
+        if "figma.com" in raw or "t=" in raw:
+            add("VIOLATION", "DS-FIGMA-MALFORMED", c["_note"],
+                "%s: store file + node, not a URL — URLs carry a rename-fragile "
+                "slug and often a t= session parameter" % c["slug"])
+        else:
+            if not RE_FILEKEY.match(m.get("file", "")):
+                add("VIOLATION", "DS-FIGMA-MALFORMED", c["_note"],
+                    "%s: file %r is not a Figma file key" % (c["slug"], m.get("file", "")))
+            if not RE_NODE.match(m.get("node", "")):
+                add("VIOLATION", "DS-FIGMA-MALFORMED", c["_note"],
+                    "%s: node %r is not dash form (e.g. 2566-21359)"
+                    % (c["slug"], m.get("node", "")))
+    voc = c.get("vocabulary")
+    if voc and voc not in vocabs:
+        add("GAP", "DS-TOKEN-UNDECLARED", c["_note"],
+            "%s references unknown vocabulary %s" % (c["slug"], voc))
+
+# ---------------------------------------------------------------------------
+# 3. Name-set comparison. Names and format labels only — never values.
+# ---------------------------------------------------------------------------
+for slug, rec in sorted(vocabs.items()):
+    declared = set(listval(rec.get("names", "")))
+    src = rec.get("source")
+    if not (src and declared):
+        continue
+    abspath, checkable = resolve(src)
+    if not (checkable and os.path.exists(abspath)):
+        continue
+    actual = set(RE_DECL.findall(read_text(abspath)))
+    for n in sorted(actual - declared):
+        add("GAP", "DS-TOKEN-UNDECLARED", src,
+            "%s declares %s, the canon does not list it" % (slug, n))
+    for n in sorted(declared - actual):
+        add("GAP", "DS-TOKEN-MISSING", src,
+            "the canon lists %s for %s, the file does not declare it" % (n, slug))
+
+by_name = {}
+for slug, rec in sorted(vocabs.items()):
+    for n in listval(rec.get("names", "")):
+        by_name.setdefault(n, []).append((slug, rec.get("format", "?")))
+for n, owners in sorted(by_name.items()):
+    fmts = sorted({f for _, f in owners})
+    if len(owners) > 1 and len(fmts) > 1:
+        add("GAP", "DS-FORMAT-SPLIT", n,
+            "declared in %s across formats %s — same name, different colour space"
+            % (", ".join(s for s, _ in owners), ", ".join(fmts)))
+
+# ---------------------------------------------------------------------------
+# 4. Scan the repos. Read-only, always.
+# ---------------------------------------------------------------------------
+def excludes_for(repo):
+    pats = []
+    f = os.path.join(repo, ".canon-design-exclude")
+    for line in read_text(f).split("\n"):
+        line = line.split("#", 1)[0].strip()
+        if line:
+            try:
+                pats.append(re.compile(line))
+            except re.error:
+                pass
+    return pats
+
+
+files_with_findings = set()
+scanned_files = 0
+
+for repo in repos:
+    if not os.path.isdir(repo):
+        add("VIOLATION", "DS-POINTER-DEAD", repo, "not a directory")
+        continue
+    name = os.path.basename(repo.rstrip("/"))
+    pats = excludes_for(repo)
+    for root, dirs, files in os.walk(repo):
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIR)
+        for fn in sorted(files):
+            ext = os.path.splitext(fn)[1]
+            if ext not in SCAN_EXT:
+                continue
+            if fn.endswith((".min.js", ".min.css", ".map")):
+                continue
+            full = os.path.join(root, fn)
+            rel = os.path.relpath(full, repo)
+            # The skip-list is LEARNED FROM THE CANON: a file the canon names as
+            # a token source is supposed to contain literals. Declaring a new
+            # vocabulary therefore silences its own false positives.
+            if os.path.realpath(full) in declared_token_files:
+                continue
+            if any(p.search(rel) for p in pats):
+                continue
+            scanned_files += 1
+            text = strip_comments(read_text(full), ext)
+            for i, line in enumerate(text.split("\n"), 1):
+                loc = "%s/%s:%d" % (name, rel, i)
+                for m in RE_PALETTE.finditer(line):
+                    add("VIOLATION", "DS-PALETTE-UTILITY", loc, m.group(0))
+                    files_with_findings.add(loc.rsplit(":", 1)[0])
+                for m in RE_TW_ARBITRARY.finditer(line):
+                    add("VIOLATION", "DS-COLOR-LITERAL", loc, m.group(0))
+                    files_with_findings.add(loc.rsplit(":", 1)[0])
+                for m in RE_HEX.finditer(line):
+                    add("VIOLATION", "DS-COLOR-LITERAL", loc, m.group(0))
+                    files_with_findings.add(loc.rsplit(":", 1)[0])
+                for m in RE_FUNC.finditer(line):
+                    add("VIOLATION", "DS-COLOR-LITERAL", loc, m.group(0).strip())
+                    files_with_findings.add(loc.rsplit(":", 1)[0])
+
+# ---------------------------------------------------------------------------
+# 5. Counts, coverage, baseline.
+# ---------------------------------------------------------------------------
+counts = {}
+for sev, rule, _, _ in findings:
+    counts[rule] = counts.get(rule, 0) + 1
+severity = {}
+for sev, rule, _, _ in findings:
+    severity[rule] = sev
+
+total = len(comps)
+cov = {
+    "image": sum(1 for c in comps if c.get("image")),
+    "figma": sum(1 for c in comps if c.get("figma")),
+    "impl": sum(1 for c in comps if c.get("impl")),
+    "absent": sum(1 for c in comps if c.get("status") == "absent"),
+}
+
+baseline = {}
+for repo in repos:
+    for line in read_text(os.path.join(repo, ".canon-design-baseline")).split("\n"):
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) == 2 and parts[1].isdigit():
+            baseline[parts[0]] = baseline.get(parts[0], 0) + int(parts[1])
+
+if baseline_write:
+    print("# canon-design-audit baseline. --strict fails only when a count EXCEEDS")
+    print("# these. Lower them as you clean up; that is the whole point.")
+    for rule in sorted(counts):
+        if severity.get(rule) == "VIOLATION":
+            print("%s %d" % (rule, counts[rule]))
+    sys.exit(0)
+
+regressions = []
+for rule in sorted(counts):
+    if severity.get(rule) != "VIOLATION":
+        continue
+    allowed = baseline.get(rule, 0)
+    if counts[rule] > allowed:
+        regressions.append((rule, counts[rule], allowed))
+
+CAP = 20
+findings.sort(key=lambda f: (f[0] != "VIOLATION", f[1], f[2]))
+
+
+def render_report(when):
+    stale = (when + datetime.timedelta(days=30)).date().isoformat()
+    out = []
+    out.append("---")
+    out.append("type: output")
+    out.append("status: stable")
+    out.append("date: %s" % when.date().isoformat())
+    out.append("generated:")
+    out.append("  by: process:canon-design-audit")
+    out.append("  at: %sZ" % when.replace(microsecond=0).isoformat())
+    out.append("stale_after: %s" % stale)
+    out.append("tool_version: %s" % version)
+    out.append("repos_scanned: [%s]"
+               % ", ".join(os.path.basename(r.rstrip("/")) for r in repos))
+    out.append("---")
+    out.append("")
+    out.append("# Design System Audit — %s" % when.date().isoformat())
+    out.append("")
+    out.append("Derived from the design canon in `Reference/Design/` plus the code, "
+               "recomputed on this run. **Nothing here is stored anywhere else.** "
+               "Do not hand-edit — change the canon or change the code, and re-run.")
+    out.append("")
+    out.append("Scanned %d file(s) across %d repo(s)."
+               % (scanned_files, len(repos)))
+    out.append("")
+    out.append("| Rule | Severity | Count | Baseline |")
+    out.append("|---|---|---|---|")
+    for rule in sorted(counts):
+        out.append("| `%s` | %s | %d | %s |"
+                   % (rule, severity.get(rule, "?"), counts[rule],
+                      baseline.get(rule, "—") if severity.get(rule) == "VIOLATION" else "n/a"))
+    if not counts:
+        out.append("| — | — | 0 | — |")
+    out.append("")
+    out.append("## Coverage")
+    out.append("")
+    out.append("Derived from which keys are present, so an omitted key reads as a "
+               "gap rather than as done:")
+    out.append("")
+    out.append("- **%d of %d** components resolve to an exported image" % (cov["image"], total))
+    out.append("- **%d of %d** resolve to a Figma node" % (cov["figma"], total))
+    out.append("- **%d of %d** resolve to an implementation" % (cov["impl"], total))
+    out.append("- **%d** are recorded as deliberately absent" % cov["absent"])
+    out.append("")
+    for rule in sorted(counts):
+        rows = [f for f in findings if f[1] == rule]
+        out.append("## %s — %s (%d)" % (rule, severity.get(rule, "?"), len(rows)))
+        out.append("")
+        for _, _, loc, detail in rows[:CAP]:
+            out.append("- `%s` — %s" % (loc, detail))
+        if len(rows) > CAP:
+            out.append("- … and %d more" % (len(rows) - CAP))
+        out.append("")
+    if unverifiable:
+        out.append("## Unverifiable pointers")
+        out.append("")
+        out.append("Named repos that were not scanned. Not reported as dead — an "
+                   "unscanned repo is unknown, not broken.")
+        out.append("")
+        for u in sorted(set(unverifiable))[:CAP]:
+            out.append("- `%s`" % u)
+        out.append("")
+    out.append("---")
+    out.append("")
+    out.append("No score is recorded, here or anywhere. Counts are facts with "
+               "locations; a grade would be a stored judgement that is wrong the "
+               "next day. Re-run to refresh.")
+    return "\n".join(out) + "\n"
+
+
+if mode == "json":
+    print(json.dumps({
+        "tool_version": version,
+        "vault": vault,
+        "repos": repos,
+        "scanned_files": scanned_files,
+        "counts": counts,
+        "severity": severity,
+        "coverage": dict(cov, total=total),
+        "baseline": baseline,
+        "regressions": [{"rule": r, "count": c, "baseline": b} for r, c, b in regressions],
+        "unverifiable": sorted(set(unverifiable)),
+        "findings": [{"severity": s, "rule": r, "location": l, "detail": d}
+                     for s, r, l, d in findings],
+    }, indent=2, sort_keys=True))
+elif not quiet:
+    print("canon-design-audit %s" % version)
+    print("  vault: %s" % vault)
+    print("  scanned %d file(s) in %d repo(s)" % (scanned_files, len(repos)))
+    print("  canon: %d vocabular(ies), %d component(s)" % (len(vocabs), total))
+    print("")
+    if not counts:
+        print("  no findings")
+    for rule in sorted(counts):
+        print("  %-9s %-22s %d" % (severity.get(rule, "?"), rule, counts[rule]))
+        for _, _, loc, detail in [f for f in findings if f[1] == rule][:5]:
+            print("              %s  %s" % (loc, detail))
+        if counts[rule] > 5:
+            print("              … and %d more" % (counts[rule] - 5))
+    print("")
+    print("  coverage: image %d/%d · figma %d/%d · impl %d/%d · absent %d"
+          % (cov["image"], total, cov["figma"], total, cov["impl"], total, cov["absent"]))
+    if unverifiable:
+        print("  %d pointer(s) unverifiable (repo not scanned)" % len(set(unverifiable)))
+else:
+    for rule in sorted(counts):
+        print("%s %d" % (rule, counts[rule]))
+
+if do_report:
+    when = datetime.datetime.utcnow()
+    outdir = os.path.join(vault, "Outputs")
+    os.makedirs(outdir, exist_ok=True)
+    dest = os.path.join(outdir, "%s — Design System Audit.md" % when.date().isoformat())
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write(render_report(when))
+    if not quiet and mode != "json":
+        print("  report: %s" % os.path.relpath(dest, vault))
+
+if strict and regressions:
+    sys.stderr.write("\ncanon-design-audit: VIOLATION counts above baseline\n")
+    for rule, c, b in regressions:
+        sys.stderr.write("  %s: %d (baseline %d)\n" % (rule, c, b))
+    sys.stderr.write("Write a baseline with --baseline-write if this is the "
+                     "starting point rather than a regression.\n")
+    sys.exit(1)
+sys.exit(0)
+PY

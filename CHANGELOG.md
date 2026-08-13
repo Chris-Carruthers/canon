@@ -58,6 +58,46 @@ public surface is the CLI flags, the config variables, and the file formats
     deterministic split: if a note cites the path in frontmatter it lives in
     `Attachments/`; if the ingest loop compiles it away it lives in `Sources/`.
 
+- **`canon-design-audit`** — reads the contract from the vault and the facts from
+  your code repos, and recomputes everything every run. Six VIOLATION rules
+  (colour literals, Tailwind palette utilities, dead pointers, missing assets,
+  malformed Figma references, malformed blocks) and three GAP rules (name-set and
+  format-label mismatches), plus derived coverage. `--report` writes one dated
+  `Outputs/` note stamped `process:canon-design-audit` with `stale_after: +30d`, so
+  `canon-trust --strict` fails on an audit nobody re-ran.
+
+  Most of its design is about **not** being the tool nobody reads. The existing
+  cautionary example is a token-parity script that reports nine false `DRIFTED`
+  results out of twenty-six, because it compares an alias against a literal:
+
+  - **It never compares two token values.** Value equivalence across aliases,
+    `calc()`, colour spaces, the cascade and shadow-root scoping is a CSS
+    resolution problem a regex cannot solve. It compares name sets and format
+    labels and leaves the rest to the browser. Stated in the header as a design
+    constraint, not an omission.
+  - **Two severities, one of which can fail a build.** VIOLATION is checkable by
+    opening the cited line; GAP is a judgement call and never fails anything, even
+    with `--strict`. A tool that fails on judgement calls gets switched off.
+  - **The skip-list is learned from the canon.** Files the canon names as a
+    `source:` or `catalog:` are *supposed* to contain literals, so declaring a
+    vocabulary silences its own false positives.
+  - **A closed list** of Tailwind's 22 default palette names × 11 steps, so
+    `bg-primary` and `text-muted-foreground` are structurally unmatchable.
+  - **Baseline, not zero** — `.canon-design-baseline` per repo, and `--strict` fails
+    only on counts *above* it. On a repo with fourteen thousand existing violations
+    the only useful signal is whether it got worse.
+  - **An unscanned repo is unknown, not broken.** Pointers into repos that were not
+    passed on the command line are reported as unverifiable rather than dead.
+  - **Comment-stripping before matching**, and a hex heuristic that requires a hex
+    letter in 3- and 4-digit forms so an issue reference like `#1234` is not read as
+    a colour.
+  - **Read-only in every repo it scans**, asserted by a test. Deliberately **not**
+    in any pre-commit hook — it scans code repos, not the vault. It measures;
+    CODEOWNERS on the token files plus branch protection is what enforces.
+
+  Calibrated against an independently measured baseline before being trusted, and
+  `docs/VERIFY.md` now carries that calibration as a numbered procedure.
+
 - **Push-race recovery in `canon-sync`.** When a teammate lands a commit between
   our pull and our push, git refuses ours as non-fast-forward. It now rebases
   onto what arrived and retries, up to three times, saying so once per attempt.

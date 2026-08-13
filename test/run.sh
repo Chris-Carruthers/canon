@@ -550,6 +550,120 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "design audit"
+# A detector is only worth having if you trust it, and trust dies on false
+# positives — the kit's own cautionary example is a token-parity script that
+# reports 9 false results out of 26 and is therefore read by nobody. So most of
+# these assertions are about what the tool must NOT report.
+DA="$KIT/bin/canon-design-audit"
+is "vendors canon-design-audit" "$([ -x "$V8/.canon/canon-design-audit" ] && echo y)" "y"
+
+RP="$SB/coderepo"; mkdir -p "$RP/src/components/ui" "$RP/src/styles"
+git -C "$RP" init -q 2>/dev/null
+# The declared token file. It is SUPPOSED to contain literals.
+printf ':root {\n  --primary: 222 47%% 11%%;\n  --background: 0 0%% 100%%;\n}\n' \
+  > "$RP/src/styles/globals.css"
+# A violator, plus two things that must not be flagged.
+printf 'export const B = () => <button className="bg-blue-500 bg-primary" style={{color:"#ff0044"}} />\n' \
+  > "$RP/src/components/ui/button.tsx"
+printf '// commented out: #abcdef\nconst url = "https://x.example/#nope";\n' \
+  > "$RP/src/components/ui/safe.tsx"
+
+mkdir -p "$V8/Reference/Design"
+cat > "$V8/Reference/Design/canon.md" <<'CANON'
+```design-tokens
+- vocabulary: demo
+  source: coderepo/src/styles/globals.css
+  format: hsl-triplet
+  scope: ":root"
+  names: [--primary, --background]
+  status: canonical
+```
+
+```design-components
+- slug: button
+  name: Button
+  vocabulary: demo
+  impl: coderepo/src/components/ui/button.tsx
+  tokens: [--primary]
+  status: shipped
+- slug: ghost
+  name: Ghost
+  vocabulary: demo
+  impl: coderepo/src/components/ui/nope.tsx
+  image: Attachments/Design/ghost--primary--default@light.png
+  figma: { file: https://figma.com/design/abc?node-id=1-2&t=SESSIONTOKEN, node: 1-2 }
+  status: shipped
+- slug: page-header
+  name: Page Header
+  status: absent
+```
+CANON
+
+AJ="$("$DA" --vault "$V8" --json "$RP" 2>/dev/null)"
+pick() { printf '%s' "$AJ" | python3 -c "
+import json,sys
+d=json.load(sys.stdin); f=d['findings']
+import os
+q=os.environ['Q']
+if q=='count': print(d['counts'].get(os.environ['R'],0))
+elif q=='locs': print(' '.join(x['location'] for x in f if x['rule']==os.environ['R']))
+elif q=='details': print(' | '.join(x['detail'] for x in f if x['rule']==os.environ['R']))
+elif q=='cov': print(d['coverage'][os.environ['R']])
+" 2>/dev/null; }
+
+is "flags a Tailwind palette utility" "$(Q=count R=DS-PALETTE-UTILITY pick)" "1"
+has "and names the utility" "$(Q=details R=DS-PALETTE-UTILITY pick)" "bg-blue-500"
+has "citing repo/path:line" "$(Q=locs R=DS-PALETTE-UTILITY pick)" "coderepo/src/components/ui/button.tsx:1"
+isnt "does NOT flag bg-primary" "$(Q=details R=DS-PALETTE-UTILITY pick)" "bg-primary"
+is "flags a hex literal" "$(Q=count R=DS-COLOR-LITERAL pick)" "1"
+isnt "does NOT flag the declared token file" "$(Q=locs R=DS-COLOR-LITERAL pick)" "coderepo/src/styles/globals.css:2"
+isnt "does NOT flag a commented-out hex" "$(Q=details R=DS-COLOR-LITERAL pick)" "#abcdef"
+is "reports a dead impl pointer" "$(Q=count R=DS-POINTER-DEAD pick)" "1"
+is "reports a missing image" "$(Q=count R=DS-ASSET-MISSING pick)" "1"
+is "rejects a pasted Figma URL with a session token" "$(Q=count R=DS-FIGMA-MALFORMED pick)" "1"
+is "counts deliberately-absent components" "$(Q=cov R=absent pick)" "1"
+is "derives impl coverage" "$(Q=cov R=impl pick)" "2"
+
+# Placeholders defeat the design: absence is the signal, so TODO must be refused.
+printf '\n```design-components\n- slug: todo-thing\n  name: Todo\n  impl: TODO\n```\n' >> "$V8/Reference/Design/canon.md"
+AJ="$("$DA" --vault "$V8" --json "$RP" 2>/dev/null)"
+is "refuses TODO instead of an omitted key" "$(Q=count R=DS-BLOCK-MALFORMED pick)" "1"
+AJ="$("$DA" --vault "$V8" --json "$RP" 2>/dev/null)"
+
+# Baseline, not zero: on a repo with thousands of pre-existing violations the
+# useful signal is "did it get worse", and a tool that fails on run 1 is ignored
+# by run 2.
+"$DA" --vault "$V8" --strict "$RP" >/dev/null 2>&1
+is "--strict fails with no baseline" "$?" "1"
+"$DA" --vault "$V8" --baseline-write "$RP" > "$RP/.canon-design-baseline" 2>/dev/null
+"$DA" --vault "$V8" --strict "$RP" >/dev/null 2>&1
+is "--strict passes at baseline" "$?" "0"
+printf 'export const C = () => <div className="text-rose-600" />\n' > "$RP/src/components/ui/more.tsx"
+"$DA" --vault "$V8" --strict "$RP" >/dev/null 2>&1
+is "--strict fails on a regression above baseline" "$?" "1"
+
+# The report is generated, dated, stamped as a process, and stores no verdict.
+"$DA" --vault "$V8" --report --quiet "$RP" >/dev/null 2>&1
+is "writes exactly one dated report" "$(find "$V8/Outputs" -name '*Design System Audit*' | wc -l | tr -d ' ')" "1"
+REP="$(find "$V8/Outputs" -name '*Design System Audit*' | head -1)"
+has "stamps the report as a process"   "$(cat "$REP")" "process:canon-design-audit"
+has "sets stale_after so rot surfaces" "$(cat "$REP")" "stale_after:"
+is  "stores no score" \
+  "$(LC_ALL=C grep -cE '^(compliance_score|design_coverage|a11y_grade|score):' "$REP" | tr -d ' ')" "0"
+
+# Read-only in the scanned repo. This is a hard property, not a nice-to-have.
+git -C "$RP" add -A >/dev/null 2>&1; git_q -C "$RP" commit -qm base >/dev/null 2>&1
+"$DA" --vault "$V8" --report "$RP" >/dev/null 2>&1
+is "never writes in the scanned repo" "$(git -C "$RP" status --porcelain | wc -l | tr -d ' ')" "0"
+
+# An unscanned repo is unknown, not broken — the tool's easiest false positive.
+AJ="$("$DA" --vault "$V8" --json "$SB/nonexistent-elsewhere" 2>/dev/null)"
+is "unscanned repo pointers are not called dead" "$(Q=count R=DS-POINTER-DEAD pick)" "1"
+
+"$DA" >/dev/null 2>&1; is "refuses to run with no repo" "$?" "2"
+
+# ---------------------------------------------------------------------------
 section "concurrent writers"
 # Two people and one shared branch, which is the whole point of a team vault.
 
