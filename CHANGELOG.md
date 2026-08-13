@@ -8,6 +8,56 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **A design system canon** — `Reference/Design/`, plus two templates
+  (**Design System**, **Design Component**). Templates go 6 → 8.
+
+  A design system is mostly code, and code stays out of the vault. So the canon
+  holds the part that is *not* code: **token names, intent, and pointers.** A token
+  *name* is API surface, like a schema field name, and `Reference/` is for schemas.
+  A token *value* is source — it has a format, it belongs to a cascade, and any
+  tool can read it from the repo on demand. Copy values into the vault and you have
+  made a second source of truth that drifts silently while reading as
+  authoritative. That rule is now stated in the router, `How We Work`, both rules
+  files, and `agent-instructions.md`.
+
+  - **Two frozen fenced blocks**, `design-tokens` and `design-components`,
+    namespaced so a generic fence name cannot collide. The key list is documented
+    in the Design System template and will be enforced by `canon-design-audit`.
+    Namespacing and freezing are a direct response to the kit's existing scar: a
+    Product Spec template whose fence names never matched the validator written
+    against it, so every file made from the template failed the check.
+  - **A three-rung resolution ladder** so a coding agent can answer "what does this
+    look like / which token do I use" without guessing: an exported image at
+    `Attachments/Design/<slug>--<variant>--<state>@<theme>.png` (no network, no
+    auth), a Figma `{ file, node }`, then `impl: repo/path`. Filenames are
+    *constructible*, so an agent derives the expected path and checks existence.
+  - **Omit a key you do not have — never `TODO`.** Absence is the machine-readable
+    signal and coverage is *derived* from it. A row full of `TODO`s reports as
+    complete-but-broken instead of honestly incomplete.
+  - **`status: absent` is a legitimate row.** "There is no shared `PageHeader`"
+    stops an agent hunting for one *and* stops it silently inventing a fourth.
+  - **Figma nodes are stored as `{ file, node }`, never as URLs** — a URL carries a
+    rename-fragile slug and often a `t=` session parameter that is credential-shaped
+    and that `canon-scan` will not catch. Node IDs are dash form here (what URLs
+    carry) and colon form at the API (what it wants); the conversion is documented
+    once, because it is the thing everyone gets wrong.
+  - **Two tiers**: a row covers most components; a per-component note exists only
+    when a reader would ask *why*. Thirty notes for thirty primitives is
+    boilerplate. The note's frontmatter is deliberately the same field set as one
+    row, so promoting duplicates nothing.
+  - `Reference/Design/` is a **routed subtree, not a 14th top-level folder** —
+    twelve edit points and an empty folder on every vault that ships no UI, for no
+    retrieval benefit, since retrieval is by filename.
+  - Governance rules ship **commented out** in both `.canon-owners` and
+    `CODEOWNERS`, with the ordering inversion spelled out: `.canon-owners` is
+    first-match-wins so the rule sits *above* the open `Reference/**` row, while
+    CODEOWNERS is last-match-wins so its twin sits near the *end*. Both files also
+    say what they cannot reach — the token values live in application repos, so the
+    rule that actually protects a design system is CODEOWNERS *there*.
+  - A **binary-assets row** in `docs/MULTIPLAYER.md`'s conflict-risk table, and a
+    deterministic split: if a note cites the path in frontmatter it lives in
+    `Attachments/`; if the ingest loop compiles it away it lives in `Sources/`.
+
 - **Push-race recovery in `canon-sync`.** When a teammate lands a commit between
   our pull and our push, git refuses ours as non-fast-forward. It now rebases
   onto what arrived and retries, up to three times, saying so once per attempt.

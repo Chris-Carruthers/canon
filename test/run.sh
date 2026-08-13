@@ -68,7 +68,7 @@ section "vault scaffold"
 SB="$(mktemp -d)"; V="$SB/vault"; R="$SB/repo"
 "$KIT/bin/canon-init-vault" "$V" >/dev/null 2>&1
 is "creates the router"        "$([ -f "$V/Vision/Agent Router.md" ] && echo y)" "y"
-is "creates 6 note templates" "$(find "$V/Templates" -name '*.md' | wc -l | tr -d ' ')" "6"
+is "creates 8 note templates" "$(find "$V/Templates" -name '*.md' | wc -l | tr -d ' ')" "8"
 is "gitkeeps every folder"    "$(find "$V" -name .gitkeep | wc -l | tr -d ' ')" "13"
 is "ships .canon-owners"      "$([ -f "$V/.canon-owners" ] && echo y)" "y"
 is "ships a self-bootstrap"   "$([ -x "$V/.canon/bootstrap.sh" ] && echo y)" "y"
@@ -427,7 +427,7 @@ cd "$V4" || exit 1; git init -q; git config user.email chris@example.com; git co
 is "vendors canon-trust + canon-verify" \
    "$([ -x "$V4/.canon/canon-trust" ] && [ -x "$V4/.canon/canon-verify" ] && echo y)" "y"
 is "templates carry generated:" \
-   "$(grep -l 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "4"
+   "$(grep -l 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "6"
 
 printf -- '---\ntype: decision\ngenerated: { by: some-agent/1, at: 2026-07-30T10:00:00Z }\n---\n# x\n' > "$V4/Decisions/a.md"
 printf -- '---\ntype: reference\nverified: { by: process:ci, at: 2026-07-02T02:00:00Z }\nstale_after: 2020-01-01\n---\n# y\n' > "$V4/Reference/b.md"
@@ -493,6 +493,61 @@ CANON_GUARD=block "$G" "$V" >/dev/null 2>&1
 is "the owner may edit it" "$?" "0"
 git config user.email t@example.com
 git reset -q
+
+# ---------------------------------------------------------------------------
+section "design canon"
+# The design canon is the one note type whose machine-readable half ships with a
+# validator, so the template and the tool must agree on the fence names. These
+# assertions are the tripwire for the failure the kit already has once: a Product
+# Spec template whose fence names never matched the validator written for it.
+# A fresh vault on purpose. By this point $V has had its router overwritten with
+# "EDITED" by the non-destructive-rerun check and its .canon-owners rewritten by
+# the ownership-guard section, so asserting file shape against it tests the
+# earlier tests' leftovers rather than the templates.
+V8="$SB/vault8"; "$KIT/bin/canon-init-vault" "$V8" >/dev/null 2>&1
+DSY="$V8/Templates/Design System.md"
+DCO="$V8/Templates/Design Component.md"
+is "ships a Design System template"    "$([ -f "$DSY" ] && echo y)" "y"
+is "ships a Design Component template" "$([ -f "$DCO" ] && echo y)" "y"
+has "declares the design-tokens fence"     "$(cat "$DSY")" '```design-tokens'
+has "declares the design-components fence" "$(cat "$DSY")" '```design-components'
+has "marks the contract frozen"            "$(cat "$DSY")" "FROZEN"
+
+# The component note's frontmatter IS one block row. If they drift, promoting a
+# row to a note silently loses fields, so assert the shared keys exist in both.
+missing_keys=""
+for k in figma image impl tokens status; do
+  LC_ALL=C grep -q "^${k}:" "$DCO" || missing_keys="$missing_keys $k"
+done
+is "component frontmatter carries the row keys" "${missing_keys:-none}" "none"
+has "component template uses dash-form node ids" "$(cat "$DCO")" "dash-form-node-id"
+
+# The whole reason the canon can live in a vault: names, never values.
+has "system template forbids token values" "$(cat "$DSY")" "Names in the vault"
+missing_rules=""
+for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
+  LC_ALL=C grep -q "design-token values\|Design-token values" "$f" 2>/dev/null \
+    || missing_rules="$missing_rules $(basename "$f")"
+done
+is "BOTH rules files ban token values" "${missing_rules:-none}" "none"
+
+# Router must advertise it, and must still fit the budget it advertises.
+has "router routes Reference/Design"  "$(cat "$V8/Vision/Agent Router.md")" "Reference/Design/"
+RL="$(wc -l < "$V8/Vision/Agent Router.md" | tr -d ' ')"
+if [ "$RL" -lt 150 ]; then ok "router still under 150 lines ($RL)"; else bad "router still under 150 lines" "$RL"; fi
+RB="$(wc -c < "$V8/Vision/Agent Router.md" | tr -d ' ')"
+if [ "$RB" -lt 8000 ]; then ok "router still under the 8000-byte cap ($RB)"; else bad "router under 8000 bytes" "$RB"; fi
+
+# .canon-owners is first-match-wins, so a design rule BELOW `Reference/** *` is
+# dead. Assert the ordering, not merely the presence.
+OWN="$V8/.canon-owners"
+DL="$(LC_ALL=C grep -n 'Reference/Design/' "$OWN" | head -1 | cut -d: -f1)"
+OL="$(LC_ALL=C grep -n '^Reference/\*\*' "$OWN" | head -1 | cut -d: -f1)"
+if [ -n "$DL" ] && [ -n "$OL" ] && [ "$DL" -lt "$OL" ]; then
+  ok "design owner rule sits above the open Reference rule"
+else
+  bad "design owner rule sits above the open Reference rule" "design@$DL open@$OL"
+fi
 
 # ---------------------------------------------------------------------------
 section "concurrent writers"

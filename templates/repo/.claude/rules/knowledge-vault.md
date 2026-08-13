@@ -15,6 +15,9 @@ by filename and structure long before it reads content.
   results from a production database.
 - **Secrets** — API keys, tokens, connection strings, `.env` contents.
 - **Source code.** Link `repo/path.ts:42` instead. Code rots inside documents.
+- **Design-token values.** A token *name* is API surface and belongs in the vault;
+  its *value* is source. Write `--primary`, never `222 47% 11%`. Copying values in
+  creates a second source of truth that drifts silently and reads as authoritative.
 
 Git history is permanent. If you are unsure whether something belongs, leave it
 out and say so.
@@ -51,6 +54,15 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
   `type:`, `status:`, `updated:`.
 - **Link generously** with `[[wikilinks]]`. A link to a note that does not exist
   yet is a feature — it marks something worth writing.
+- **The design canon lives in `Reference/Design/`.** Its machine-readable half is
+  two fenced blocks with frozen key sets — `design-tokens` and
+  `design-components` — whose contract is documented in the Design System
+  template. A component resolves in three rungs: an exported image under
+  `Attachments/Design/`, a Figma `{ file, node }`, then `impl: repo/path`. **Omit
+  a key you do not have** rather than writing `TODO`; absence is what the tooling
+  reads, and coverage is derived from it. Write a per-component note only when a
+  reader would ask *why* — a decision, a drift story, an a11y contract. Otherwise
+  add a row.
 
 ## Stamp what you write
 

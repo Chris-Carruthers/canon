@@ -36,6 +36,12 @@ Never mix raw material with compiled knowledge.
 The loop is: drop a source → compile it → ask questions → file the output back.
 Each pass makes the next answer better. Nobody writes the wiki layer by hand.
 
+**Binary assets split by the same rule, stated so it is never a judgement call:**
+if a note cites the path in its frontmatter, the file lives in `Attachments/`. If
+the ingest loop reads it once and compiles it away, it lives in `Sources/`. So a
+whole exported Figma page goes to `Sources/Design/`; the one canonical screenshot a
+component note points at goes to `Attachments/Design/`.
+
 ## Note conventions
 
 - **Link generously** with `[[wikilinks]]`; links to not-yet-written notes are
@@ -45,6 +51,8 @@ Each pass makes the next answer better. Nobody writes the wiki layer by hand.
 - **Frontmatter** `type:` / `status:` / `updated:` so notes can be tabled
   automatically.
 - **Code stays out.** Link to repo paths.
+- **Values stay out too.** A design token's *name* is API surface and belongs in
+  the vault; its *value* is source. `--primary`, never `222 47% 11%`.
 
 ## Specs and handoffs
 
@@ -67,6 +75,34 @@ just the clean parts.
 If you want machine validation of the fenced blocks, write a small validator
 against **your own frozen schema** rather than depending on an external standard
 that ships breaking changes. Templates are in `Templates/`.
+
+## The design canon
+
+`Reference/Design/` is where the design system lives — and the reason it can live
+in a vault at all is that it holds **names, intent and pointers, never values**. A
+token name is API surface, like a schema field name. A token value is source: it
+has a format, it belongs to a cascade, and any tool can read it from the repo on
+demand. Copy values in and you have made a second source of truth that drifts
+silently while reading as authoritative.
+
+Two tiers, so the common case stays cheap:
+
+- **A row** in the `design-components` block covers most components.
+- **A note** — from the Design Component template — only when a reader would ask
+  *why*: a design decision, a drift story, a real accessibility contract. Thirty
+  notes for thirty primitives is boilerplate, not knowledge. The note's
+  frontmatter is deliberately the same field set as one row, so promoting costs
+  nothing and duplicates nothing.
+
+**A component resolves in three rungs**, and every rung's absence is detectable:
+an exported image under `Attachments/Design/` (cheapest — no network, no auth), a
+Figma `{ file, node }`, then `impl: repo/path`. Omit a key you do not have rather
+than writing `TODO` — absence is the signal, and coverage is *derived* from it.
+
+Unlike the spec blocks above, these two **do** ship with a validator:
+`canon-design-audit` parses them, and its key list is frozen against the template.
+It also scans the code repos and reports what has drifted. It measures; it does not
+enforce. Enforcement is CODEOWNERS on the token files plus branch protection.
 
 ## Size budgets
 

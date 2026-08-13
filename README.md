@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-140%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-153%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -273,6 +273,7 @@ flowchart LR
 | Piece | What it does |
 |---|---|
 | **A vault** | Markdown notes: `Decisions/`, `Projects/`, `Sessions/`, `Reference/`, … in one git repo |
+| **A design canon** | `Reference/Design/` — token names, a component inventory, and design assets an agent can resolve. Names and pointers, never values |
 | **A router note** | The one small file agents load every session — a map of what lives where |
 | **Repo wiring** | `CLAUDE.md` + `SessionStart` hook so agents find the vault from any repo |
 | **A session-note check** | A `Stop` hook that notices when work happened but nothing got written down |

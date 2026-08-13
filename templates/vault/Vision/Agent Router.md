@@ -19,6 +19,7 @@ map, not a manual.
 | What a workstream is / where it stands | `Projects/<name>.md` |
 | A client / customer / domain area | `Clients/<name>.md` |
 | Durable facts, schemas, APIs, pricing | `Reference/` |
+| Design system: tokens, components, design assets | `Reference/Design/` |
 | Intent for a feature (what & why) | `Specs/` |
 | Ops state to pick work up cold | `Handoffs/` |
 | What happened in past sessions | `Sessions/YYYY-MM-DD — <title> (<initials>).md` |
@@ -52,7 +53,8 @@ map, not a manual.
   and it is theirs to add via `canon-verify`.
 - **Never** PHI, personal data, secrets, keys, tokens, or `.env` contents. This
   is a git repo; history is permanent.
-- **No source code** — link `repo/path.ts:42` instead.
+- **No source code** — link `repo/path.ts:42` instead. **No design-token values**
+  either: token *names* are API surface and belong here, values live in the repo.
 - **One concept per note**; frontmatter `type:` / `status:` / `updated:` on
   Project / Client / Decision / Reference notes.
 - **Size budgets:** index notes ≤200 lines / 25 KB · detail notes <500 lines ·

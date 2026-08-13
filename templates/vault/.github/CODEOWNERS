@@ -39,3 +39,14 @@
 # The scan suppression files decide what secrets can slip through
 /.canon-scan-allow            @your-org/security
 /.canon-scan-exclude          @your-org/security
+
+# Design system — off by default. Mirror of the .canon-owners rule.
+#
+# LAST MATCH WINS here, the opposite of .canon-owners, so this sits near the end
+# of the file while its twin sits near the top. Both positions are correct; the
+# inversion is the trap. Uncomment both together, or neither.
+#
+# And remember what this can and cannot reach: it governs notes about the design
+# system. Protecting the design system itself means CODEOWNERS on the token files
+# in your application repos.
+# /Reference/Design/          @your-org/design

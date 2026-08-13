@@ -44,10 +44,17 @@ yourself** — that field means a human confirmed the content and is theirs to a
 - **Never write personal data, patient data, secrets, keys, tokens, or `.env`
   contents into the vault.** It is a git repo; history is permanent.
 - **No source code in the vault.** Link `repo/path.ts:42` instead.
+- **No design-token values in the vault.** A token *name* is API surface and
+  belongs there; its *value* is source. Write `--primary`, never `222 47% 11%`.
 - **`Vision/` is owned, not open.** It is direction, not documentation. Propose a
   change via a `Decisions/` note or a reviewed branch rather than editing it in
   place. Check `.canon-owners` in the vault for who owns what.
 - Do not commit or push the vault on someone's behalf unless asked.
+
+The design canon lives in `Reference/Design/`: two frozen fenced blocks
+(`design-tokens`, `design-components`) whose contract is in the Design System
+template. Omit a key you do not have rather than writing `TODO` — absence is what
+the tooling reads.
 
 Freely writable: `Sessions/`, `Projects/`, `Clients/`, `Reference/`, `Outputs/`,
 `Sources/`, `_Inbox/`.

@@ -42,6 +42,7 @@ behaves when two people touch it.** Four classes, and the conflict risk of each:
 | **Append-only** | `Sessions/`, `Decisions/`, `Specs/`, `Handoffs/` | one new file per unit of work | **near-zero** — different filenames never collide |
 | **Shared-editable** | `Projects/`, `Clients/`, `Reference/` | everyone, edited in place | **real** — this is where conflicts actually happen |
 | **Governed** | `Vision/`, the router, `.canon-owners` | owners only, by proposal | **none by design** — changes go through review |
+| **Binary assets** | `Attachments/`, `Sources/` | one file per exported artifact | **near-zero** — deterministic filenames, and git cannot merge a PNG anyway, so a collision is a rename not a conflict |
 
 **The insight worth internalising:** most of what a knowledge vault produces is
 append-only, and append-only content cannot conflict. A fifteen-person team all

@@ -16,6 +16,9 @@ into context automatically; if it didn't, resolve the path and read
 - `Vision/` — how this team works, conventions (read first)
 - `Projects/<name>.md` — what the workstream is and where it stands
 - the newest `Sessions/` note linked from that project — what happened last
+- `Reference/Design/` — **before building any UI.** The design canon: which token
+  names exist, which components already exist (and which deliberately do not), and
+  where each resolves to a Figma node and an implementation.
 
 Reach vault content **on demand** with glob and grep against the vault path.
 Do not try to load the vault; it is far larger than a context window.
@@ -30,6 +33,8 @@ Skip this for trivial questions; use judgment.
 - **Never write PHI, personal data, secrets, keys, tokens, or `.env` contents
   into the vault.** It is a git repo; history is permanent.
 - **No source code in the vault.** Link `repo/path.ts:42` instead.
+- **No design-token values in the vault.** Token *names* belong there; values live
+  in the repo. Write `--primary`, never `222 47% 11%`.
 - Do not commit or push the vault on the user's behalf unless asked.
 
 Detailed write conventions load automatically when you touch vault files

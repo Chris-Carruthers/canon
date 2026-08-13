@@ -37,6 +37,24 @@ Vision/Agent Router.md       lead@example.com,staff@example.com
 # Decisions/**               lead@example.com
 
 # ---------------------------------------------------------------------------
+# Design system — off by default, and note WHERE it has to sit.
+#
+# FIRST MATCH WINS here, so this rule must stay ABOVE `Reference/** *` below or
+# it is dead on arrival: the open rule would match first and this would never
+# fire. That ordering trap is the whole reason it is written here rather than
+# further down the file.
+#
+# Uncomment when a person actually owns the design system. Governing it before
+# anyone owns it means changes queue for review by nobody.
+#
+# Be honest about the leverage: this file governs NOTES ABOUT the design system.
+# The token values live in your code repos, so the rule that actually protects
+# the design system is CODEOWNERS on those repos' token files — which is out of
+# this file's reach entirely.
+# ---------------------------------------------------------------------------
+# Reference/Design/**        design@example.com
+
+# ---------------------------------------------------------------------------
 # Explicitly open: the working layers. Everyone writes here, all the time.
 # Listed for clarity even though unmatched paths are open by default.
 # ---------------------------------------------------------------------------
