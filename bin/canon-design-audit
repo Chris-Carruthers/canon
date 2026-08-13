@@ -373,6 +373,33 @@ for n, owners in sorted(by_name.items()):
 # ---------------------------------------------------------------------------
 # 4. Scan the repos. Read-only, always.
 # ---------------------------------------------------------------------------
+def tracked_files(repo):
+    """Prefer git's index over a filesystem walk.
+
+    Build output is the biggest false-positive source there is: a Qwik or Next
+    build emits bundled CSS-in-JS full of palette utilities, and counting it says
+    nothing about what anyone wrote. Those directories are gitignored by every
+    project that has them, and no hardcoded skip-list keeps up with framework
+    conventions — `server/`, `.output/`, `.svelte-kit/`, `storybook-static/` — while
+    also being a legitimate source directory name somewhere else.
+
+    So: if it is a git repo, scan what git tracks. Otherwise fall back to a walk.
+    Returns None when git is unavailable so the caller can walk instead.
+    """
+    if not os.path.isdir(os.path.join(repo, ".git")):
+        return None
+    try:
+        import subprocess
+        out = subprocess.run(["git", "-C", repo, "ls-files", "-z"],
+                             capture_output=True, check=False)
+        if out.returncode != 0:
+            return None
+        names = [n for n in out.stdout.decode("utf-8", "replace").split("\0") if n]
+        return names or None
+    except Exception:
+        return None
+
+
 def excludes_for(repo):
     pats = []
     f = os.path.join(repo, ".canon-design-exclude")
@@ -395,16 +422,28 @@ for repo in repos:
         continue
     name = os.path.basename(repo.rstrip("/"))
     pats = excludes_for(repo)
-    for root, dirs, files in os.walk(repo):
-        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIR)
-        for fn in sorted(files):
+
+    rels = tracked_files(repo)
+    if rels is None:
+        rels = []
+        for root, dirs, files in os.walk(repo):
+            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIR)
+            for fn in sorted(files):
+                rels.append(os.path.relpath(os.path.join(root, fn), repo))
+    else:
+        rels = [r for r in rels
+                if not any(part in SKIP_DIR for part in r.split("/"))]
+
+    for rel in sorted(rels):
+            fn = os.path.basename(rel)
             ext = os.path.splitext(fn)[1]
             if ext not in SCAN_EXT:
                 continue
             if fn.endswith((".min.js", ".min.css", ".map")):
                 continue
-            full = os.path.join(root, fn)
-            rel = os.path.relpath(full, repo)
+            full = os.path.join(repo, rel)
+            if not os.path.isfile(full):
+                continue
             # The skip-list is LEARNED FROM THE CANON: a file the canon names as
             # a token source is supposed to contain literals. Declaring a new
             # vocabulary therefore silences its own false positives.

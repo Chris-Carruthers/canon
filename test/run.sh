@@ -654,8 +654,24 @@ is  "stores no score" \
 
 # Read-only in the scanned repo. This is a hard property, not a nice-to-have.
 git -C "$RP" add -A >/dev/null 2>&1; git_q -C "$RP" commit -qm base >/dev/null 2>&1
+
+# Build output is the biggest false-positive source there is — a framework build
+# emits bundled CSS full of palette utilities, and counting it says nothing about
+# what anyone wrote. Once the repo has an index, scan what git tracks: gitignored
+# build output then disappears without needing a skip-list that keeps up with
+# every framework's output directory naming.
+mkdir -p "$RP/server"
+printf 'const x = "bg-emerald-700 bg-emerald-800 bg-emerald-900";\n' > "$RP/server/entry.preview.js"
+AJ="$("$DA" --vault "$V8" --json "$RP" 2>/dev/null)"
+isnt "skips untracked build output in a git repo" \
+  "$(Q=locs R=DS-PALETTE-UTILITY pick)" "coderepo/server/entry.preview.js:1"
+isnt "and does not count it" "$(Q=details R=DS-PALETTE-UTILITY pick)" "bg-emerald-700"
+# Compared before/after rather than asserted empty: the assertion is "the tool
+# changed nothing", not "the repo happens to be clean". An earlier version of this
+# check silently measured a fixture file created two lines above it.
+BEFORE="$(git -C "$RP" status --porcelain)"
 "$DA" --vault "$V8" --report "$RP" >/dev/null 2>&1
-is "never writes in the scanned repo" "$(git -C "$RP" status --porcelain | wc -l | tr -d ' ')" "0"
+is "never writes in the scanned repo" "$(git -C "$RP" status --porcelain)" "$BEFORE"
 
 # An unscanned repo is unknown, not broken — the tool's easiest false positive.
 AJ="$("$DA" --vault "$V8" --json "$SB/nonexistent-elsewhere" 2>/dev/null)"
