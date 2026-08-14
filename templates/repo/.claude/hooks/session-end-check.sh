@@ -43,7 +43,10 @@ GUARD="$STATE_DIR/reminded-$SESSION_ID"
 [ -f "$GUARD" ] && exit 0
 
 # --- resolve the vault -------------------------------------------------------
+# Repo copy → plugin bin → PATH. CLAUDE_PLUGIN_ROOT is set only when canon was
+# added with /plugin, and it is the only way a plugin hook can find its own files.
 RESOLVER="$REPO/.claude/hooks/canon-path"
+[ -x "$RESOLVER" ] || [ -z "${CLAUDE_PLUGIN_ROOT:-}" ] || RESOLVER="${CLAUDE_PLUGIN_ROOT}/bin/canon-path"
 [ -x "$RESOLVER" ] || RESOLVER="$(command -v canon-path 2>/dev/null || true)"
 [ -n "$RESOLVER" ] && [ -x "$RESOLVER" ] || exit 0
 VAULT="$("$RESOLVER" 2>/dev/null || true)"
@@ -131,6 +134,7 @@ fi
 # speaks only when there is genuinely unshared work. No new noise on a read-only
 # session with a clean vault.
 SH="$REPO/.claude/hooks/canon-status"
+[ -x "$SH" ] || [ -z "${CLAUDE_PLUGIN_ROOT:-}" ] || SH="${CLAUDE_PLUGIN_ROOT}/bin/canon-status"
 [ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"
 SYNC=""
 if [ -n "$SH" ] && [ -x "$SH" ]; then

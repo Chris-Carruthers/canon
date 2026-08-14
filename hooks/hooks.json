@@ -1,0 +1,25 @@
+{
+  "description": "canon — load the team's vault at session start, notice an unwritten session note at the end",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/templates/repo/.claude/hooks/session-start.sh\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/templates/repo/.claude/hooks/session-end-check.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

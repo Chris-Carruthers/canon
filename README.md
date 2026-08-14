@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-179%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-194%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -36,7 +36,8 @@ reading the vault with two apps and no commands.
 - [New here? Read this first](#new-here-read-this-first) — the plain-English version
 - **[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)** — GitHub Desktop + Obsidian, no commands
 - [How it works](#how-it-works) — the two diagrams
-- [What you get](#what-you-get) · [Quickstart](#quickstart) · [How it finds the vault](#how-it-finds-the-vault)
+- [What you get](#what-you-get) · [Install as a Claude Code plugin](#install-it-as-a-claude-code-plugin) · [Quickstart](#quickstart) · [How it finds the vault](#how-it-finds-the-vault)
+- [Works with agents that are not Claude](#works-with-agents-that-are-not-claude) — seven runtimes from one template
 - [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
 - [Design, and why](#design-and-why) — the limits that shaped it
 - [Sync](#sync-automatic-inbound-deliberate-outbound) · [The gate](#the-gate) · [Trust](#trust-telling-an-agent-draft-from-a-checked-fact) · [Ownership](#ownership-not-everything-should-be-everyones)
@@ -186,10 +187,14 @@ Desktop plus Obsidian, click to clone, click to get updates, no commands at all.
 The notes are plain Markdown, so **any** tool that can read files can use them —
 Claude Code, Codex, Cursor, Gemini CLI, or a person with `grep`.
 
-The *automatic* wiring in this kit — the part that loads context at the start of a
-session and writes the note at the end — currently ships for **Claude Code only**.
-Adding other runtimes is a small job and an explicitly welcome contribution; see
-[CONTRIBUTING](CONTRIBUTING.md). Nothing about the notes themselves is
+`install.sh` writes the same instruction block for **seven runtimes** — Claude Code,
+`AGENTS.md`, Gemini CLI, Copilot, Cursor, Windsurf and Cline — all generated from one
+template. See [Works with agents that are not Claude](#works-with-agents-that-are-not-claude).
+
+The *automatic* wiring — the part that loads context at the start of a session and
+writes the note at the end — is **Claude Code only**, because it is the runtime with
+a hook system to attach to. Adding others as they grow one is a welcome contribution;
+see [CONTRIBUTING](CONTRIBUTING.md). Nothing about the notes themselves is
 Claude-specific.
 
 ---
@@ -287,6 +292,64 @@ flowchart LR
 | **`canon-design-audit`** | Does the code match the design canon? Derives violations and coverage every run; never compares token values |
 | **Chat connectors** | Ask the canon questions from **Slack** or **Discord**; read-only, cites its sources |
 | **MCP server** | Exposes the vault to **any MCP client** — Claude Desktop, Cursor, VS Code. One connector, not one per editor |
+
+## Install it as a Claude Code plugin
+
+Two commands, no clone:
+
+```
+/plugin marketplace add Chris-Carruthers/canon
+/plugin install canon@canon
+```
+
+Then `/canon-setup`, which is the one thing a plugin cannot do for you: **tell this
+machine where the vault is.** Everything else — the SessionStart and Stop hooks, the
+CLI, the slash commands — arrives with the plugin.
+
+| | Plugin | `install.sh` |
+|---|---|---|
+| Hooks (load context, notice a missing note) | ✅ every project | ✅ the folder you install into |
+| `canon-sync` / `canon-status` / `canon-trust` / `canon-design-audit` | ✅ bundled | ✅ if you put `bin/` on `PATH` |
+| `/canon-sync`, `/canon-status`, `/canon-setup` | ✅ | — |
+| Instruction files for **other** agents | — | ✅ six runtimes |
+| The commit-time secret gate | — | — *(lives in the vault; run its `bootstrap.sh`)* |
+| Teammates inherit it by cloning the repo | — | ✅ commit `.claude/` and `CLAUDE.md` |
+
+**Use both if you work across repos**: the plugin gives *you* the hooks everywhere,
+`install.sh` gives *the repo* wiring your teammates get by cloning.
+
+Two things worth being straight about. **The plugin does not install the secret
+gate** — that is a git hook inside the vault, so run `./.canon/bootstrap.sh` there or
+nothing checks notes for credentials before they enter history. And **the same hook
+scripts serve both installs**; they look for their tools in the repo copy, then
+`${CLAUDE_PLUGIN_ROOT}/bin`, then `PATH`. One file, three resolution sites, so plugin
+mode and installed mode cannot drift apart.
+
+## Works with agents that are not Claude
+
+`install.sh` writes the **same instruction block** into every runtime that has a
+conventional filename, all generated from one template so they cannot disagree:
+
+| Runtime | File |
+|---|---|
+| Claude Code | `CLAUDE.md` |
+| Codex, Zed, Jules, and anything else on the open convention | `AGENTS.md` |
+| Gemini CLI | `GEMINI.md` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
+| Cursor | `.cursor/rules/knowledge-vault.mdc` |
+| Windsurf | `.windsurf/rules/knowledge-vault.md` |
+| Cline | `.clinerules/knowledge-vault.md` |
+
+All on by default; opt out with `--no-gemini`, `--no-copilot`, `--no-windsurf`,
+`--no-cline`, or `--claude-only`. `--uninstall` removes every one of them **without
+needing the same flags you installed with**, and deletes files it created outright
+rather than leaving empty ones behind.
+
+**The honest limit:** these make other agents *read* the vault, which is most of the
+value. Only Claude Code gets the hooks that load context automatically and notice a
+session ending with nothing written down — the other runtimes have no hook system to
+attach to. Adding one when they do is a welcome contribution; see
+[CONTRIBUTING](CONTRIBUTING.md).
 
 ## Quickstart
 

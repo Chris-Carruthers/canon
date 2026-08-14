@@ -1,0 +1,20 @@
+{
+  "name": "canon",
+  "description": "A shared knowledge vault your team's agents read before work and write to after. Loads the team's context at session start, notices when a session ends without a note, and gates credentials before they reach git history.",
+  "version": "0.2.0",
+  "author": {
+    "name": "Chris Carruthers",
+    "url": "https://github.com/Chris-Carruthers/canon"
+  },
+  "homepage": "https://github.com/Chris-Carruthers/canon",
+  "repository": "https://github.com/Chris-Carruthers/canon",
+  "license": "MIT",
+  "keywords": [
+    "knowledge-base",
+    "obsidian",
+    "memory",
+    "context",
+    "documentation",
+    "team"
+  ]
+}

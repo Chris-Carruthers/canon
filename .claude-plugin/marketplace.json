@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "canon",
+  "description": "canon — a shared knowledge vault that your team's AI agents read before work and write to after",
+  "owner": {
+    "name": "Chris Carruthers",
+    "url": "https://github.com/Chris-Carruthers"
+  },
+  "plugins": [
+    {
+      "name": "canon",
+      "source": "./",
+      "description": "Give every agent on your team the same accumulated context. Injects the vault's router note at session start, notices when work happened but nothing was written down, and blocks credentials before they enter git history. Works for any discipline — the vault is markdown, not code.",
+      "category": "productivity",
+      "author": {
+        "name": "Chris Carruthers"
+      }
+    }
+  ]
+}

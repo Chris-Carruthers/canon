@@ -28,8 +28,18 @@ print(json.dumps({
 PY
 }
 
-# Locate the resolver: prefer the copy installed in this repo, fall back to PATH.
+# Locate the resolver. Three sites, in this order, because this same file runs in
+# two different installations:
+#   1. the copy install.sh put in the repo
+#   2. the plugin's own bin/, when canon was added with /plugin rather than
+#      install.sh — CLAUDE_PLUGIN_ROOT is set by Claude Code and is the only way a
+#      plugin hook can find files it shipped with
+#   3. PATH, for anyone who put bin/ there
+# Keeping one hook that works in both modes beats shipping two that drift.
 RESOLVER="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/canon-path"
+if [ ! -x "$RESOLVER" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  RESOLVER="${CLAUDE_PLUGIN_ROOT}/bin/canon-path"
+fi
 if [ ! -x "$RESOLVER" ]; then
   RESOLVER="$(command -v canon-path 2>/dev/null || true)"
 fi
@@ -86,6 +96,7 @@ BODY="$(head -c "$CAP" "$ROUTER" 2>/dev/null || true)"
 # cannot slow down or hang a session start. Silent when everything is current.
 STATUS=""
 SH="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/canon-status"
+[ -x "$SH" ] || [ -z "${CLAUDE_PLUGIN_ROOT:-}" ] || SH="${CLAUDE_PLUGIN_ROOT}/bin/canon-status"
 [ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"
 if [ -n "$SH" ] && [ -x "$SH" ]; then
   STATUS="$("$SH" "$VAULT" 2>/dev/null || true)"

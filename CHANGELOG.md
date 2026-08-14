@@ -8,6 +8,41 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **canon installs as a Claude Code plugin.**
+  `/plugin marketplace add Chris-Carruthers/canon` then `/plugin install canon@canon`
+  — no clone, and the hooks apply to every project rather than the one folder you
+  ran the installer in. Ships `.claude-plugin/plugin.json`, a
+  `.claude-plugin/marketplace.json` so the repo is its own marketplace,
+  `hooks/hooks.json` wiring SessionStart and Stop, and three slash commands:
+  `/canon-setup`, `/canon-sync`, `/canon-status`.
+  - **One set of hook scripts serves both installs.** They now resolve their tools
+    from the repo copy → `${CLAUDE_PLUGIN_ROOT}/bin` → `PATH`. Shipping a second
+    copy under `hooks/` would have been simpler and would have drifted; this kit
+    has already been bitten once by two artifacts that were supposed to agree.
+  - `/canon-setup` exists because the one thing a plugin genuinely cannot do is
+    know **where your vault is**. It walks the three cases and is explicit that the
+    plugin does **not** install the commit-time secret gate — that is a git hook
+    inside the vault.
+  - Verified by installing it into real Claude Code (2.1.232) and running both
+    hooks out of the plugin cache with only `CLAUDE_PLUGIN_ROOT` set, rather than
+    by checking that the JSON parses.
+
+- **`install.sh` writes instruction files for seven runtimes**, all generated from
+  the single `agent-instructions.md` template so they cannot disagree: `CLAUDE.md`,
+  `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`,
+  `.cursor/rules/knowledge-vault.mdc`, `.windsurf/rules/knowledge-vault.md`,
+  `.clinerules/knowledge-vault.md`. A test asserts they are byte-identical.
+  - On by default — a stray instruction file costs nothing, while a missing one is
+    a teammate silently getting no context because they use a different tool. Opt
+    out with `--no-gemini`, `--no-copilot`, `--no-windsurf`, `--no-cline` or
+    `--claude-only`.
+  - **`--uninstall` removes all of them without being handed the same flags**, and
+    now **deletes** a file it created outright instead of leaving a zero-byte one.
+    An uninstaller that leaves litter is one people stop trusting.
+  - Stated plainly in the README: these make other agents *read* the vault. Only
+    Claude Code gets the hooks, because it is the only one of the seven with a hook
+    system to attach to.
+
 - **A design system canon** — `Reference/Design/`, plus two templates
   (**Design System**, **Design Component**). Templates go 6 → 8.
 

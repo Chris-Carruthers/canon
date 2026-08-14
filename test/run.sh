@@ -495,6 +495,105 @@ git config user.email t@example.com
 git reset -q
 
 # ---------------------------------------------------------------------------
+section "plugin packaging"
+# Claude Code parses these before it will show the plugin at all, so a typo here
+# is invisible until someone tries to install and gets nothing.
+python3 -c "import json;json.load(open('$KIT/.claude-plugin/plugin.json'))" 2>/dev/null \
+  && ok "plugin.json is valid JSON" || bad "plugin.json is invalid JSON"
+python3 -c "import json;json.load(open('$KIT/.claude-plugin/marketplace.json'))" 2>/dev/null \
+  && ok "marketplace.json is valid JSON" || bad "marketplace.json is invalid JSON"
+python3 -c "import json;json.load(open('$KIT/hooks/hooks.json'))" 2>/dev/null \
+  && ok "hooks.json is valid JSON" || bad "hooks.json is invalid JSON"
+
+is "plugin version tracks VERSION" \
+  "$(python3 -c "import json;print(json.load(open('$KIT/.claude-plugin/plugin.json'))['version'])" 2>/dev/null)" \
+  "$(cat "$KIT/VERSION")"
+is "marketplace lists the plugin" \
+  "$(python3 -c "import json;print(json.load(open('$KIT/.claude-plugin/marketplace.json'))['plugins'][0]['name'])" 2>/dev/null)" \
+  "canon"
+
+# Every command the plugin hooks references must exist at the path it names,
+# resolved from the plugin root. A hooks.json pointing at a moved script fails
+# silently at session start, which is the worst place for it.
+missing_hookfiles=""
+for rel in $(python3 -c "
+import json,re
+d=json.load(open('$KIT/hooks/hooks.json'))
+for ev in d['hooks'].values():
+    for g in ev:
+        for h in g['hooks']:
+            m=re.search(r'\\\$\{CLAUDE_PLUGIN_ROOT\}/([^\"]+)', h['command'])
+            if m: print(m.group(1))
+" 2>/dev/null); do
+  [ -f "$KIT/$rel" ] || missing_hookfiles="$missing_hookfiles $rel"
+done
+is "hooks.json points at files that exist" "${missing_hookfiles:-none}" "none"
+
+# The same hook script must work whether canon was installed into a repo or added
+# as a plugin. Assert the plugin-root fallback is present in both, because losing
+# it breaks plugin mode without breaking any other test.
+missing_fallback=""
+for f in session-start.sh session-end-check.sh; do
+  LC_ALL=C grep -q 'CLAUDE_PLUGIN_ROOT' "$KIT/templates/repo/.claude/hooks/$f" \
+    || missing_fallback="$missing_fallback $f"
+done
+is "hooks resolve tools from the plugin root too" "${missing_fallback:-none}" "none"
+
+# Plugin mode: no repo copy, nothing on PATH, only CLAUDE_PLUGIN_ROOT.
+PLUGOUT="$(cd "$SB" && env -u CANON_HOME CLAUDE_PLUGIN_ROOT="$KIT" CANON_HOME="$V4" \
+  bash "$KIT/templates/repo/.claude/hooks/session-start.sh" </dev/null 2>/dev/null)"
+has "SessionStart works in plugin mode" "$PLUGOUT" "hookSpecificOutput"
+
+missing_cmds=""
+for c in canon-sync canon-status canon-setup; do
+  [ -f "$KIT/commands/$c.md" ] || missing_cmds="$missing_cmds $c"
+done
+is "ships the slash commands" "${missing_cmds:-none}" "none"
+
+# ---------------------------------------------------------------------------
+section "other agent runtimes"
+R3="$SB/repo3"; mkdir -p "$R3"; git init -q "$R3" 2>/dev/null
+"$KIT/install.sh" "$R3" --vault "$V4" >/dev/null 2>&1
+missing_rt=""
+for f in CLAUDE.md AGENTS.md GEMINI.md .github/copilot-instructions.md \
+         .windsurf/rules/knowledge-vault.md .clinerules/knowledge-vault.md \
+         .cursor/rules/knowledge-vault.mdc; do
+  [ -f "$R3/$f" ] || missing_rt="$missing_rt $f"
+done
+is "writes an instruction file per runtime" "${missing_rt:-none}" "none"
+
+# Generated from ONE template, so they cannot drift. Six hand-maintained copies of
+# the same instructions is six chances to disagree, silently.
+drift=""
+BASE="$(cat "$R3/CLAUDE.md")"
+for f in AGENTS.md GEMINI.md .github/copilot-instructions.md \
+         .windsurf/rules/knowledge-vault.md .clinerules/knowledge-vault.md; do
+  [ "$(cat "$R3/$f")" = "$BASE" ] || drift="$drift $f"
+done
+is "every runtime file is byte-identical" "${drift:-none}" "none"
+
+"$KIT/install.sh" "$R3" --vault "$V4" >/dev/null 2>&1
+is "re-install does not duplicate the block" \
+  "$(LC_ALL=C grep -c 'canon:knowledge-vault' "$R3/GEMINI.md" | tr -d ' ')" "1"
+
+is "--claude-only writes no extra runtimes" \
+  "$(R4="$SB/repo4"; mkdir -p "$R4"; git init -q "$R4" 2>/dev/null; \
+     "$KIT/install.sh" "$R4" --vault "$V4" --claude-only >/dev/null 2>&1; \
+     [ -f "$R4/GEMINI.md" ] && echo present || echo absent)" "absent"
+
+# Uninstall must not need the same flags it was installed with — nobody remembers
+# them, and a tool you cannot cleanly remove is one people will not try.
+"$KIT/install.sh" "$R3" --uninstall >/dev/null 2>&1
+left=""
+for f in GEMINI.md .github/copilot-instructions.md \
+         .windsurf/rules/knowledge-vault.md .clinerules/knowledge-vault.md; do
+  [ -e "$R3/$f" ] && left="$left $f"
+done
+is "uninstall removes every runtime file" "${left:-none}" "none"
+is "and prunes the directories it created" \
+  "$([ -d "$R3/.windsurf" ] || [ -d "$R3/.clinerules" ] && echo left || echo pruned)" "pruned"
+
+# ---------------------------------------------------------------------------
 section "design canon"
 # The design canon is the one note type whose machine-readable half ships with a
 # validator, so the template and the tool must agree on the fence names. These

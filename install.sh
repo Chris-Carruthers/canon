@@ -10,6 +10,17 @@
 #                  then "files changed here" means "notes you wrote", which is
 #                  what the end-of-session prompt keys off
 #
+# Writes the same instruction block for every agent runtime that has a
+# conventional filename: CLAUDE.md, AGENTS.md, GEMINI.md,
+# .github/copilot-instructions.md, .windsurf/rules/, .clinerules/ — all generated
+# from one template so they cannot drift. Opt out with --no-gemini, --no-copilot,
+# --no-windsurf, --no-cline, or --claude-only.
+#
+# Only Claude Code gets the automatic hooks; the other runtimes have nowhere to
+# attach them. They read the vault, they do not maintain it. If you want the
+# hooks without install.sh, canon also ships as a Claude Code plugin — see the
+# README.
+#
 # Idempotent and non-destructive:
 #   * never overwrites an existing CLAUDE.md — appends one marked block, once
 #   * merges into an existing .claude/settings.json, backing it up first
@@ -32,13 +43,22 @@ TARGET=""
 VAULT=""
 DRY=0
 UNINSTALL=0
+# On by default. A stray instruction file costs nothing and is removed cleanly by
+# --uninstall, whereas a missing one is a teammate quietly getting no context
+# because they happen to use a different tool.
+WANT_GEMINI=1; WANT_COPILOT=1; WANT_WINDSURF=1; WANT_CLINE=1
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --vault) VAULT="${2:-}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
-    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
+    --no-gemini) WANT_GEMINI=0; shift ;;
+    --no-copilot) WANT_COPILOT=0; shift ;;
+    --no-windsurf) WANT_WINDSURF=0; shift ;;
+    --no-cline) WANT_CLINE=0; shift ;;
+    --claude-only) WANT_GEMINI=0; WANT_COPILOT=0; WANT_WINDSURF=0; WANT_CLINE=0; shift ;;
+    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
     *) TARGET="$1"; shift ;;
   esac
 done
@@ -108,19 +128,32 @@ print("  cleaned .claude/settings.json (backup written)")
 PY
   fi
 
-  for name in CLAUDE.md AGENTS.md; do
+  # Every runtime file we might have written, regardless of the flags used on the
+  # way in. Uninstall must not depend on being handed the same flags as install —
+  # nobody remembers them, and a tool you cannot cleanly remove is one people
+  # refuse to try in the first place.
+  for name in CLAUDE.md AGENTS.md GEMINI.md .github/copilot-instructions.md \
+              .windsurf/rules/knowledge-vault.md .clinerules/knowledge-vault.md; do
   CM="$TARGET/$name"
   if [ -f "$CM" ] && grep -qF "$MARKER" "$CM" 2>/dev/null && [ "$DRY" != "1" ]; then
     python3 - "$CM" "$MARKER" <<'PY'
-import sys
+import os, sys
 path, marker = sys.argv[1], sys.argv[2]
 lines = open(path, encoding="utf-8").read().split("\n")
 try: i = next(n for n, l in enumerate(lines) if marker in l)
 except StopIteration: sys.exit(0)
 # Our block runs from the marker to EOF (install.sh only ever appends it).
 kept = "\n".join(lines[:i]).rstrip() + "\n"
-open(path, "w", encoding="utf-8").write("" if kept.strip() == "" else kept)
-print(f"  stripped the canon block from {path.rsplit('/', 1)[-1]}")
+name = path.rsplit("/", 1)[-1]
+if kept.strip() == "":
+    # Nothing of theirs was in it, so we created the whole file. Leaving a
+    # zero-byte GEMINI.md behind is litter, and litter is what makes people
+    # distrust an uninstaller.
+    os.remove(path)
+    print(f"  removed {name} (we created it)")
+else:
+    open(path, "w", encoding="utf-8").write(kept)
+    print(f"  stripped the canon block from {name}")
 PY
   fi
   done
@@ -129,7 +162,8 @@ PY
     && { run rm -f "$TARGET/.cursor/rules/knowledge-vault.mdc"; say "removed cursor rules"; }
 
   # Prune directories only if we emptied them.
-  for d in "$TARGET/.claude/hooks" "$TARGET/.claude/rules" "$TARGET/.cursor/rules" "$TARGET/.cursor"; do
+  for d in "$TARGET/.claude/hooks" "$TARGET/.claude/rules" "$TARGET/.cursor/rules" "$TARGET/.cursor" \
+           "$TARGET/.windsurf/rules" "$TARGET/.windsurf" "$TARGET/.clinerules" "$TARGET/.github"; do
     [ -d "$d" ] && [ -z "$(ls -A "$d" 2>/dev/null)" ] && run rmdir "$d"
   done
 
@@ -211,11 +245,32 @@ fi
 # identical block into both is what makes "works with your agent too" true rather
 # than aspirational — and generating both from one template is what stops them
 # drifting apart later.
-for name in CLAUDE.md AGENTS.md; do
+#
+# Other runtimes read the same body from their own conventional filename. Every
+# one of these is generated from `agent-instructions.md`, never hand-written, for
+# the same reason CLAUDE.md and AGENTS.md are: six copies of an instruction block
+# maintained by hand is six chances to disagree, and the disagreement is silent.
+#
+# Honest about coverage: these files make other agents READ the vault. Only Claude
+# Code gets the hooks that load context automatically and notice a missing session
+# note — the rest have no hook system to attach to. That is a real difference and
+# it is stated in the README rather than papered over.
+#
+# Opt out with --no-<runtime>; see --help.
+RUNTIME_FILES="CLAUDE.md AGENTS.md"
+[ "$WANT_GEMINI" = "1" ]   && RUNTIME_FILES="$RUNTIME_FILES GEMINI.md"
+[ "$WANT_COPILOT" = "1" ]  && RUNTIME_FILES="$RUNTIME_FILES .github/copilot-instructions.md"
+[ "$WANT_WINDSURF" = "1" ] && RUNTIME_FILES="$RUNTIME_FILES .windsurf/rules/knowledge-vault.md"
+[ "$WANT_CLINE" = "1" ]    && RUNTIME_FILES="$RUNTIME_FILES .clinerules/knowledge-vault.md"
+
+for name in $RUNTIME_FILES; do
   CM="$TARGET/$name"
   if [ "$DRY" = "1" ]; then
     say "[dry-run] ensure $name vault block"
-  elif [ ! -f "$CM" ]; then
+    continue
+  fi
+  mkdir -p "$(dirname "$CM")"
+  if [ ! -f "$CM" ]; then
     { printf '%s\n' "$MARKER"; cat "$TPL/agent-instructions.md"; } > "$CM"
     say "created $name"
   elif grep -qF "$MARKER" "$CM" 2>/dev/null; then
