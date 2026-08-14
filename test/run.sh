@@ -551,6 +551,42 @@ done
 is "ships the slash commands" "${missing_cmds:-none}" "none"
 
 # ---------------------------------------------------------------------------
+section "Claude Desktop / Cowork bundle"
+# The .mcpb is built by a script that needs node+npm, so CI cannot pack it. What
+# CI CAN do is assert the manifest is coherent — which is where the mistakes are.
+MB="$KIT/connectors/mcpb/manifest.json"
+python3 -c "import json;json.load(open('$MB'))" 2>/dev/null \
+  && ok "mcpb manifest is valid JSON" || bad "mcpb manifest is invalid JSON"
+
+mb() { python3 -c "
+import json,sys
+d=json.load(open('$MB'))
+for k in sys.argv[1].split('.'): d=d[k]
+print(d)" "$1" 2>/dev/null; }
+
+is "manifest version tracks VERSION"  "$(mb version)" "$(cat "$KIT/VERSION")"
+is "declares the MCPB manifest spec"  "$(mb manifest_version)" "0.3"
+is "declares a node server"           "$(mb server.type)" "node"
+is "entry point exists in the repo"   "$([ -f "$KIT/$(mb server.entry_point)" ] && echo y)" "y"
+
+# The whole reason this bundle beats a hand-edited config file: the user PICKS a
+# folder in a dialog and it lands in CANON_HOME, which is what resolveVault reads.
+is "asks the user for a vault directory" "$(mb user_config.vault_dir.type)" "directory"
+is "the vault is required"               "$(mb user_config.vault_dir.required)" "True"
+has "wires the pick into CANON_HOME"     "$(mb server.mcp_config.env)" 'user_config.vault_dir'
+has "runs the entry point from the bundle" "$(mb server.mcp_config.args)" '__dirname'
+
+# npm ships the version the MCP client reports in serverInfo. If it disagrees with
+# the bundle, a user reporting "canon 0.1.0 is broken" sends you to the wrong code.
+is "mcp package version tracks VERSION" \
+  "$(python3 -c "import json;print(json.load(open('$KIT/connectors/mcp/package.json'))['version'])" 2>/dev/null)" \
+  "$(cat "$KIT/VERSION")"
+
+is "the built bundle is not committed" \
+  "$(LC_ALL=C grep -q '^canon.mcpb$' "$KIT/.gitignore" && echo ignored)" "ignored"
+is "build script is executable" "$([ -x "$KIT/connectors/mcpb/build.sh" ] && echo y)" "y"
+
+# ---------------------------------------------------------------------------
 section "other agent runtimes"
 R3="$SB/repo3"; mkdir -p "$R3"; git init -q "$R3" 2>/dev/null
 "$KIT/install.sh" "$R3" --vault "$V4" >/dev/null 2>&1

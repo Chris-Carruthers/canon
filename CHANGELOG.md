@@ -8,6 +8,29 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **Claude Desktop and Cowork support.** `connectors/mcpb/` packs canon's existing
+  read-only MCP server into a double-clickable **`.mcpb` bundle**: the user picks
+  their vault folder in a dialog, which is wired to `CANON_HOME`, so there is no
+  config file to hand-edit and no terminal. `build.sh` verifies the manifest version
+  against `VERSION` and that the entry point is actually in the bundle before
+  packing, rather than after shipping.
+  - The bundle keeps the repo's directory layout instead of flattening it, so
+    `server.mjs` can keep importing `../../shared/vault.mjs` unchanged. Flattening
+    would have created a second copy of that import to keep in step.
+  - **Documented the constraint that actually decides the setup:** Cowork runs
+    sessions **in the cloud by default**, and *local MCP servers do not run in cloud
+    sessions*. So the bundle covers Claude Desktop and **local** Cowork sessions,
+    while the zero-install path for cloud sessions is adding the vault as a
+    **connected folder** — which works because a cloud session reaches local files
+    back through the desktop app.
+  - Also notes that in a cloud session the notes Claude reads leave the machine.
+    Fine for most vaults, wrong for some; the scanner gates credentials at commit
+    time and has no opinion about what you later share.
+  - `connectors/mcp/package.json` bumped 0.1.0 → 0.2.0 so the version an MCP client
+    reports in `serverInfo` matches the bundle a user installed.
+  - Twelve assertions on manifest coherence, since CI cannot run the packer (it
+    needs node and npm). The built `canon.mcpb` is gitignored — it is an artifact.
+
 - **canon installs as a Claude Code plugin.**
   `/plugin marketplace add Chris-Carruthers/canon` then `/plugin install canon@canon`
   — no clone, and the hooks apply to every project rather than the one folder you

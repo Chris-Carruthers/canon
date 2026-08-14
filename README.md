@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-194%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-206%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -37,6 +37,7 @@ reading the vault with two apps and no commands.
 - **[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)** — GitHub Desktop + Obsidian, no commands
 - [How it works](#how-it-works) — the two diagrams
 - [What you get](#what-you-get) · [Install as a Claude Code plugin](#install-it-as-a-claude-code-plugin) · [Quickstart](#quickstart) · [How it finds the vault](#how-it-finds-the-vault)
+- [Claude Desktop and Cowork](#claude-desktop-and-cowork) — connected folder, or the `.mcpb` bundle
 - [Works with agents that are not Claude](#works-with-agents-that-are-not-claude) — seven runtimes from one template
 - [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
 - [Design, and why](#design-and-why) — the limits that shaped it
@@ -324,6 +325,51 @@ nothing checks notes for credentials before they enter history. And **the same h
 scripts serve both installs**; they look for their tools in the repo copy, then
 `${CLAUDE_PLUGIN_ROOT}/bin`, then `PATH`. One file, three resolution sites, so plugin
 mode and installed mode cannot drift apart.
+
+## Claude Desktop and Cowork
+
+Cowork runs sessions **in the cloud by default**, and that single fact decides how
+you should hook up a vault — because the vault is a folder on your laptop.
+
+| | Cowork **cloud** session | Cowork **local** session · Claude Desktop |
+|---|---|---|
+| Read the vault as a **connected folder** | ✅ routed through the desktop app | ✅ |
+| canon's **MCP bundle** (`.mcpb`) | ❌ *local MCP servers do not run in cloud sessions* | ✅ |
+| Best option | connected folder | either; the bundle adds search tools |
+
+### The zero-install option: connect the folder
+
+Add the vault folder as a **connected folder** in Claude Desktop. Nothing to
+install, and it works in cloud sessions too, because the cloud session reaches
+local files back through the desktop app. Claude reads the notes directly.
+
+Tell it to *"read `Vision/Agent Router.md` first"* and it will find its way around —
+the router exists precisely so an agent does not have to guess at folder names.
+
+### The bundle: one file, one dialog
+
+For local sessions and Claude Desktop, `canon.mcpb` installs canon's read-only MCP
+server by double-click. You pick your vault folder in a dialog; there is no config
+file to hand-edit and no terminal.
+
+```bash
+./connectors/mcpb/build.sh      # produces canon.mcpb
+```
+
+Four tools — `canon_router`, `canon_search`, `canon_list`, `canon_read` — and **no
+write tool at all**. Every caller-supplied path goes through a symlink-aware check
+that refuses anything outside the vault you selected.
+
+Building needs node and npm, because a `.mcpb` carries its own `node_modules` so the
+person installing it does not have to. That is why it is a build step rather than a
+dependency the kit acquires — canon's core stays `bash`, `git`, `python3`.
+
+**A caution worth reading before you connect a work vault.** In a cloud session the
+notes Claude reads leave your machine. That is fine for most vaults and wrong for
+some. If yours holds anything you would not send to a third party, use a local
+session, and read [Use Claude Cowork safely](https://support.claude.com/en/collections/19667525-claude-cowork)
+first. canon's scanner gates *credentials* at commit time; it has no opinion about
+what you later choose to share.
 
 ## Works with agents that are not Claude
 

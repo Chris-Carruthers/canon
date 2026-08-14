@@ -2,3 +2,6 @@
 *.bak
 *.bak.*
 .canon-scan-allow
+
+# Built MCPB bundle — an artifact, not source. Rebuild with connectors/mcpb/build.sh
+canon.mcpb
