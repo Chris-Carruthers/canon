@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-206%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-210%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -364,12 +364,18 @@ Building needs node and npm, because a `.mcpb` carries its own `node_modules` so
 person installing it does not have to. That is why it is a build step rather than a
 dependency the kit acquires — canon's core stays `bash`, `git`, `python3`.
 
-**A caution worth reading before you connect a work vault.** In a cloud session the
-notes Claude reads leave your machine. That is fine for most vaults and wrong for
-some. If yours holds anything you would not send to a third party, use a local
-session, and read [Use Claude Cowork safely](https://support.claude.com/en/collections/19667525-claude-cowork)
-first. canon's scanner gates *credentials* at commit time; it has no opinion about
-what you later choose to share.
+**One thing to decide deliberately.** In a cloud session, the notes Claude reads
+leave your machine; in a local session they do not. Which is acceptable depends
+entirely on what is in your vault, and it is a call for whoever is accountable for
+that content — not a default this project should pick for you.
+
+Worth knowing while you decide: canon's scanner gates **credentials** at commit
+time and has no opinion about what you later choose to share, so it is not the
+control here. If your vault carries client, patient or otherwise regulated
+material, answer this question before connecting it, and read
+[Use Claude Cowork safely](https://support.claude.com/en/collections/19667525-claude-cowork).
+Record the answer as a `Decisions/` note so the next person does not have to
+re-litigate it.
 
 ## Works with agents that are not Claude
 

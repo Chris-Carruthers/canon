@@ -40,17 +40,44 @@ deliberately does not govern.
 
 ## Ownership
 
+**Decide this before anything else here is worth writing.** These are placeholders.
+Nobody outside your team can fill them in.
+
 | Role | Who | Evidence |
 |---|---|---|
-| Owns the token contract | | |
-| Owns component review | | |
-| Owns accessibility | | |
+| Owns the token contract | `<name>` | |
+| Owns component review | `<name>` | |
+| Owns accessibility | `<name>` | |
+| Accountable if it stalls | `<name>` | |
 
 <!--
-"Unowned" is an answer, and if it is the answer it is the most important line in
-this note. Write it, with what you checked to conclude it. An unowned design
-system does not converge, and a reader needs to know that before they file a
-request nobody will read.
+HOW TO DECIDE THIS, if it is not obvious.
+
+A design system needs three different kinds of authority and they are usually three
+different people. Splitting them is not bureaucracy — it is what stops the system
+being blocked on one person's calendar:
+
+  Token contract     normally a designer. They decide which names exist and what
+                     each one means. This is the role that must NOT be a committee.
+  Component review   whoever says yes to a new shared component, and no to the
+                     fourth button. Often an engineer or design-systems lead.
+  Accessibility      whoever is accountable for the standard being MET, not merely
+                     aspired to. Name someone even if no audit has run — an
+                     unowned WCAG claim in a spec is worse than no claim, because
+                     it reads as done.
+  Accountable        the person who unblocks the other three when the disciplines
+                     disagree. Usually a product or engineering lead.
+
+One person can hold several roles. Nobody holding a role is also an answer.
+
+WRITE "unowned" IF THAT IS TRUE, along with what you checked to conclude it. It is
+the most important line in this note when it is true. An unowned design system does
+not converge, and a reader needs to know that before filing a request nobody will
+read.
+
+Evidence means how you know — a ticket, a decision note, the person's own
+confirmation. "We assumed" is not evidence, and assumed ownership is the same as
+none.
 -->
 
 ## Source of truth

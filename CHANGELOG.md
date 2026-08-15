@@ -8,6 +8,32 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **`canon-sync --only <path>`** (repeatable) stages just the paths you name.
+
+  The default stays `git add -A`, which is right for one person and one vault. It
+  stops being right the moment a second agent session writes to the same vault:
+  `git add -A` cannot tell your notes from the half-written ones another session
+  left two minutes ago, so both land in one commit under your message. Nothing is
+  lost, but the history now asserts something untrue, and a shared vault's history
+  is the thing you are meant to be able to trust.
+
+  A path that does not exist is refused with exit 2 and **nothing staged**, rather
+  than silently committing nothing or falling back to everything.
+
+### Changed
+
+- **The design-system Ownership section is a filled-in placeholder with
+  instructions**, not an empty table. It now names four roles — token contract,
+  component review, accessibility, and who is accountable when it stalls — and
+  explains why they are usually different people, so a team can decide rather than
+  guess. "Unowned" remains an explicitly valid answer, and the Evidence column
+  makes assumed ownership visible as the non-answer it is.
+- **The Cowork cloud-session note states the trade-off instead of recommending
+  one.** Whether notes may leave the machine depends on what is in the vault, and
+  that is the accountable owner's call, not this project's default. It now points
+  out that the scanner gates credentials and is *not* the control for this, and
+  suggests recording the answer as a `Decisions/` note.
+
 - **Claude Desktop and Cowork support.** `connectors/mcpb/` packs canon's existing
   read-only MCP server into a double-clickable **`.mcpb` bundle**: the user picks
   their vault folder in a dialog, which is wired to `CANON_HOME`, so there is no

@@ -874,6 +874,28 @@ case "$OUT8" in *"a teammate pushed first"*) bad "does not retry a non-race fail
 git -C "$V6" remote set-url origin "$RMT"
 
 # ---------------------------------------------------------------------------
+section "--only, for shared machines"
+# The scenario this exists for: a second agent session has left half-written notes
+# in the vault. `git add -A` would sweep them into this commit under this message.
+git -C "$V6" checkout -q main 2>/dev/null
+echo "mine"   > "$V6/Sessions/mine.md"
+echo "theirs" > "$V6/Sessions/another-session-wip.md"
+CANON_HOME="$V6" "$SY" --only "Sessions/mine.md" --push -m "only mine" >/dev/null 2>&1
+is "commits only the named path" \
+   "$(git -C "$V6" show --name-only --format= HEAD | tr -d ' ')" "Sessions/mine.md"
+is "leaves the other session's file alone" \
+   "$(git -C "$V6" status --porcelain -- "Sessions/another-session-wip.md" | wc -l | tr -d ' ')" "1"
+
+# A typo'd path must stop, not silently commit nothing or fall back to everything.
+CANON_HOME="$V6" "$SY" --only "Sessions/does-not-exist.md" -m x >/dev/null 2>&1
+is "refuses a path that does not exist" "$?" "2"
+is "and stages nothing when it refuses" \
+   "$(git -C "$V6" diff --cached --name-only | wc -l | tr -d ' ')" "0"
+
+git -C "$V6" add -A >/dev/null 2>&1; git_q -C "$V6" commit -qm cleanup >/dev/null 2>&1
+git -C "$V6" push -q 2>/dev/null
+
+# ---------------------------------------------------------------------------
 section "branch mode"
 # Baseline the owner's world: a governed glob and a vision doc already on trunk.
 printf 'Vision/**  boss@t\n' > "$V6/.canon-owners"

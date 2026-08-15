@@ -8,6 +8,15 @@
 #   canon-sync --no-pull          skip the pull
 #   canon-sync --branch           put this change on a branch for review
 #   canon-sync --trunk            push straight to the shared branch
+#   canon-sync --only PATH        stage only PATH (repeatable); see below
+#
+# --only, and why you will want it on a busy machine. By default this stages
+# everything, which is correct for one person and one vault. It stops being
+# correct the moment a second agent session writes to the same vault: `git add -A`
+# cannot tell your notes from the half-written ones another session left two
+# minutes ago, so both land in one commit under your message. Nothing is lost, but
+# the history now says a thing that is not true. Name your paths and the rest is
+# left alone.
 #
 # Asymmetric by design:
 #   pull  — safe, automatic where possible: you always read fresh context
@@ -48,6 +57,7 @@ case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; e
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DO_PULL=1; DO_PUSH=0; STATUS_ONLY=0; MSG=""
 MODE="${CANON_BRANCH_MODE:-auto}"
+ONLY=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -56,8 +66,9 @@ while [ $# -gt 0 ]; do
     --status) STATUS_ONLY=1; shift ;;
     --branch) MODE=branch; shift ;;
     --trunk) MODE=trunk; shift ;;
+    --only) ONLY[${#ONLY[@]}]="${2:-}"; shift 2 ;;
     -m|--message) MSG="${2:-}"; shift 2 ;;
-    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,50p' "$0"; exit 0 ;;
     *) echo "canon-sync: unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -181,7 +192,29 @@ if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --other
 fi
 
 # --- stage + scan ------------------------------------------------------------
-git add -A
+# Default: everything. That is right for one person and one vault.
+#
+# --only exists because it stops being right the moment more than one agent
+# session writes to the same vault. `git add -A` cannot tell your notes from the
+# ones another session left half-written two minutes ago; it sweeps both into one
+# commit under your message. The other session's work is not lost, but it is now
+# committed by someone who never read it, described by a message about something
+# else. That is how a shared vault's history stops being trustworthy.
+if [ "${#ONLY[@]}" -gt 0 ]; then
+  MISSING=""
+  for p in "${ONLY[@]}"; do
+    [ -e "$p" ] || MISSING="$MISSING $p"
+  done
+  if [ -n "$MISSING" ]; then
+    echo "canon-sync: --only named path(s) that do not exist:$MISSING" >&2
+    echo "  nothing staged. Check the paths and re-run." >&2
+    exit 2
+  fi
+  git add -- "${ONLY[@]}"
+  echo "staged ${#ONLY[@]} path(s); everything else left alone"
+else
+  git add -A
+fi
 echo
 if [ "${CANON_SKIP_SCAN:-0}" = "1" ]; then
   echo "canon-scan: SKIPPED (CANON_SKIP_SCAN=1) — you are on your own"
