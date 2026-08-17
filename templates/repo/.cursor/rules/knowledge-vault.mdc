@@ -51,10 +51,15 @@ yourself** — that field means a human confirmed the content and is theirs to a
   place. Check `.canon-owners` in the vault for who owns what.
 - Do not commit or push the vault on someone's behalf unless asked.
 
-The design canon lives in `Reference/Design/`: two frozen fenced blocks
-(`design-tokens`, `design-components`) whose contract is in the Design System
-template. Omit a key you do not have rather than writing `TODO` — absence is what
-the tooling reads.
+The design canon lives in `Reference/Design/`: three frozen fenced blocks
+(`design-tokens`, `design-components`, `design-tools`) whose contract is in the
+Design System template. Omit a key you do not have rather than writing `TODO` —
+absence is what the tooling reads.
+
+Before running a design tool, read the `design-tools` block and target the
+vocabulary its row names; a generator left to pick its own invents one. What it
+emits comes back as names in the vault, values in the repo — never as pasted
+markup.
 
 Freely writable: `Sessions/`, `Projects/`, `Clients/`, `Reference/`, `Outputs/`,
 `Sources/`, `_Inbox/`.

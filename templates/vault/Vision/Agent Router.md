@@ -19,7 +19,7 @@ map, not a manual.
 | What a workstream is / where it stands | `Projects/<name>.md` |
 | A client / customer / domain area | `Clients/<name>.md` |
 | Durable facts, schemas, APIs, pricing | `Reference/` |
-| Design system: tokens, components, design assets | `Reference/Design/` |
+| Design system: tokens, components, design assets, approved design tools | `Reference/Design/` |
 | Intent for a feature (what & why) | `Specs/` |
 | Ops state to pick work up cold | `Handoffs/` |
 | What happened in past sessions | `Sessions/YYYY-MM-DD — <title> (<initials>).md` |

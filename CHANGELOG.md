@@ -8,6 +8,45 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **A `design-tools` block** — a third frozen fenced block in the design canon,
+  recording what is approved for *making or fixing* UI, alongside a
+  `templates/repo/DESIGN.md` for wiring a tool to it and `docs/DESIGN-TOOLS.md`
+  with two worked entries.
+
+  The canon could say what existed and whether the code conformed. It had no answer
+  for "what do I use to build one", so an agent reaching `Reference/Design/` learned
+  that nothing was canonical and stopped there.
+
+  The block follows the kit's only existing precedent for an external design vendor.
+  Figma is not registered anywhere: it is a typed pointer field validated by
+  `canon-design-audit`, with a hard rule against storing the URL. So a tool row
+  carries an identifier and never a location — no URL to rot when a product gets
+  renamed, no filesystem path, because a skill sits at a different absolute path on
+  every machine.
+
+  Two keys carry the weight. **`verified:` is required**, because third-party
+  capability rots faster than anything else in this canon — features ship, limits
+  change, free tiers get metered — and a claim with no date is one somebody acts on
+  a year after it stopped being true. A row older than 180 days becomes a
+  `DS-TOOL-STALE` **GAP**, so an unchecked claim decays into a visible absence
+  rather than a quiet lie; it is a GAP and not a violation because a rule that can
+  fail a build through the mere passage of time is a rule someone switches off.
+
+  **`vocabulary:` is required for any tool whose `roles:` write UI**, and the audit
+  cross-checks it against the `design-tokens` block. A generator given no target
+  vocabulary does not decline to choose one — it invents one, and you meet the extra
+  `--primary` months later in a diff that looked fine and a suite that stayed green.
+  This is the enforcement arm of *names in the vault, values in the repo*: the tool
+  is told which names to use and reads the values from the repo itself.
+
+  New rules: `DS-TOOL-MALFORMED` (VIOLATION) and `DS-TOOL-STALE` (GAP).
+  `values-to` is resolved like `impl` and `source`, so a tool aimed at a tokens file
+  that does not exist reports `DS-POINTER-DEAD`.
+
+  **A vault that registers no tools produces byte-identical output to a build
+  without this feature**, in every mode including `--json`. An unused registry
+  should be invisible, not a row of zeroes.
+
 - **`canon-sync --only <path>`** (repeatable) stages just the paths you name.
 
   The default stays `git add -A`, which is right for one person and one vault. It

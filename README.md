@@ -744,9 +744,9 @@ it first looks:
 Copy values into the vault and you have built a second source of truth that drifts
 silently while reading as authoritative.
 
-**For coding agents, the useful part is that assets resolve deterministically.** Two
-frozen fenced blocks — `design-tokens` and `design-components` — give a three-rung
-ladder, and *every rung's absence is detectable*:
+**For coding agents, the useful part is that assets resolve deterministically.**
+Frozen fenced blocks — `design-tokens`, `design-components` and `design-tools` —
+give a three-rung ladder, and *every rung's absence is detectable*:
 
 | Rung | Field | Needs |
 |---|---|---|
@@ -759,6 +759,11 @@ and checks whether it exists rather than guessing. **Omit a key you do not have 
 never `TODO`.** Absence is the signal, and coverage is derived from it. `status:
 absent` is a legitimate row: *"there is no shared `PageHeader`"* stops an agent
 hunting for one and stops it silently inventing a fourth.
+
+The third block, `design-tools`, records what is approved for *making* UI — and any
+tool whose role writes UI must name the vocabulary it targets, checked against the
+tokens block. A generator given no target does not abstain from picking one, it
+invents one. See **[`docs/DESIGN-TOOLS.md`](docs/DESIGN-TOOLS.md)**.
 
 ### `canon-design-audit`
 
