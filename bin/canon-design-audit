@@ -204,6 +204,14 @@ def mapval(v):
     return d
 
 
+def utc_now():
+    """Naive UTC. datetime.utcnow() is deprecated and warns on stderr from 3.12,
+    and a tool that prints a warning on every run trains people to ignore its
+    output. Naive rather than aware because it is compared against dates parsed
+    from the canon with strptime, and mixing aware and naive raises."""
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+
+
 findings = []       # (severity, rule, location, detail)
 
 
@@ -344,7 +352,7 @@ for slug in sorted(tools):
                 "%s: verified %r is not a YYYY-MM-DD date"
                 % (slug, when_verified.strip()))
         else:
-            age = (datetime.datetime.utcnow() - seen_at).days
+            age = (utc_now() - seen_at).days
             if age > TOOL_STALE_DAYS:
                 add("GAP", "DS-TOOL-STALE", rec["_note"],
                     "%s: verified %s, %d days ago — recheck what it can do"
@@ -743,7 +751,7 @@ else:
         print("%s %d" % (rule, counts[rule]))
 
 if do_report:
-    when = datetime.datetime.utcnow()
+    when = utc_now()
     outdir = os.path.join(vault, "Outputs")
     os.makedirs(outdir, exist_ok=True)
     dest = os.path.join(outdir, "%s — Design System Audit.md" % when.date().isoformat())
