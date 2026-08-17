@@ -815,6 +815,165 @@ is "unscanned repo pointers are not called dead" "$(Q=count R=DS-POINTER-DEAD pi
 "$DA" >/dev/null 2>&1; is "refuses to run with no repo" "$?" "2"
 
 # ---------------------------------------------------------------------------
+section "design tools registry"
+# The registry answers "what do I use to MAKE one", which the token and component
+# blocks do not. Its own fixture vault, not V8's: these assertions turn on exact
+# counts, and sharing a vault with the section above would couple them.
+#
+# The rule that carries the weight is `vocabulary` being mandatory for a tool that
+# writes UI. A generator with no named target does not abstain from choosing — it
+# invents a vocabulary, and you meet the extra --primary months later, in a diff
+# that looked fine.
+V9="$SB/vault9"; "$KIT/bin/canon-init-vault" "$V9" >/dev/null 2>&1
+RT="$SB/toolrepo"; mkdir -p "$RT/src/styles"
+printf ':root {\n  --primary: 222 47%% 11%%;\n}\n' > "$RT/src/styles/tokens.css"
+mkdir -p "$V9/Reference/Design"
+
+# A vault that registers NO tools must behave exactly as one built without the
+# feature. An unused registry should be invisible, not a row of zeroes.
+cat > "$V9/Reference/Design/canon.md" <<'CANON'
+```design-tokens
+- vocabulary: demo
+  source: toolrepo/src/styles/tokens.css
+  format: hsl-triplet
+  names: [--primary]
+  status: canonical
+```
+CANON
+TJ="$("$DA" --vault "$V9" --json "$RT" 2>/dev/null)"
+tpick() { printf '%s' "$TJ" | python3 -c "
+import json,os,sys
+d=json.load(sys.stdin); q=os.environ['Q']
+if q=='count': print(d['counts'].get(os.environ['R'],0))
+elif q=='details': print(' | '.join(x['detail'] for x in d['findings'] if x['rule']==os.environ['R']))
+elif q=='sev': print(d['severity'].get(os.environ['R'],''))
+elif q=='haskey': print('y' if os.environ['R'] in d else 'n')
+elif q=='tools': print(d.get('tools',{}).get(os.environ['R'],''))
+" 2>/dev/null; }
+is "omits the tools key when none are registered" "$(Q=haskey R=tools tpick)" "n"
+
+# A well-formed row: parses silently and is counted.
+cat >> "$V9/Reference/Design/canon.md" <<'CANON'
+
+```design-tools
+- slug: stitch
+  name: Google Stitch
+  kind: vendor
+  roles: [generator]
+  emits: [design-md, html-css]
+  ingest: proposed
+  values-to: toolrepo/src/styles/tokens.css
+  vocabulary: demo
+  verified: 2099-01-01
+  hazard: "cannot hold a brand; re-state hex every time"
+- slug: impeccable
+  name: impeccable
+  kind: skill
+  roles: [critic]
+  version: "3.9.1"
+  verified: 2099-01-01
+```
+CANON
+TJ="$("$DA" --vault "$V9" --json "$RT" 2>/dev/null)"
+is "accepts a well-formed registry"      "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+is "counts registered tools"             "$(Q=tools R=registered tpick)" "2"
+is "counts only the ones that write UI"  "$(Q=tools R=writing tpick)" "1"
+is "a critic-only tool needs no vocabulary" "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+
+# Each malformed case on its own run: overlapping fixtures make a count assertion
+# prove nothing about which rule actually fired.
+tools_only() { printf '```design-tools\n%s\n```\n' "$1" > "$V9/Reference/Design/tools.md"
+  TJ="$("$DA" --vault "$V9" --json "$RT" 2>/dev/null)"; }
+
+tools_only "- slug: t1
+  name: T1
+  kind: vendor
+  roles: [generator]
+  vocabulary: demo
+  verified: 2099-01-01
+  bogus-key: x"
+is "rejects an unknown key" "$(Q=count R=DS-BLOCK-MALFORMED tpick)" "1"
+
+tools_only "- slug: t2
+  name: T2
+  kind: teleporter
+  roles: [critic]
+  verified: 2099-01-01"
+has "rejects an unknown kind" "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown kind"
+
+tools_only "- slug: t3
+  name: T3
+  kind: skill
+  roles: [critic, soothsayer]
+  verified: 2099-01-01"
+has "rejects an unknown role" "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown role"
+
+tools_only "- slug: t4
+  name: T4
+  kind: vendor
+  roles: [generator]
+  vocabulary: demo"
+has "requires verified — a claim needs a date" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "verified is required"
+
+tools_only "- slug: t5
+  name: T5
+  kind: vendor
+  roles: [generator]
+  verified: 2099-01-01"
+has "requires a vocabulary when the tool writes UI" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "vocabulary is required"
+
+tools_only "- slug: t6
+  name: T6
+  kind: vendor
+  roles: [implementer]
+  vocabulary: nosuchvocab
+  verified: 2099-01-01"
+has "rejects a vocabulary no design-tokens block declares" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "not declared in any design-tokens block"
+
+tools_only "- slug: t7
+  name: T7
+  kind: skill
+  roles: [critic]
+  verified: last Tuesday"
+has "rejects a verified date that is not YYYY-MM-DD" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "not a YYYY-MM-DD date"
+
+tools_only "- slug: t8
+  name: T8
+  kind: skill
+  roles: [critic]
+  verified: TODO"
+is "refuses TODO in verified" "$(Q=count R=DS-BLOCK-MALFORMED tpick)" "1"
+
+tools_only "- slug: t9
+  name: T9
+  kind: vendor
+  roles: [generator]
+  vocabulary: demo
+  values-to: toolrepo/src/styles/nope.css
+  verified: 2099-01-01"
+is "reports a dead values-to pointer" "$(Q=count R=DS-POINTER-DEAD tpick)" "1"
+
+# Staleness is a GAP on purpose. A rule that can fail a build through the mere
+# passage of time is a rule someone switches off, so an unchecked claim decays
+# into a visible absence rather than a broken pipeline.
+tools_only "- slug: t10
+  name: T10
+  kind: vendor
+  roles: [critic]
+  verified: 2001-01-01"
+is  "flags a stale tool claim"            "$(Q=count R=DS-TOOL-STALE tpick)" "1"
+is  "as a GAP, never a violation"         "$(Q=sev R=DS-TOOL-STALE tpick)" "GAP"
+has "and says how long ago it was checked" "$(Q=details R=DS-TOOL-STALE tpick)" "2001-01-01"
+"$DA" --vault "$V9" --strict "$RT" >/dev/null 2>&1
+is "a stale claim cannot fail --strict" "$?" "0"
+
+rm -f "$V9/Reference/Design/tools.md"
+
+# ---------------------------------------------------------------------------
 section "concurrent writers"
 # Two people and one shared branch, which is the whole point of a team vault.
 

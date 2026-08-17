@@ -10,10 +10,17 @@
 #   --baseline-write   print a .canon-design-baseline for redirection
 #   --quiet            counts only
 #
-# It reads the CONTRACT from the vault — the design-tokens and design-components
-# blocks under Reference/Design/ — and the FACTS from your code repos, and
-# recomputes everything on every run. Nothing is cached in frontmatter, no score
-# is stored, and there is no scorecard note to keep current.
+# It reads the CONTRACT from the vault — the design-tokens, design-components and
+# design-tools blocks under Reference/Design/ — and the FACTS from your code repos,
+# and recomputes everything on every run. Nothing is cached in frontmatter, no
+# score is stored, and there is no scorecard note to keep current.
+#
+# design-tools is the registry of what is approved for MAKING or FIXING UI. It is
+# checked, not merely parsed: a tool whose roles write UI must name the vocabulary
+# it targets, and that vocabulary must exist. A generator left to choose its own
+# does not abstain — it invents one, and you meet the fifth --primary months later.
+# A vault that registers no tools gets byte-identical output to a build without
+# the feature; an unused registry should be invisible, not a row of zeroes.
 #
 # READ-ONLY in every repo it scans. The single file it ever writes is the report,
 # and only with --report.
@@ -51,7 +58,7 @@ while [ $# -gt 0 ]; do
     --json) MODE="json"; shift ;;
     --baseline-write) BASELINE_WRITE=1; shift ;;
     --quiet) QUIET=1; shift ;;
-    -h|--help) sed -n '2,34p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     -*) echo "canon-design-audit: unknown option: $1" >&2; exit 2 ;;
     *) REPOS[${#REPOS[@]}]="$1"; shift ;;
   esac
@@ -91,7 +98,18 @@ TOKEN_KEYS = {"vocabulary", "source", "format", "scope", "catalog", "names",
               "status", "of"}
 COMP_KEYS = {"slug", "name", "vocabulary", "figma", "image", "impl", "tokens",
              "status", "note"}
+TOOL_KEYS = {"slug", "name", "kind", "roles", "emits", "ingest", "values-to",
+             "vocabulary", "version", "verified", "hazard", "note"}
 FORMATS = {"hsl-triplet", "oklch", "hex", "rgb-triplet", "named"}
+KINDS = {"vendor", "skill", "script"}
+ROLES = {"generator", "critic", "implementer", "design-source", "style-guide"}
+# A tool in either of these roles WRITES UI, so it must be told which vocabulary
+# to target. Left to itself it does not decline to choose — it invents one.
+WRITING_ROLES = {"generator", "implementer"}
+# Third-party capability rots faster than anything else in this canon. Six months
+# is long enough not to nag and short enough that a claim cannot quietly outlive
+# the product it describes.
+TOOL_STALE_DAYS = 180
 
 # Tailwind's default palette, enumerated on purpose. A pattern like
 # `bg-[a-z]+-[0-9]+` would also match bg-primary-500 and every project's own
@@ -206,18 +224,53 @@ for root, dirs, files in os.walk(design_dir):
         if f.endswith(".md"):
             canon_files.append(os.path.join(root, f))
 
-vocabs, comps = {}, []
+KEYS_BY_FENCE = {"design-tokens": TOKEN_KEYS, "design-components": COMP_KEYS,
+                 "design-tools": TOOL_KEYS}
+
+vocabs, comps, tools = {}, [], {}
 for path in canon_files:
     rel = os.path.relpath(path, vault)
     text = read_text(path)
-    for kind, body in re.findall(r"```(design-tokens|design-components)\n(.*?)```",
-                                text, flags=re.S):
+    for kind, body in re.findall(
+            r"```(design-tokens|design-components|design-tools)\n(.*?)```",
+            text, flags=re.S):
         for rec in records(body):
-            unknown = sorted(set(rec) - (TOKEN_KEYS if kind == "design-tokens"
-                                         else COMP_KEYS))
+            unknown = sorted(set(rec) - KEYS_BY_FENCE[kind])
             if unknown:
                 add("VIOLATION", "DS-BLOCK-MALFORMED", rel,
                     "unknown key(s) in %s: %s" % (kind, ", ".join(unknown)))
+            if kind == "design-tools":
+                slug = rec.get("slug")
+                if not slug or not rec.get("name"):
+                    add("VIOLATION", "DS-TOOL-MALFORMED", rel,
+                        "design-tools record missing slug or name")
+                    continue
+                if slug in tools:
+                    add("VIOLATION", "DS-TOOL-MALFORMED", rel,
+                        "duplicate tool slug: %s" % slug)
+                k = rec.get("kind")
+                if k and k not in KINDS:
+                    add("VIOLATION", "DS-TOOL-MALFORMED", rel,
+                        "unknown kind %r for %s" % (k, slug))
+                roles = set(listval(rec.get("roles", "")))
+                for r in sorted(roles - ROLES):
+                    add("VIOLATION", "DS-TOOL-MALFORMED", rel,
+                        "unknown role %r for %s" % (r, slug))
+                # Rule 9. A capability claim with no date is one somebody acts on
+                # a year after it stopped being true.
+                if not rec.get("verified"):
+                    add("VIOLATION", "DS-TOOL-MALFORMED", rel,
+                        "%s: verified is required — a tool claim needs a date "
+                        "you checked" % slug)
+                # Rule 10. Enforced here rather than left to review, because the
+                # failure is silent: a fifth --primary, months later.
+                if roles & WRITING_ROLES and not rec.get("vocabulary"):
+                    add("VIOLATION", "DS-TOOL-MALFORMED", rel,
+                        "%s: roles %s write UI, so vocabulary is required"
+                        % (slug, sorted(roles & WRITING_ROLES)))
+                rec["_note"] = rel
+                tools[slug] = rec
+                continue
             if kind == "design-tokens":
                 slug = rec.get("vocabulary")
                 if not slug:
@@ -255,8 +308,11 @@ PLACEHOLDER = {"todo", "tbd", "?", "n/a", "na", "-", "none", "xxx", "fixme"}
 # component legitimately called "Todo" or a note titled "None of the above" is not
 # a placeholder — flagging it would be the tool's own first false positive.
 PLACEHOLDER_KEYS = {"vocabulary", "source", "format", "scope", "catalog", "names",
-                    "status", "of", "slug", "figma", "image", "impl", "tokens"}
-for rec in list(vocabs.values()) + comps:
+                    "status", "of", "slug", "figma", "image", "impl", "tokens",
+                    "kind", "roles", "ingest", "values-to", "verified"}
+# `hazard` is deliberately absent from that set alongside `name` and `note`: it is
+# free text, and a tool whose one trap really is "none" should be able to say so.
+for rec in list(vocabs.values()) + comps + list(tools.values()):
     for k, v in sorted(rec.items()):
         if k.startswith("_") or k not in PLACEHOLDER_KEYS:
             continue
@@ -264,6 +320,35 @@ for rec in list(vocabs.values()) + comps:
             add("VIOLATION", "DS-BLOCK-MALFORMED", rec["_note"],
                 "%s: %r — omit the key instead; absence is the signal"
                 % (k, v.strip()))
+
+# Tool checks that need every vocabulary in hand, so they run after the walk.
+# A tool pointed at a vocabulary that does not exist is worse than one pointed at
+# nothing: it reads as governed.
+for slug in sorted(tools):
+    rec = tools[slug]
+    want = rec.get("vocabulary")
+    if want and want not in vocabs:
+        add("VIOLATION", "DS-TOOL-MALFORMED", rec["_note"],
+            "%s: vocabulary %r is not declared in any design-tokens block"
+            % (slug, want))
+    # GAP, never a VIOLATION — a stale claim is an unchecked claim, not a defect,
+    # and a rule that can fail --strict on the passage of time is a rule people
+    # switch off. It decays into a visible absence instead of a silent lie.
+    when_verified = rec.get("verified")
+    if when_verified:
+        try:
+            seen_at = datetime.datetime.strptime(when_verified.strip(),
+                                                 "%Y-%m-%d")
+        except ValueError:
+            add("VIOLATION", "DS-TOOL-MALFORMED", rec["_note"],
+                "%s: verified %r is not a YYYY-MM-DD date"
+                % (slug, when_verified.strip()))
+        else:
+            age = (datetime.datetime.utcnow() - seen_at).days
+            if age > TOOL_STALE_DAYS:
+                add("GAP", "DS-TOOL-STALE", rec["_note"],
+                    "%s: verified %s, %d days ago — recheck what it can do"
+                    % (slug, when_verified.strip(), age))
 
 # ---------------------------------------------------------------------------
 # 2. Resolve repo-prefixed pointers.
@@ -305,6 +390,20 @@ for slug, rec in sorted(vocabs.items()):
         if not os.path.exists(abspath):
             add("VIOLATION", "DS-POINTER-DEAD", ptr,
                 "%s of vocabulary %s does not exist" % (key, slug))
+
+# `values-to` is repo-prefixed like impl/source (rule 4), so it gets the same
+# treatment: a tool told to write values into a file that does not exist is a
+# broken instruction, not a stylistic lapse.
+for slug in sorted(tools):
+    ptr = tools[slug].get("values-to")
+    if not ptr:
+        continue
+    abspath, checkable = resolve(ptr)
+    if not checkable:
+        unverifiable.append("%s (values-to of %s)" % (ptr, slug))
+    elif not os.path.exists(abspath):
+        add("VIOLATION", "DS-POINTER-DEAD", ptr,
+            "values-to of tool %s does not exist" % slug)
 
 for c in comps:
     ptr = c.get("impl")
@@ -485,6 +584,13 @@ cov = {
     "impl": sum(1 for c in comps if c.get("impl")),
     "absent": sum(1 for c in comps if c.get("status") == "absent"),
 }
+# Reported as a count of what is declared, never as a score. Zero registered tools
+# is a legitimate state and reads as one.
+tool_summary = {
+    "registered": len(tools),
+    "writing": sum(1 for t in tools.values()
+                   if set(listval(t.get("roles", ""))) & WRITING_ROLES),
+}
 
 baseline = {}
 for repo in repos:
@@ -559,6 +665,9 @@ def render_report(when):
     out.append("- **%d of %d** resolve to a Figma node" % (cov["figma"], total))
     out.append("- **%d of %d** resolve to an implementation" % (cov["impl"], total))
     out.append("- **%d** are recorded as deliberately absent" % cov["absent"])
+    if tools:
+        out.append("- **%d** design tool(s) registered, **%d** of which write UI"
+                   % (tool_summary["registered"], tool_summary["writing"]))
     out.append("")
     for rule in sorted(counts):
         rows = [f for f in findings if f[1] == rule]
@@ -587,7 +696,7 @@ def render_report(when):
 
 
 if mode == "json":
-    print(json.dumps({
+    payload = {
         "tool_version": version,
         "vault": vault,
         "repos": repos,
@@ -600,12 +709,21 @@ if mode == "json":
         "unverifiable": sorted(set(unverifiable)),
         "findings": [{"severity": s, "rule": r, "location": l, "detail": d}
                      for s, r, l, d in findings],
-    }, indent=2, sort_keys=True))
+    }
+    # Emitted only when the block is used, so a vault that registers no tools gets
+    # byte-identical output to a build without this feature. A registry nobody has
+    # filled in should be invisible, not a row of zeroes.
+    if tools:
+        payload["tools"] = tool_summary
+    print(json.dumps(payload, indent=2, sort_keys=True))
 elif not quiet:
     print("canon-design-audit %s" % version)
     print("  vault: %s" % vault)
     print("  scanned %d file(s) in %d repo(s)" % (scanned_files, len(repos)))
     print("  canon: %d vocabular(ies), %d component(s)" % (len(vocabs), total))
+    if tools:
+        print("  tools: %d registered, %d that write UI"
+              % (tool_summary["registered"], tool_summary["writing"]))
     print("")
     if not counts:
         print("  no findings")
