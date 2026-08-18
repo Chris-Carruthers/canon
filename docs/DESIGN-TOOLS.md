@@ -23,9 +23,10 @@ This is the whole point of registering a tool rather than just using one:
 > `Attachments/Design/` images.
 >
 > **Generated markup does not enter a repo as-is.** It is a structural draft.
-> Pasting it is how a codebase acquires thousands of hardcoded colour utilities,
-> and that is not a hypothetical — it is the most common measured violation in
-> every repo we have pointed the audit at.
+> Pasting it is how a codebase acquires hardcoded colour utilities in bulk, and
+> `DS-PALETTE-UTILITY` is usually the largest count in an audit of a codebase that
+> has been generated into. Run `canon-design-audit` before and after if you want
+> your own number rather than this claim.
 
 One-way on purpose. The canon does not round-trip back into a generator: these
 tools have no API, and their output is not reproducible from the same input.
@@ -53,9 +54,9 @@ vocabularies it is allowed near. `--export` renders the join for you:
 
 ```json
 "targets": [
-  { "repo": "dexhive-prod-frontend", "vocabulary": "optimize-shadcn-hsl",
+  { "repo": "web-app", "vocabulary": "web-shadcn-hsl",
     "format": "hsl-triplet",
-    "values_in": "dexhive-prod-frontend/src/styles/globals.css" }
+    "values_in": "web-app/src/styles/tokens.css" }
 ]
 ```
 
