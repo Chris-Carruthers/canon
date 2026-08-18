@@ -765,19 +765,23 @@ hunting for one and stops it silently inventing a fourth.
 ```
 $ canon-design-audit ~/code/web-app
 canon-design-audit 0.2.0
-  scanned 695 file(s) in 1 repo(s)
-  canon: 5 vocabular(ies), 24 component(s)
+  scanned 412 file(s) in 1 repo(s)
+  canon: 2 vocabular(ies), 18 component(s)
 
-  VIOLATION DS-PALETTE-UTILITY     14054
+  VIOLATION DS-PALETTE-UTILITY     1240
               web-app/src/Page.tsx:31  bg-blue-500
-              … and 14049 more
-  VIOLATION DS-COLOR-LITERAL       551
-  GAP       DS-FORMAT-SPLIT        19
-              --primary  declared in app-shell, optimize, tenant-hub across
+              … and 1239 more
+  VIOLATION DS-COLOR-LITERAL       86
+  GAP       DS-FORMAT-SPLIT        3
+              --primary  declared in core-tokens, legacy-tokens across
                          formats hsl-triplet, oklch
 
-  coverage: image 0/24 · figma 6/24 · impl 20/24 · absent 4
+  coverage: image 4/18 · figma 9/18 · impl 15/18 · absent 3
 ```
+
+*Illustrative figures from a made-up repo.* Your first run against an existing
+codebase will report a far larger `DS-PALETTE-UTILITY` count, which is the point of
+`--baseline-write`.
 
 Two claims worth being precise about, because they are why the thing is usable:
 
