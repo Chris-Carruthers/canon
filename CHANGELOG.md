@@ -8,6 +8,37 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **`--export` and `--view`: the canon as one document, for both audiences.**
+
+  The canon was written for machines and readable by neither. An agent that wanted it
+  as data had to reimplement the `Reference/Design/` walk and three fence regexes,
+  and the only existing parser lives inside a bash heredoc where nothing can import
+  it — `--json` exported two integers about the new block. A person had to open
+  several notes and then a CSS file in a repo they may not have cloned, and there was
+  no swatch anywhere: image coverage is routinely 0 of N.
+
+  `--export` prints the resolved canon as JSON — vocabularies with their **current
+  values read from the repo**, components with which rungs resolve, registered tools
+  with their targets joined out per repo, and the tokens more than one vocabulary
+  claims. `--view` writes the same model to `Outputs/<date> — Design System View.md`:
+  plain markdown so an agent greps it, tables and colour chips so a person reads it
+  in Obsidian. The kit's own rule is Bases for human dashboards and plain text for
+  anything an agent must read — and a Base cannot see inside a fenced block, so the
+  only surface that serves both is a derived one.
+
+  Values appear and are still not stored: both outputs are dated and regenerated,
+  exactly like the audit report. Where a naming repo was not scanned the values read
+  `unverifiable` rather than absent — unscanned is unknown, not empty. Colours are
+  emitted as the CSS function their declared format implies and left for the renderer
+  to resolve, because deciding whether two colour spaces agree is the browser's job,
+  not a regex's.
+
+  The collision table is the part no previous artifact had: the tokens several
+  vocabularies each declare, flagged where they also differ in colour space. That is
+  where "I assumed they matched" starts, and it was previously only assertable in
+  prose — which is how this canon came to hold a value claim it had no way to notice
+  going stale.
+
 - **A `design-tools` block** — a third frozen fenced block in the design canon,
   recording what is approved for *making or fixing* UI, alongside a
   `templates/repo/DESIGN.md` for wiring a tool to it and `docs/DESIGN-TOOLS.md`
@@ -63,6 +94,28 @@ public surface is the CLI flags, the config variables, and the file formats
   than silently committing nothing or falling back to everything.
 
 ### Changed
+
+- **`values-to` is gone from `design-tools`; where values land is derived.** It was
+  a verbatim copy of one vocabulary's `source`, and that duplication is exactly how
+  it came to hold a single path for a tool used across three repos. Every
+  vocabulary's `source` is repo-prefixed, so the vocabulary whose source sits in the
+  repo you are editing is the one to target — *"vocabulary X for surface Y"* was
+  already fully expressed by the two blocks together. `--export` renders the join as
+  `targets: [{repo, vocabulary, format, values_in}]`. A removal, rather than the
+  `targets:` key this was heading towards.
+
+- **`status:` and `owner:` on a tool row** — `approved | trial | rejected`, and a
+  rejected row needs no vocabulary. The block was telling component rows that
+  `status: absent` is high-value information while having no way to say "we evaluated
+  this and said no" about itself, and silence reads as nobody having looked.
+
+- **`install.sh --design`** writes the `DESIGN.md` that makes a design tool target
+  your vocabulary instead of inventing one. It shipped as a template nothing
+  installed, with a doc line telling people to copy it by hand. Opt-in rather than on
+  by default: a stray `CLAUDE.md` costs nothing, while a stray `DESIGN.md` in a repo
+  with no UI points a tool at an unrelated vocabulary. Created if absent, never
+  overwritten, and left alone by `--uninstall` — once you fill in the vocabulary slug
+  it is your content, not ours.
 
 - **The design-system Ownership section is a filled-in placeholder with
   instructions**, not an empty table. It now names four roles — token contract,
@@ -285,6 +338,60 @@ public surface is the CLI flags, the config variables, and the file formats
   note for a session that changed no code.
 
 ### Fixed
+
+- **Copy-pasting the frozen contract silently disabled the rule it documents.**
+  `records()` did not strip trailing `# annotations`, and the only annotated
+  authoring example the kit ships is the contract block itself. Authoring a row the
+  documented way produced four malformed findings *and* left `roles:` unparsed, so
+  the vocabulary requirement never fired. That is the Product Spec scar the same
+  template warns about, reproduced in the commit that quotes it. A `#` is only a
+  comment when whitespace follows, so `#ffffff` and `#123` survive, and quoted values
+  are left alone. Now asserted directly: the annotated block, copied verbatim, must
+  validate clean.
+
+- **`roles:` is required, so the vocabulary rule cannot be switched off.** It was
+  optional, and rule 1 — *omit a key you do not have* — actively taught authors that
+  leaving it out was fine. A row of `slug`/`name`/`kind`/`checked` passed clean and
+  reported "0 that write UI", which is the one thing the block exists to prevent.
+
+- **`verified:` renamed to `checked:` in `design-tools`.** `verified:` is already
+  load-bearing here: it means *a human confirmed this note*, it drives
+  `canon-trust`'s tiers, and the rules files tell agents never to write it for
+  themselves. Requiring it on every tool row, as a bare date with no actor, put
+  agents in direct conflict with that instruction.
+
+- **Template/validator drift, in the change that warns about drift.** Rule 4 never
+  learned `values-to` though the code resolved it; `status: proposed` was instructed
+  five times without being in the `design-tokens` enum; rule 8 forbade a filesystem
+  path while the same block demonstrated one. There is also now a test that the
+  template declares the `design-tools` fence, which the other two fences already had.
+
+- **Both rules files are asserted to carry the design-tools instruction**, the same
+  way they are already asserted to ban token values. Six files hand-carry a version
+  of "read the block, target the vocabulary it names", against `install.sh`'s own
+  comment that six hand-maintained copies is six chances to disagree, silently.
+  Generating them from one source is the real fix; until then the load-bearing words
+  are pinned by a test.
+
+- **Three smaller ones.** A duplicate tool slug was reported and then silently
+  overwritten, so every later check ran against the second row only and the first
+  row's defects vanished behind one finding. A `checked:` date in the future is
+  refused — it is not a check that happened, and ten fixtures were using
+  `2099-01-01` to mean "fresh". `emits`/`version` now reject a placeholder like the
+  other keys.
+
+- **Two overclaims.** "Byte-identical output in every mode" is scoped to a vault
+  whose blocks are valid: `--help` changed, and `PLACEHOLDER_KEYS` grew by names that
+  also apply to token and component rows. And "Figma is not registered anywhere"
+  contradicted the template's own companion list — it has no registry *entry*, which
+  is the actual point.
+
+- **A `DESIGN.md` alone does not wire a design tool up.** impeccable's context loader
+  returns early without a `PRODUCT.md` and never emits the `DESIGN.md` body, so the
+  guardrail reached nothing — found by running it, not by reading it. Now documented
+  as a prerequisite, along with the collision that the tool's own `document` command
+  writes a root `DESIGN.md` and an `.impeccable/design.json` carrying token values, at
+  the path canon uses for a values-free pointer file.
 
 - **`canon-sync --push` aborted before pushing on stock macOS.** `"origin/$BRANCH…"`
   — bash 3.2 folds the UTF-8 ellipsis bytes into the variable name, so under

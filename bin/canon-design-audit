@@ -103,8 +103,9 @@ TOKEN_KEYS = {"vocabulary", "source", "format", "scope", "catalog", "names",
               "status", "of"}
 COMP_KEYS = {"slug", "name", "vocabulary", "figma", "image", "impl", "tokens",
              "status", "note"}
-TOOL_KEYS = {"slug", "name", "kind", "roles", "emits", "ingest", "values-to",
-             "vocabulary", "version", "checked", "hazard", "note"}
+TOOL_KEYS = {"slug", "name", "kind", "roles", "emits", "ingest", "status",
+             "vocabulary", "version", "checked", "hazard", "note", "owner"}
+TOOL_STATUS = {"approved", "trial", "rejected"}
 FORMATS = {"hsl-triplet", "oklch", "hex", "rgb-triplet", "named"}
 KINDS = {"vendor", "skill", "script"}
 ROLES = {"generator", "critic", "implementer", "design-source", "style-guide"}
@@ -295,6 +296,14 @@ for path in canon_files:
                 if slug in tools:
                     add("VIOLATION", "DS-TOOL-MALFORMED", rel,
                         "duplicate tool slug: %s" % slug)
+                    # Reported AND skipped. Overwriting meant every check below ran
+                    # against the second row only, so the first row's defects went
+                    # unreported behind a single duplicate-slug finding.
+                    continue
+                st = rec.get("status")
+                if st and st not in TOOL_STATUS:
+                    add("VIOLATION", "DS-TOOL-MALFORMED", rel,
+                        "unknown status %r for %s" % (st, slug))
                 k = rec.get("kind")
                 if k and k not in KINDS:
                     add("VIOLATION", "DS-TOOL-MALFORMED", rel,
@@ -320,7 +329,8 @@ for path in canon_files:
                         "somebody last confirmed it" % slug)
                 # Rule 10. Enforced here rather than left to review, because the
                 # failure is silent: a fifth --primary, months later.
-                if roles & WRITING_ROLES and not listval(rec.get("vocabulary", "")):
+                if (roles & WRITING_ROLES and rec.get("status") != "rejected"
+                        and not listval(rec.get("vocabulary", ""))):
                     add("VIOLATION", "DS-TOOL-MALFORMED", rel,
                         "%s: roles %s write UI, so vocabulary is required"
                         % (slug, sorted(roles & WRITING_ROLES)))
@@ -365,7 +375,8 @@ PLACEHOLDER = {"todo", "tbd", "?", "n/a", "na", "-", "none", "xxx", "fixme"}
 # a placeholder — flagging it would be the tool's own first false positive.
 PLACEHOLDER_KEYS = {"vocabulary", "source", "format", "scope", "catalog", "names",
                     "status", "of", "slug", "figma", "image", "impl", "tokens",
-                    "kind", "roles", "ingest", "values-to", "checked"}
+                    "kind", "roles", "ingest", "checked", "emits", "version",
+                    "owner"}
 # `hazard` is deliberately absent from that set alongside `name` and `note`: it is
 # free text, and a tool whose one trap really is "none" should be able to say so.
 for rec in list(vocabs.values()) + comps + list(tools.values()):
@@ -380,6 +391,18 @@ for rec in list(vocabs.values()) + comps + list(tools.values()):
 # Tool checks that need every vocabulary in hand, so they run after the walk.
 # A tool pointed at a vocabulary that does not exist is worse than one pointed at
 # nothing: it reads as governed.
+# Deliberately a VIOLATION here while the same broken cross-reference on a
+# COMPONENT row is only a GAP (DS-TOKEN-UNDECLARED). They are not the same defect.
+# A component naming a vocabulary that no longer exists is a stale reference: the
+# component still exists and still works. A tool that WRITES UI pointed at a
+# vocabulary that does not exist is a live instruction that will produce wrong
+# output the next time somebody runs it. Same shape, different consequence.
+#
+# Note the general property this shares with every other canon-side violation
+# (DS-BLOCK-MALFORMED, DS-POINTER-DEAD, DS-FIGMA-MALFORMED): baselines are read per
+# code repo, so a defect in the vault fails --strict everywhere at once. That is
+# intended — a broken canon is broken in every repo that reads it — but it does
+# mean the fix belongs in the vault, not in a repo's baseline file.
 for slug in sorted(tools):
     rec = tools[slug]
     for want in listval(rec.get("vocabulary", "")):
@@ -401,6 +424,10 @@ for slug in sorted(tools):
                 % (slug, when_checked.strip()))
         else:
             age = (utc_now() - seen_at).days
+            if age < 0:
+                add("VIOLATION", "DS-TOOL-MALFORMED", rec["_note"],
+                    "%s: checked %s is in the future — a date nobody could have "
+                    "checked on" % (slug, when_checked.strip()))
             if age > TOOL_STALE_DAYS:
                 add("GAP", "DS-TOOL-STALE", rec["_note"],
                     "%s: checked %s, %d days ago — recheck what it can do"
@@ -446,20 +473,6 @@ for slug, rec in sorted(vocabs.items()):
         if not os.path.exists(abspath):
             add("VIOLATION", "DS-POINTER-DEAD", ptr,
                 "%s of vocabulary %s does not exist" % (key, slug))
-
-# `values-to` is repo-prefixed like impl/source (rule 4), so it gets the same
-# treatment: a tool told to write values into a file that does not exist is a
-# broken instruction, not a stylistic lapse.
-for slug in sorted(tools):
-    ptr = tools[slug].get("values-to")
-    if not ptr:
-        continue
-    abspath, checkable = resolve(ptr)
-    if not checkable:
-        unverifiable.append("%s (values-to of %s)" % (ptr, slug))
-    elif not os.path.exists(abspath):
-        add("VIOLATION", "DS-POINTER-DEAD", ptr,
-            "values-to of tool %s does not exist" % slug)
 
 for c in comps:
     ptr = c.get("impl")
@@ -627,7 +640,20 @@ for slug in sorted(tools):
         "roles": listval(t.get("roles", "")),
         "emits": listval(t.get("emits", "")),
         "vocabulary": listval(t.get("vocabulary", "")),
-        "values_to": t.get("values-to"), "ingest": t.get("ingest"),
+        # Derived, not declared. A tool writing values writes them into the
+        # targeted vocabulary's own source file, and that vocabulary's source is
+        # repo-prefixed — so the repo AND the destination both fall out of the
+        # vocabulary. A `values-to` key duplicated this, which is how it ended up
+        # single-valued for a tool used across three repos.
+        "targets": [{
+            "vocabulary": v,
+            "repo": (vocabs[v].get("source") or "").split("/", 1)[0] or None,
+            "values_in": vocabs[v].get("source"),
+            "format": vocabs[v].get("format"),
+        } for v in listval(t.get("vocabulary", "")) if v in vocabs],
+        "status": t.get("status") or "approved",
+        "owner": t.get("owner"),
+        "ingest": t.get("ingest"),
         "version": unquote(t.get("version")), "checked": t.get("checked"),
         "hazard": unquote(t.get("hazard")), "note": t.get("_note"),
     })
@@ -832,14 +858,19 @@ def render_view(when):
     if resolved["tools"]:
         out.append("## What to build UI with")
         out.append("")
-        out.append("| Tool | Kind | Roles | Targets | Checked | Watch out for |")
-        out.append("|---|---|---|---|---|---|")
+        out.append("| Tool | Kind | Roles | Status | Targets, and where values land | Checked | Watch out for |")
+        out.append("|---|---|---|---|---|---|---|")
         for t in resolved["tools"]:
-            out.append("| %s | %s | %s | %s | %s | %s |" % (
+            tg = "<br>".join("`%s` → `%s`" % (x["vocabulary"], x["values_in"])
+                             for x in t["targets"]) or "—"
+            out.append("| %s | %s | %s | %s | %s | %s | %s |" % (
                 t["name"] or t["slug"], t["kind"] or "—",
-                ", ".join(t["roles"]) or "—",
-                ", ".join("`%s`" % v for v in t["vocabulary"]) or "—",
-                t["checked"] or "—", t["hazard"] or ""))
+                ", ".join(t["roles"]) or "—", t["status"],
+                tg, t["checked"] or "—", t["hazard"] or ""))
+        out.append("")
+        out.append("Where values land is **derived** from each targeted "
+                   "vocabulary's own source file, not declared on the tool — so it "
+                   "cannot drift out of step with the vocabulary it belongs to.")
         out.append("")
 
     out.append("## Token vocabularies")

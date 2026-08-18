@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-254%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-267%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -761,9 +761,15 @@ absent` is a legitimate row: *"there is no shared `PageHeader`"* stops an agent
 hunting for one and stops it silently inventing a fourth.
 
 The third block, `design-tools`, records what is approved for *making* UI — and any
-tool whose role writes UI must name the vocabulary it targets, checked against the
+tool whose role writes UI must name the vocabularies it targets, checked against the
 tokens block. A generator given no target does not abstain from picking one, it
-invents one. See **[`docs/DESIGN-TOOLS.md`](docs/DESIGN-TOOLS.md)**.
+invents one. `install.sh --design` writes the `DESIGN.md` a tool reads to find out
+which one applies. See **[`docs/DESIGN-TOOLS.md`](docs/DESIGN-TOOLS.md)**.
+
+`canon-design-audit --export` prints the whole canon as JSON — token names with the
+values read out of the code, which rungs each component resolves to, and the tools —
+so an agent consumes one document instead of reimplementing the subtree walk.
+`--view` writes the same model as markdown for people, colour chips included.
 
 ### `canon-design-audit`
 

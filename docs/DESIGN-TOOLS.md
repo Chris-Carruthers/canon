@@ -30,20 +30,43 @@ This is the whole point of registering a tool rather than just using one:
 One-way on purpose. The canon does not round-trip back into a generator: these
 tools have no API, and their output is not reproducible from the same input.
 
-## Why a row does not record where the tool lives
+## Why a row carries no paths at all
 
 Same reasoning as the Figma rule (rule 3): a vendor URL is rename-fragile the moment
 the product is renamed or folded into something else. An install path is worse — a
 skill sits at a different absolute path on every machine, so a committed one is
-somebody else's machine.
+somebody else's machine. The `slug` and `kind` identify it; how to reach it belongs
+in the prose note, where being wrong costs nothing instead of failing a build.
 
-The `slug` and `kind` identify it; how to reach it belongs in the prose note, where
-being wrong costs nothing instead of failing a build.
+**Where a tool writes values carries no key either — it is derived.** A tool writes
+into the tokens file of whichever vocabulary it is targeting, and every vocabulary
+already declares that file as its `source`. An earlier draft of this block had a
+`values-to` key, and in practice it was a verbatim copy of one vocabulary's
+`source` — which is exactly how it ended up holding a single path for a tool used
+across three repos.
 
-This applies to the tool's own location only. `values-to` points at a file the tool
-*writes into*, and that is repo-prefixed and pointer-checked like `impl` and
-`source` — a tool aimed at a tokens file that does not exist is a broken
-instruction, and the audit says so.
+That removal also answers the question the key was there to answer. Every
+vocabulary's `source` is repo-prefixed, so **the vocabulary whose source lives in
+the repo you are editing is the one to target.** "Vocabulary X for surface Y" is
+fully expressed by the two blocks together; the tool row only has to list which
+vocabularies it is allowed near. `--export` renders the join for you:
+
+```json
+"targets": [
+  { "repo": "dexhive-prod-frontend", "vocabulary": "optimize-shadcn-hsl",
+    "format": "hsl-triplet",
+    "values_in": "dexhive-prod-frontend/src/styles/globals.css" }
+]
+```
+
+## Recording a tool you turned down
+
+`status:` is `approved`, `trial`, or `rejected`, and `owner` is who decided. A
+rejected row is the most useful kind: it says somebody evaluated this and said no,
+where silence says nobody has looked. It is the same idea as a component row with
+`status: absent`, which stops an agent both hunting for a shared `PageHeader` and
+quietly building a fourth one. A `rejected` tool is exempt from needing a
+`vocabulary` — it is not going to be pointed at anything.
 
 ## Why `checked:` is mandatory
 
@@ -201,7 +224,10 @@ the owner decide.
   blog post. It is deliberately not called `verified:` — that name is already load-
   bearing in this kit, where it means *a human confirmed this note*, drives
   `canon-trust`, and agents are told never to write it for themselves.
-- If the tool writes UI, name the vocabulary. If you do not know which vocabulary
-  it should target, that is the finding — write it up as an open question instead of
-  registering the tool.
+- If the tool writes UI, name every vocabulary it is allowed near. If you do not
+  know which, that is the finding — write it up as an open question instead of
+  registering the tool. Do not add a path for where values go; it is derived from
+  the vocabulary's own `source`.
+- `status: trial` is the honest default until somebody has actually used it here.
+  `approved` claims a decision, so name the `owner` who made it.
 - Then run `canon-design-audit --json <repo>` and read the `DS-TOOL-*` rules.

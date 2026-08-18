@@ -97,9 +97,9 @@ What is approved for *making* or *fixing* UI here, and which vocabulary each one
 must target. Summary only; the full `design-tools` block lives in the companion
 note.
 
-| Tool | Kind | Roles | Targets | Checked |
-|---|---|---|---|---|
-| `<slug>` | vendor | generator | `<vocabulary-slug>` | YYYY-MM-DD |
+| Tool | Kind | Roles | Status | Targets | Checked |
+|---|---|---|---|---|---|
+| `<slug>` | vendor | generator | approved | `<vocabulary-slug>` | YYYY-MM-DD |
 
 An empty table is a valid and useful answer — it says nobody has agreed on a tool
 yet, which stops an agent adopting one on your behalf.
@@ -206,11 +206,12 @@ from the template failed the check.
 - slug: <kebab-slug>                  # required, unique
   name: <Display Name>                # required
   kind: vendor                        # vendor | skill | script
-  roles: [generator]                  # generator | critic | implementer | design-source | style-guide
+  roles: [generator]                  # REQUIRED. generator | critic | implementer | design-source | style-guide
+  vocabulary: [<slug>, <slug>]        # a LIST. required unless status is rejected
+  status: approved                    # approved | trial | rejected
+  owner: <name>                       # who approved it, and who un-approves it
   emits: [design-md, html-css]        # what you get out of it
   ingest: proposed                    # status the rows imported from it carry
-  values-to: repo/path/to/tokens.css  # where its VALUES must land
-  vocabulary: [<slug>, <slug>]        # required for generator / implementer; a LIST
   version: "1.2.3"                    # optional — for a pinned skill or script
   checked: YYYY-MM-DD                 # required — capability rots
   hazard: "one short phrase"          # optional — the single trap
@@ -233,9 +234,9 @@ TEN RULES. Each one exists because it is the thing that gets got wrong.
    scanner will not catch. Store file + node; render the URL when you need it:
      https://www.figma.com/design/<file>/x?node-id=<node>&m=dev
 
-4. impl / source / catalog / values-to are repo-prefixed and RELATIVE —
-   repo/path.tsx:42 — matching the vault's existing convention for pointing at
-   code. Never absolute, never a URL. Absolute paths are somebody else's machine.
+4. impl / source / catalog are repo-prefixed and RELATIVE — repo/path.tsx:42 —
+   matching the vault's existing convention for pointing at code. Never absolute,
+   never a URL. Absolute paths are somebody else's machine.
 
 5. NAMES IN THE VAULT, VALUES IN THE REPO. Stated again because it is the rule
    people break first and it is the whole reason this shape exists.
@@ -243,18 +244,21 @@ TEN RULES. Each one exists because it is the thing that gets got wrong.
 6. `status: absent` IS A LEGITIMATE, HIGH-VALUE ROW. A row saying there is no
    shared PageHeader stops an agent hunting for one AND stops it silently
    inventing a fourth one. Absence recorded is cheaper than absence rediscovered.
+   The tool block applies the same idea with `status: rejected`: "we looked at this
+   and said no" is worth more than silence, which reads as "nobody has looked".
 
 7. One image per component per theme, PNG, under 200 KB. Do not gitignore
    Attachments/ — a path that silently cannot resolve is worse than a declared
    absence, because the tool can report an absence.
 
-8. A design-tools ROW DOES NOT RECORD WHERE THE TOOL ITSELF LIVES. No URL — same
-   reasoning as rule 3, and a vendor URL is rename-fragile the moment the product
-   is renamed. No install path either: a skill sits at a different absolute path on
-   every machine. The slug and kind are enough to identify it; how to reach it
-   belongs in the prose note, where being wrong costs nothing.
-   This is about the TOOL's location only. `values-to` points at a file the tool
-   writes into, and it is repo-prefixed and checked like any other pointer (rule 4).
+8. A design-tools ROW CARRIES NO PATH AND NO URL AT ALL. No URL — same reasoning
+   as rule 3, and a vendor URL is rename-fragile the moment the product is renamed.
+   No install path — a skill sits at a different absolute path on every machine.
+   And no destination path either: where a tool writes values is DERIVED from the
+   `source` of each vocabulary it targets, because that is where those values
+   already live. An earlier draft had a `values-to` key and it was a verbatim copy
+   of one vocabulary's `source`, which is exactly how it ended up single-valued for
+   a tool used across three repos. Derive it; do not restate it.
 
 9. `checked:` IS REQUIRED, AND IT IS A DATE SOMEBODY CHECKED. Third-party capability
    rots faster than anything else in this canon — features ship, limits change,
@@ -270,9 +274,16 @@ TEN RULES. Each one exists because it is the thing that gets got wrong.
 
    It is a LIST because one tool legitimately serves several surfaces: a code-
    editing skill run across three repos targets three vocabularies, and a single
-   value would force either a lie or three near-duplicate rows. List every
-   vocabulary the tool is approved to target; which one applies in a given repo is
-   decided by that repo's own DESIGN.md, not here. A single unbracketed slug is
-   still accepted and reads as a one-item list.
+   value would force either a lie or three near-duplicate rows. A single unbracketed
+   slug is still accepted and reads as a one-item list.
+
+   WHICH ONE APPLIES IN A GIVEN REPO NEEDS NO KEY. Every vocabulary's `source` is
+   repo-prefixed, so the vocabulary whose source lives in the repo you are editing
+   IS the one to target. "Vocabulary X for surface Y" is therefore already fully
+   expressed by the two blocks together, and the tool row only has to say which
+   ones it is allowed near.
+
+   `status: rejected` is exempt: a tool you evaluated and turned down needs no
+   target, and recording the rejection is the point — see rule 6.
 -->
 

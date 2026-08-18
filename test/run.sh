@@ -658,6 +658,22 @@ done
 is "component frontmatter carries the row keys" "${missing_keys:-none}" "none"
 has "component template uses dash-form node ids" "$(cat "$DCO")" "dash-form-node-id"
 
+# DESIGN.md is what makes a design tool target this repo's vocabulary instead of
+# inventing one. It shipped as a template nothing installed.
+is "does NOT write DESIGN.md by default" "$([ -e "$R2/DESIGN.md" ] && echo y || echo n)" "n"
+RD="$SB/designrepo"; mkdir -p "$RD"; git -C "$RD" init -q 2>/dev/null
+"$KIT/install.sh" "$RD" --vault "$V8" --design >/dev/null 2>&1
+is "--design writes one"          "$([ -f "$RD/DESIGN.md" ] && echo y)" "y"
+has "naming the vocabulary slot"  "$(cat "$RD/DESIGN.md")" "vocabulary-slug"
+has "and pointing at the canon"   "$(cat "$RD/DESIGN.md")" "Reference/Design/"
+# It becomes the user's content the moment they fill it in, so it is never
+# clobbered and never removed.
+printf 'MINE\n' > "$RD/DESIGN.md"
+"$KIT/install.sh" "$RD" --vault "$V8" --design >/dev/null 2>&1
+is "never overwrites an edited DESIGN.md" "$(cat "$RD/DESIGN.md")" "MINE"
+"$KIT/install.sh" "$RD" --uninstall >/dev/null 2>&1
+is "--uninstall leaves it in place"       "$(cat "$RD/DESIGN.md")" "MINE"
+
 # The whole reason the canon can live in a vault: names, never values.
 has "system template forbids token values" "$(cat "$DSY")" "Names in the vault"
 missing_rules=""
@@ -666,6 +682,25 @@ for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vau
     || missing_rules="$missing_rules $(basename "$f")"
 done
 is "BOTH rules files ban token values" "${missing_rules:-none}" "none"
+
+# Same discipline for the tools instruction. Six files carry a version of "read the
+# design-tools block and target the vocabulary it names", and install.sh's own
+# comment says six hand-maintained copies of an instruction is six chances to
+# disagree, silently. Until they are generated from one source, assert they agree
+# on the load-bearing words.
+missing_tools=""
+for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
+  LC_ALL=C grep -q "design-tools" "$f" 2>/dev/null \
+    || missing_tools="$missing_tools $(basename "$f"):block"
+  LC_ALL=C grep -q "vocabulary" "$f" 2>/dev/null \
+    || missing_tools="$missing_tools $(basename "$f"):vocab"
+done
+is "BOTH rules files name the design-tools block and the vocabulary rule" \
+  "${missing_tools:-none}" "none"
+# The generated runtime files inherit it from agent-instructions.md, so if the
+# template loses the instruction every one of the seven loses it at once.
+has "the generated instruction template carries it too" \
+  "$(cat "$KIT/templates/repo/agent-instructions.md")" "design-tools"
 
 # Router must advertise it, and must still fit the budget it advertises.
 has "router routes Reference/Design"  "$(cat "$V8/Vision/Agent Router.md")" "Reference/Design/"
@@ -863,16 +898,15 @@ cat >> "$V9/Reference/Design/canon.md" <<'CANON'
   roles: [generator]
   emits: [design-md, html-css]
   ingest: proposed
-  values-to: toolrepo/src/styles/tokens.css
   vocabulary: demo
-  checked: 2099-01-01
+  checked: 2026-08-01
   hazard: "cannot hold a brand; re-state hex every time"
 - slug: impeccable
   name: impeccable
   kind: skill
   roles: [critic]
   version: "3.9.1"
-  checked: 2099-01-01
+  checked: 2026-08-01
 ```
 CANON
 TJ="$("$DA" --vault "$V9" --json "$RT" 2>/dev/null)"
@@ -891,7 +925,7 @@ tools_only "- slug: t1
   kind: vendor
   roles: [generator]
   vocabulary: demo
-  checked: 2099-01-01
+  checked: 2026-08-01
   bogus-key: x"
 is "rejects an unknown key" "$(Q=count R=DS-BLOCK-MALFORMED tpick)" "1"
 
@@ -899,14 +933,14 @@ tools_only "- slug: t2
   name: T2
   kind: teleporter
   roles: [critic]
-  checked: 2099-01-01"
+  checked: 2026-08-01"
 has "rejects an unknown kind" "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown kind"
 
 tools_only "- slug: t3
   name: T3
   kind: skill
   roles: [critic, soothsayer]
-  checked: 2099-01-01"
+  checked: 2026-08-01"
 has "rejects an unknown role" "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown role"
 
 tools_only "- slug: t4
@@ -921,7 +955,7 @@ tools_only "- slug: t5
   name: T5
   kind: vendor
   roles: [generator]
-  checked: 2099-01-01"
+  checked: 2026-08-01"
 has "requires a vocabulary when the tool writes UI" \
   "$(Q=details R=DS-TOOL-MALFORMED tpick)" "vocabulary is required"
 
@@ -930,7 +964,7 @@ tools_only "- slug: t6
   kind: vendor
   roles: [implementer]
   vocabulary: nosuchvocab
-  checked: 2099-01-01"
+  checked: 2026-08-01"
 has "rejects a vocabulary no design-tokens block declares" \
   "$(Q=details R=DS-TOOL-MALFORMED tpick)" "not declared in any design-tokens block"
 
@@ -941,7 +975,7 @@ tools_only "- slug: t6b
   kind: skill
   roles: [implementer]
   vocabulary: [demo, alsodemo]
-  checked: 2099-01-01"
+  checked: 2026-08-01"
 is "accepts a list of vocabularies" \
   "$(Q=count R=DS-TOOL-MALFORMED tpick)" "1"
 has "and names only the one that does not exist" \
@@ -951,7 +985,7 @@ tools_only "- slug: t6c
   kind: skill
   roles: [implementer]
   vocabulary: demo
-  checked: 2099-01-01"
+  checked: 2026-08-01"
 is "a bare slug still reads as a one-item list" \
   "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
 
@@ -969,15 +1003,71 @@ tools_only "- slug: t8
   roles: [critic]
   checked: TODO"
 is "refuses TODO in checked" "$(Q=count R=DS-BLOCK-MALFORMED tpick)" "1"
+tools_only "- slug: t8b
+  name: T8b
+  kind: skill
+  roles: [critic]
+  emits: TBD
+  version: TODO
+  checked: 2026-08-01"
+is "refuses a placeholder in emits or version" \
+  "$(Q=count R=DS-BLOCK-MALFORMED tpick)" "2"
 
+# Where a tool writes values is DERIVED from the vocabulary's own source, not
+# declared on the tool. An earlier draft had a values-to key that was a verbatim
+# copy of one vocabulary's source, which is how it ended up single-valued for a
+# tool used across three repos.
 tools_only "- slug: t9
   name: T9
   kind: vendor
   roles: [generator]
   vocabulary: demo
   values-to: toolrepo/src/styles/nope.css
+  checked: 2026-08-01"
+has "refuses a hand-declared values-to" \
+  "$(Q=details R=DS-BLOCK-MALFORMED tpick)" "values-to"
+
+# A tool you evaluated and turned down is a row worth keeping, and it needs no
+# target — recording the rejection is the whole point.
+tools_only "- slug: t9b
+  name: Rejected Thing
+  kind: vendor
+  roles: [generator]
+  status: rejected
+  owner: A Person
+  checked: 2026-08-01"
+is "a rejected tool needs no vocabulary" "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+tools_only "- slug: t9c
+  name: T9c
+  kind: vendor
+  roles: [critic]
+  status: mulling-it-over
+  checked: 2026-08-01"
+has "rejects an unknown status" "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown status"
+
+# A future date is not a check that happened.
+tools_only "- slug: t9d
+  name: T9d
+  kind: vendor
+  roles: [critic]
   checked: 2099-01-01"
-is "reports a dead values-to pointer" "$(Q=count R=DS-POINTER-DEAD tpick)" "1"
+has "refuses a checked date in the future" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "in the future"
+
+# Duplicates were reported and then silently overwritten, so every later check ran
+# against the second row only and the first row's defects vanished.
+tools_only "- slug: dup
+  name: First
+  kind: teleporter
+  roles: [critic]
+  checked: 2026-01-01
+- slug: dup
+  name: Second
+  kind: vendor
+  roles: [critic]
+  checked: 2026-01-01"
+has "still checks the first of two duplicate rows" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown kind"
 
 # Staleness is a GAP on purpose. A rule that can fail a build through the mere
 # passage of time is a rule someone switches off, so an unchecked claim decays
@@ -1002,7 +1092,7 @@ tools_only "- slug: my-tool                       # required, unique
   kind: vendor                        # vendor | skill | script
   roles: [generator]                  # generator | critic | implementer
   vocabulary: [demo]                  # required for generator / implementer
-  checked: 2099-01-01                # required — capability rots"
+  checked: 2026-08-01                # required — capability rots"
 is "accepts the annotated contract block, copied verbatim" \
   "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
 # 2, not 1: canon.md in this fixture already registers a generator alongside a
@@ -1017,7 +1107,7 @@ tools_only "- slug: hexy
   roles: [generator]
   vocabulary: [demo]
   hazard: \"defaults to #ffffff, see #123\"
-  checked: 2099-01-01"
+  checked: 2026-08-01"
 is "does not eat a hex value or an issue reference" \
   "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
 
@@ -1026,7 +1116,7 @@ is "does not eat a hex value or an issue reference" \
 tools_only "- slug: rogue
   name: Rogue Generator
   kind: vendor
-  checked: 2099-01-01"
+  checked: 2026-08-01"
 has "requires roles, so the vocabulary rule cannot be switched off" \
   "$(Q=details R=DS-TOOL-MALFORMED tpick)" "roles is required"
 
