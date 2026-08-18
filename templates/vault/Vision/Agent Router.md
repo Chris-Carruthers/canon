@@ -20,6 +20,7 @@ map, not a manual.
 | A client / customer / domain area | `Clients/<name>.md` |
 | Durable facts, schemas, APIs, pricing | `Reference/` |
 | Design system: tokens, components, design assets | `Reference/Design/` |
+| Who can explain a feature, and when they were last checked | `Reference/Cognitive Coverage/` |
 | Intent for a feature (what & why) | `Specs/` |
 | Ops state to pick work up cold | `Handoffs/` |
 | What happened in past sessions | `Sessions/YYYY-MM-DD — <title> (<initials>).md` |

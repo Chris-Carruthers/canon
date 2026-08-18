@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-210%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-224%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -39,6 +39,7 @@ reading the vault with two apps and no commands.
 - [What you get](#what-you-get) · [Install as a Claude Code plugin](#install-it-as-a-claude-code-plugin) · [Quickstart](#quickstart) · [How it finds the vault](#how-it-finds-the-vault)
 - [Claude Desktop and Cowork](#claude-desktop-and-cowork) — connected folder, or the `.mcpb` bundle
 - [Works with agents that are not Claude](#works-with-agents-that-are-not-claude) — seven runtimes from one template
+- [Cognitive coverage](#cognitive-coverage-can-you-explain-what-your-agent-built) — the quiz nobody else runs
 - [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
 - [Design, and why](#design-and-why) — the limits that shaped it
 - [Sync](#sync-automatic-inbound-deliberate-outbound) · [The gate](#the-gate) · [Trust](#trust-telling-an-agent-draft-from-a-checked-fact) · [Ownership](#ownership-not-everything-should-be-everyones)
@@ -280,6 +281,7 @@ flowchart LR
 |---|---|
 | **A vault** | Markdown notes: `Decisions/`, `Projects/`, `Sessions/`, `Reference/`, … in one git repo |
 | **A design canon** | `Reference/Design/` — token names, a component inventory, and design assets an agent can resolve. Names and pointers, never values |
+| **Cognitive coverage** | A quiz on what your agent just built, graded against the real code, recorded with a date. Tests whether *you* can explain it |
 | **A router note** | The one small file agents load every session — a map of what lives where |
 | **Repo wiring** | `CLAUDE.md` + `SessionStart` hook so agents find the vault from any repo |
 | **A session-note check** | A `Stop` hook that notices when work happened but nothing got written down |
@@ -810,6 +812,45 @@ It is **read-only in every repo it scans**, asserted by a test. And it is not in
 pre-commit hook: it scans code repos, not the vault. It measures. Enforcement is
 CODEOWNERS on the token files plus branch protection, in the repos where those files
 live.
+
+## Cognitive coverage: can you explain what your agent built?
+
+Code review asks *is this correct*. Tests ask *does it work*. Neither asks the
+question that decides whether a team can operate what it ships: **can a person
+explain it without reading it again?**
+
+Agent-built code fails that quietly, because it passes review — it *is* correct. The
+gap surfaces later, when someone has to change it and realises they are reading it
+for the first time.
+
+```
+/cognitive-coverage
+```
+
+The skill reads what you just built, writes six to ten questions across six bands —
+shape, state, failure, boundary, decision, change — asks them one at a time, and
+grades against the implementation rather than against your confidence. At least one
+question is about something *surprising* in the code, because that is where
+understanding actually lives and it is what nobody retains from watching an agent
+work.
+
+Then it records a dated entry in `Reference/Cognitive Coverage/<feature>.md`, newest
+first, **appending rather than overwriting**. The history is the value: it shows
+whether understanding improved after somebody went and read the code, or quietly
+decayed. It records the questions too, so a re-test can be harder instead of
+identical.
+
+**The design is mostly about refusing to be nice.** A quiz everyone passes is worse
+than no quiz — it converts an unknown gap into a false belief and burns the one
+moment someone was willing to be tested. So: an answer that would equally fit a
+different implementation is *partial* at best, "I don't know" is a *gap* and never a
+partial, and the bands are never averaged into one number, because a person who is
+solid on shape and blank on failure modes has a specific problem that a percentage
+hides.
+
+It is a coverage report for a system, not a performance review — and it says so,
+because if it reads as a scorecard on a colleague then nobody asks for it twice and
+the people who need it stop first.
 
 ## Ownership: not everything should be everyone's
 

@@ -68,7 +68,7 @@ section "vault scaffold"
 SB="$(mktemp -d)"; V="$SB/vault"; R="$SB/repo"
 "$KIT/bin/canon-init-vault" "$V" >/dev/null 2>&1
 is "creates the router"        "$([ -f "$V/Vision/Agent Router.md" ] && echo y)" "y"
-is "creates 8 note templates" "$(find "$V/Templates" -name '*.md' | wc -l | tr -d ' ')" "8"
+is "creates 9 note templates" "$(find "$V/Templates" -name '*.md' | wc -l | tr -d ' ')" "9"
 is "gitkeeps every folder"    "$(find "$V" -name .gitkeep | wc -l | tr -d ' ')" "13"
 is "ships .canon-owners"      "$([ -f "$V/.canon-owners" ] && echo y)" "y"
 is "ships a self-bootstrap"   "$([ -x "$V/.canon/bootstrap.sh" ] && echo y)" "y"
@@ -427,7 +427,7 @@ cd "$V4" || exit 1; git init -q; git config user.email chris@example.com; git co
 is "vendors canon-trust + canon-verify" \
    "$([ -x "$V4/.canon/canon-trust" ] && [ -x "$V4/.canon/canon-verify" ] && echo y)" "y"
 is "templates carry generated:" \
-   "$(grep -l 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "6"
+   "$(grep -l 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "7"
 
 printf -- '---\ntype: decision\ngenerated: { by: some-agent/1, at: 2026-07-30T10:00:00Z }\n---\n# x\n' > "$V4/Decisions/a.md"
 printf -- '---\ntype: reference\nverified: { by: process:ci, at: 2026-07-02T02:00:00Z }\nstale_after: 2020-01-01\n---\n# y\n' > "$V4/Reference/b.md"
@@ -628,6 +628,41 @@ done
 is "uninstall removes every runtime file" "${left:-none}" "none"
 is "and prunes the directories it created" \
   "$([ -d "$R3/.windsurf" ] || [ -d "$R3/.clinerules" ] && echo left || echo pruned)" "pruned"
+
+# ---------------------------------------------------------------------------
+section "cognitive coverage"
+# The skill is prose, so what CI can check is that it is wired: discoverable by the
+# plugin, writing somewhere the router advertises, and told the two things that make
+# the record worth keeping — append-only, and one person per entry.
+CC="$KIT/skills/cognitive-coverage/SKILL.md"
+is "ships the skill"             "$([ -f "$CC" ] && echo y)" "y"
+is "ships the note template"     "$([ -f "$KIT/templates/vault/Templates/Cognitive Coverage.md" ] && echo y)" "y"
+
+# Skills are matched on their description, so a skill nobody can trigger is inert.
+has "frontmatter names the skill"  "$(sed -n '1,6p' "$CC")" "name: cognitive-coverage"
+has "description carries triggers" "$(sed -n '1,6p' "$CC")" "quiz me"
+
+# The honesty rules are the whole feature. A quiz everyone passes is worse than none.
+has "refuses to grade generously"  "$(cat "$CC")" "worse than no quiz"
+has "treats I-do-not-know as a gap" "$(cat "$CC")" "never a partial"
+has "bans a single averaged score" "$(cat "$CC")" "single number hides it"
+has "requires a surprising question" "$(cat "$CC")" "surprising"
+
+# Append-only, or the history — the actual value — is destroyed on the second run.
+has "never overwrites an entry"    "$(cat "$CC")" "never overwrite"
+has "records the questions asked"  "$(cat "$CC")" "measures memory"
+has "one person per entry"         "$(cat "$CC")" "One person at a time"
+
+# Routed, or agents never find it.
+has "router advertises the folder" "$(cat "$KIT/templates/vault/Vision/Agent Router.md")" "Reference/Cognitive Coverage/"
+missing_cc=""
+for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
+  LC_ALL=C grep -q "Cognitive Coverage" "$f" 2>/dev/null || missing_cc="$missing_cc $(basename "$f")"
+done
+is "BOTH rules files mention it" "${missing_cc:-none}" "none"
+
+# It stores a result, against the kit's derived-never-stored rule, so it must say why.
+has "justifies storing the result" "$(cat "$CC")" "cannot be recomputed"
 
 # ---------------------------------------------------------------------------
 section "design canon"

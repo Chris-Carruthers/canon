@@ -63,6 +63,11 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
   reads, and coverage is derived from it. Write a per-component note only when a
   reader would ask *why* — a decision, a drift story, an a11y contract. Otherwise
   add a row.
+- **`Reference/Cognitive Coverage/` records whether a person can explain a feature**,
+  as dated assessments, newest first. Never overwrite an entry — the history is the
+  point. One person per entry, and record the questions asked so a re-test can be
+  harder rather than identical. Stored rather than derived on purpose: it is a fact
+  about a person on a date, which nothing can recompute.
 
 ## Stamp what you write
 

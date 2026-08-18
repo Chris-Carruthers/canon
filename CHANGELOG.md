@@ -8,6 +8,39 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **`cognitive-coverage` skill** — a graded quiz on what your agent just built,
+  recorded with a date.
+
+  Code review asks *is this correct*; tests ask *does it work*. Neither asks whether
+  a **person** can explain it without reading it again. Agent-built code fails that
+  quietly, precisely because it passes review.
+
+  Six to ten questions across six bands — shape, state, failure, boundary, decision,
+  change — asked one at a time and graded against the implementation. At least one
+  must be about something *surprising* in the code, because that is where
+  understanding lives and it is what nobody retains from watching an agent work.
+
+  Records to `Reference/Cognitive Coverage/<feature>.md`, newest first, **appending
+  rather than overwriting**, with the questions asked so a re-test can be harder
+  instead of identical. Ships with a `Cognitive Coverage` note template (templates
+  8 → 9) and a router row.
+
+  **Most of the design is refusing to be nice.** A quiz everyone passes is worse than
+  no quiz: it converts an unknown gap into a false belief and burns the one moment
+  somebody was willing to be tested. So an answer that would equally fit a different
+  implementation is *partial* at best, "I don't know" is a *gap* and never a partial,
+  softball questions answerable from a function name are called out as a failure
+  mode, and the bands are never averaged into one number — a person solid on shape
+  and blank on failure modes has a specific problem that a percentage hides.
+
+  It stores its result, against the kit's derived-never-stored rule, and says why:
+  this cannot be recomputed, because it records what a specific person could explain
+  on a specific date. Same class of fact as `verified:`.
+
+  Framed as a coverage report for a system rather than a performance review — stated
+  in the skill itself, because if it reads as a scorecard on a colleague then nobody
+  asks for it twice and the people who need it stop first.
+
 - **`canon-sync --only <path>`** (repeatable) stages just the paths you name.
 
   The default stays `git add -A`, which is right for one person and one vault. It

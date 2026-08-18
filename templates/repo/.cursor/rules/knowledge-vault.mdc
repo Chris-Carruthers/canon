@@ -51,6 +51,9 @@ yourself** — that field means a human confirmed the content and is theirs to a
   place. Check `.canon-owners` in the vault for who owns what.
 - Do not commit or push the vault on someone's behalf unless asked.
 
+`Reference/Cognitive Coverage/` records whether a person can explain a feature, as
+dated assessments, newest first. Never overwrite an entry.
+
 The design canon lives in `Reference/Design/`: two frozen fenced blocks
 (`design-tokens`, `design-components`) whose contract is in the Design System
 template. Omit a key you do not have rather than writing `TODO` — absence is what

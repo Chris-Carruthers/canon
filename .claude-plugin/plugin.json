@@ -1,6 +1,6 @@
 {
   "name": "canon",
-  "description": "A shared knowledge vault your team's agents read before work and write to after. Loads the team's context at session start, notices when a session ends without a note, and gates credentials before they reach git history.",
+  "description": "A shared knowledge vault your team's agents read before work and write to after. Loads the team's context at session start, notices when a session ends without a note, and gates credentials before they reach git history. Includes cognitive-coverage: a graded quiz on what your agent just built.",
   "version": "0.2.0",
   "author": {
     "name": "Chris Carruthers",
@@ -15,6 +15,9 @@
     "memory",
     "context",
     "documentation",
-    "team"
+    "team",
+    "quiz",
+    "understanding",
+    "onboarding"
   ]
 }
