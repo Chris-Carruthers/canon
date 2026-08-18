@@ -435,7 +435,7 @@ for slug in sorted(tools):
 
 # ---------------------------------------------------------------------------
 # 2. Resolve repo-prefixed pointers.
-#    `dexhive-prod-frontend/src/x.css` resolves against a scanned repo whose
+#    `web-app/src/x.css` resolves against a scanned repo whose
 #    basename matches the first segment. If that repo was NOT scanned we report
 #    nothing — an unscanned repo is unverifiable, not broken. Calling it dead
 #    would be the tool's first false positive.
