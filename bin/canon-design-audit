@@ -7,6 +7,8 @@
 #   --report           write a dated report into <vault>/Outputs/
 #   --strict           exit 1 when a VIOLATION count exceeds its baseline
 #   --json             machine-readable findings on stdout
+#   --export           the resolved canon itself, as JSON, on stdout
+#   --view             write a human-and-agent readable view into <vault>/Outputs/
 #   --baseline-write   print a .canon-design-baseline for redirection
 #   --quiet            counts only
 #
@@ -44,7 +46,7 @@ CANON_VERSION="0.2.0"
 case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VAULT=""; MODE="text"; DO_REPORT=0; STRICT=0; QUIET=0; BASELINE_WRITE=0
+VAULT=""; MODE="text"; DO_REPORT=0; STRICT=0; QUIET=0; BASELINE_WRITE=0; DO_VIEW=0
 # An indexed array, not a newline-joined string piped on stdin: the python body
 # arrives via `python3 - <<'PY'`, which IS stdin, so anything piped in is
 # swallowed by the heredoc and the repo list silently arrives empty.
@@ -56,9 +58,11 @@ while [ $# -gt 0 ]; do
     --report) DO_REPORT=1; shift ;;
     --strict) STRICT=1; shift ;;
     --json) MODE="json"; shift ;;
+    --export) MODE="export"; shift ;;
+    --view) DO_VIEW=1; shift ;;
     --baseline-write) BASELINE_WRITE=1; shift ;;
     --quiet) QUIET=1; shift ;;
-    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,41p' "$0"; exit 0 ;;
     -*) echo "canon-design-audit: unknown option: $1" >&2; exit 2 ;;
     *) REPOS[${#REPOS[@]}]="$1"; shift ;;
   esac
@@ -80,13 +84,14 @@ fi
 
 python3 - \
   "$VAULT" "$MODE" "$DO_REPORT" "$STRICT" "$QUIET" "$BASELINE_WRITE" "$CANON_VERSION" \
-  "${REPOS[@]}" <<'PY'
+  "$DO_VIEW" "${REPOS[@]}" <<'PY'
 import datetime, json, os, re, sys
 
 vault, mode, do_report, strict, quiet, baseline_write, version = (
     sys.argv[1], sys.argv[2], sys.argv[3] == "1", sys.argv[4] == "1",
     sys.argv[5] == "1", sys.argv[6] == "1", sys.argv[7])
-repos = [os.path.abspath(p) for p in sys.argv[8:] if p.strip()]
+do_view = sys.argv[8] == "1"
+repos = [os.path.abspath(p) for p in sys.argv[9:] if p.strip()]
 
 # ---------------------------------------------------------------------------
 # FROZEN key sets. These must match templates/vault/Templates/Design System.md.
@@ -99,7 +104,7 @@ TOKEN_KEYS = {"vocabulary", "source", "format", "scope", "catalog", "names",
 COMP_KEYS = {"slug", "name", "vocabulary", "figma", "image", "impl", "tokens",
              "status", "note"}
 TOOL_KEYS = {"slug", "name", "kind", "roles", "emits", "ingest", "values-to",
-             "vocabulary", "version", "verified", "hazard", "note"}
+             "vocabulary", "version", "checked", "hazard", "note"}
 FORMATS = {"hsl-triplet", "oklch", "hex", "rgb-triplet", "named"}
 KINDS = {"vendor", "skill", "script"}
 ROLES = {"generator", "critic", "implementer", "design-source", "style-guide"}
@@ -130,6 +135,9 @@ RE_HEX = re.compile(r"#(?:[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|[0-9a-fA-F]{3,4})\b"
 RE_FUNC = re.compile(r"\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\s*\(")
 RE_TW_ARBITRARY = re.compile(r"-\[#(?:[0-9a-fA-F]{3,8})\]")
 RE_DECL = re.compile(r"(--[a-zA-Z][a-zA-Z0-9-]*)\s*:")
+# Name AND value, for the derived view. The audit itself never compares two
+# values; rendering one so a human can look at it is a different act.
+RE_DECL_VAL = re.compile(r"(--[a-zA-Z][a-zA-Z0-9-]*)\s*:\s*([^;}\n]+)")
 RE_NODE = re.compile(r"^[0-9]+-[0-9]+$")
 RE_FILEKEY = re.compile(r"^[A-Za-z0-9]{20,25}$")
 
@@ -160,6 +168,36 @@ def read_text(path):
         return ""
 
 
+def strip_trailing_comment(line):
+    """Drop a trailing `# annotation` from a block line.
+
+    This exists because the frozen contract in the template is ANNOTATED — every
+    line carries `# required, unique` and the like — and the obvious way to author
+    a row is to copy that block. Without this, doing the documented thing produced
+    four malformed findings AND silently unparsed `roles:`, which turned the
+    vocabulary rule off. That is the Product Spec scar again: the example the
+    template gives must be the thing the validator accepts.
+
+    A `#` is only a comment when whitespace follows it, so a hex value like #fff or
+    an issue reference like #123 survives. A `#` inside a quoted value is left
+    alone, because `hazard: "..."` is free text."""
+    out, in_quote = [], None
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if in_quote:
+            if ch == in_quote:
+                in_quote = None
+        elif ch in "\"'":
+            in_quote = ch
+        elif (ch == "#" and i > 0 and line[i - 1].isspace()
+              and (i + 1 == len(line) or line[i + 1].isspace())):
+            return "".join(out).rstrip()
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def records(body):
     """Split a fenced block into `- key: value` records. Same shape the kit's
     other fenced blocks use: one record starts at a `- ` in column zero."""
@@ -177,6 +215,7 @@ def records(body):
     for rec in out:
         d = {}
         for line in rec:
+            line = strip_trailing_comment(line)
             if ":" not in line:
                 continue
             k, v = line.split(":", 1)
@@ -261,18 +300,27 @@ for path in canon_files:
                     add("VIOLATION", "DS-TOOL-MALFORMED", rel,
                         "unknown kind %r for %s" % (k, slug))
                 roles = set(listval(rec.get("roles", "")))
+                # Required, not optional. Rule 1 says omit a key you do not have,
+                # which taught authors that leaving `roles` out was fine — and an
+                # absent `roles` meant the vocabulary rule below could never fire.
+                # A registry entry that cannot say what the tool DOES is not an
+                # entry, and this rule must not be disableable by omission.
+                if not roles:
+                    add("VIOLATION", "DS-TOOL-MALFORMED", rel,
+                        "%s: roles is required — without it nothing can check "
+                        "whether the tool needs a vocabulary" % slug)
                 for r in sorted(roles - ROLES):
                     add("VIOLATION", "DS-TOOL-MALFORMED", rel,
                         "unknown role %r for %s" % (r, slug))
                 # Rule 9. A capability claim with no date is one somebody acts on
                 # a year after it stopped being true.
-                if not rec.get("verified"):
+                if not rec.get("checked"):
                     add("VIOLATION", "DS-TOOL-MALFORMED", rel,
-                        "%s: verified is required — a tool claim needs a date "
-                        "you checked" % slug)
+                        "%s: checked is required — a tool claim needs the date "
+                        "somebody last confirmed it" % slug)
                 # Rule 10. Enforced here rather than left to review, because the
                 # failure is silent: a fifth --primary, months later.
-                if roles & WRITING_ROLES and not rec.get("vocabulary"):
+                if roles & WRITING_ROLES and not listval(rec.get("vocabulary", "")):
                     add("VIOLATION", "DS-TOOL-MALFORMED", rel,
                         "%s: roles %s write UI, so vocabulary is required"
                         % (slug, sorted(roles & WRITING_ROLES)))
@@ -317,7 +365,7 @@ PLACEHOLDER = {"todo", "tbd", "?", "n/a", "na", "-", "none", "xxx", "fixme"}
 # a placeholder — flagging it would be the tool's own first false positive.
 PLACEHOLDER_KEYS = {"vocabulary", "source", "format", "scope", "catalog", "names",
                     "status", "of", "slug", "figma", "image", "impl", "tokens",
-                    "kind", "roles", "ingest", "values-to", "verified"}
+                    "kind", "roles", "ingest", "values-to", "checked"}
 # `hazard` is deliberately absent from that set alongside `name` and `note`: it is
 # free text, and a tool whose one trap really is "none" should be able to say so.
 for rec in list(vocabs.values()) + comps + list(tools.values()):
@@ -334,29 +382,29 @@ for rec in list(vocabs.values()) + comps + list(tools.values()):
 # nothing: it reads as governed.
 for slug in sorted(tools):
     rec = tools[slug]
-    want = rec.get("vocabulary")
-    if want and want not in vocabs:
-        add("VIOLATION", "DS-TOOL-MALFORMED", rec["_note"],
-            "%s: vocabulary %r is not declared in any design-tokens block"
-            % (slug, want))
+    for want in listval(rec.get("vocabulary", "")):
+        if want not in vocabs:
+            add("VIOLATION", "DS-TOOL-MALFORMED", rec["_note"],
+                "%s: vocabulary %r is not declared in any design-tokens block"
+                % (slug, want))
     # GAP, never a VIOLATION — a stale claim is an unchecked claim, not a defect,
     # and a rule that can fail --strict on the passage of time is a rule people
     # switch off. It decays into a visible absence instead of a silent lie.
-    when_verified = rec.get("verified")
-    if when_verified:
+    when_checked = rec.get("checked")
+    if when_checked:
         try:
-            seen_at = datetime.datetime.strptime(when_verified.strip(),
+            seen_at = datetime.datetime.strptime(when_checked.strip(),
                                                  "%Y-%m-%d")
         except ValueError:
             add("VIOLATION", "DS-TOOL-MALFORMED", rec["_note"],
-                "%s: verified %r is not a YYYY-MM-DD date"
-                % (slug, when_verified.strip()))
+                "%s: checked %r is not a YYYY-MM-DD date"
+                % (slug, when_checked.strip()))
         else:
             age = (utc_now() - seen_at).days
             if age > TOOL_STALE_DAYS:
                 add("GAP", "DS-TOOL-STALE", rec["_note"],
-                    "%s: verified %s, %d days ago — recheck what it can do"
-                    % (slug, when_verified.strip(), age))
+                    "%s: checked %s, %d days ago — recheck what it can do"
+                    % (slug, when_checked.strip(), age))
 
 # ---------------------------------------------------------------------------
 # 2. Resolve repo-prefixed pointers.
@@ -476,6 +524,127 @@ for n, owners in sorted(by_name.items()):
         add("GAP", "DS-FORMAT-SPLIT", n,
             "declared in %s across formats %s — same name, different colour space"
             % (", ".join(s for s, _ in owners), ", ".join(fmts)))
+
+# ---------------------------------------------------------------------------
+# 3b. The resolved canon, as one model.
+#     Built once and rendered two ways: markdown for people, JSON for agents.
+#     It exists because both audiences were otherwise re-deriving it — a human by
+#     opening five notes and a CSS file, an agent by reimplementing the subtree
+#     glob and the three fence regexes. Neither should have to.
+#
+#     Values ARE resolved here, read from the repo at call time. That does not
+#     contradict names-in-the-vault: nothing is stored. This is a dated, derived
+#     artifact, exactly like the audit report, and it is regenerated or it is wrong.
+# ---------------------------------------------------------------------------
+def read_values(rec):
+    """Current values for one vocabulary, read from its source file.
+
+    Returns (values, status). status is 'read', 'unverifiable' when the naming
+    repo was not scanned, or 'missing' when it was and the file is not there —
+    the same three-way distinction the pointer checks make, for the same reason:
+    an unscanned repo is unknown, not empty."""
+    src = rec.get("source")
+    if not src:
+        return {}, "no-source"
+    abspath, checkable = resolve(src)
+    if not checkable:
+        return {}, "unverifiable"
+    if not os.path.exists(abspath):
+        return {}, "missing"
+    found = {}
+    for name, raw in RE_DECL_VAL.findall(read_text(abspath)):
+        val = raw.strip().rstrip(";").strip()
+        # First declaration wins. A file with :root and a .dark block declares the
+        # same name twice, and picking the later one would silently show dark mode.
+        if name not in found and val:
+            found[name] = val
+    return found, "read"
+
+
+def unquote(v):
+    """Strip the surrounding quotes a block value may carry. `hazard: "..."` is
+    quoted in the contract so a colon inside it cannot split the record, but the
+    quotes are syntax, not content, and rendering them looks like a typo."""
+    if not v:
+        return v
+    v = v.strip()
+    if len(v) > 1 and v[0] == v[-1] and v[0] in "\"'":
+        return v[1:-1]
+    return v
+
+
+def css_value(fmt, raw):
+    """A browser-resolvable colour for a declared value, or None.
+
+    The canon's rule is that value equivalence is the browser's problem, not a
+    regex's. This is that rule applied: wrap the bare value in whatever function
+    its declared format implies and let the renderer do the colour science."""
+    v = raw.strip()
+    if not v or "var(" in v:
+        return None
+    if fmt == "hsl-triplet":
+        return "hsl(%s)" % v
+    if fmt == "rgb-triplet":
+        return "rgb(%s)" % v
+    if fmt in ("hex", "named", "oklch"):
+        return v
+    return None
+
+
+resolved = {"vocabularies": [], "components": [], "tools": [], "collisions": []}
+
+for slug, rec in sorted(vocabs.items()):
+    vals, status = read_values(rec)
+    declared = listval(rec.get("names", ""))
+    resolved["vocabularies"].append({
+        "vocabulary": slug,
+        "format": rec.get("format"),
+        "status": rec.get("status"),
+        "of": rec.get("of"),
+        "source": rec.get("source"),
+        "scope": rec.get("scope"),
+        "values_status": status,
+        "tokens": [{"name": n, "value": vals.get(n)} for n in declared] or
+                  [{"name": n, "value": v} for n, v in sorted(vals.items())],
+        "note": rec.get("_note"),
+    })
+
+for c in comps:
+    resolved["components"].append({
+        "slug": c.get("slug"), "name": c.get("name"),
+        "vocabulary": c.get("vocabulary"), "status": c.get("status"),
+        "resolves": {
+            "image": c.get("image"), "figma": c.get("figma"), "impl": c.get("impl"),
+        },
+        "tokens": listval(c.get("tokens", "")),
+        "note": c.get("_note"),
+    })
+
+for slug in sorted(tools):
+    t = tools[slug]
+    resolved["tools"].append({
+        "slug": slug, "name": t.get("name"), "kind": t.get("kind"),
+        "roles": listval(t.get("roles", "")),
+        "emits": listval(t.get("emits", "")),
+        "vocabulary": listval(t.get("vocabulary", "")),
+        "values_to": t.get("values-to"), "ingest": t.get("ingest"),
+        "version": unquote(t.get("version")), "checked": t.get("checked"),
+        "hazard": unquote(t.get("hazard")), "note": t.get("_note"),
+    })
+
+# The collision table is the one thing no existing artifact showed a human: the
+# same name owned by several vocabularies. Reported whenever it is shared, not
+# only when formats differ — a shared name is worth seeing even inside one format,
+# because that is where "I assumed they matched" starts.
+for n, owners in sorted(by_name.items()):
+    if len(owners) > 1:
+        resolved["collisions"].append({
+            "token": n,
+            "vocabularies": [s for s, _ in owners],
+            "formats": sorted({f for _, f in owners}),
+            "split": len({f for _, f in owners}) > 1,
+        })
+
 
 # ---------------------------------------------------------------------------
 # 4. Scan the repos. Read-only, always.
@@ -630,6 +799,136 @@ CAP = 20
 findings.sort(key=lambda f: (f[0] != "VIOLATION", f[1], f[2]))
 
 
+def render_view(when):
+    """The design system as one document, for people and agents both.
+
+    Plain markdown on purpose: a human reads it in Obsidian, an agent greps it.
+    The kit's own rule is Bases for human dashboards and plain text for anything an
+    agent must read — and a Base cannot see inside a fenced block, so the only
+    surface that serves both is a derived one."""
+    out = []
+    out.append("---")
+    out.append("type: output")
+    out.append("status: stable")
+    out.append("date: %s" % when.date().isoformat())
+    out.append("generated:")
+    out.append("  by: process:canon-design-audit")
+    out.append("  at: %sZ" % when.replace(microsecond=0).isoformat())
+    out.append("stale_after: %s"
+               % (when + datetime.timedelta(days=30)).date().isoformat())
+    out.append("tool_version: %s" % version)
+    out.append("repos_scanned: [%s]"
+               % ", ".join(os.path.basename(r.rstrip("/")) for r in repos))
+    out.append("---")
+    out.append("")
+    out.append("# Design System View — %s" % when.date().isoformat())
+    out.append("")
+    out.append("Every token name, component and approved tool in the canon, with the "
+               "values read out of the code on this run. **Do not hand-edit** — change "
+               "the canon or change the code and re-run. Values are shown here because "
+               "this file is derived and dated; they are still not stored in the vault.")
+    out.append("")
+
+    if resolved["tools"]:
+        out.append("## What to build UI with")
+        out.append("")
+        out.append("| Tool | Kind | Roles | Targets | Checked | Watch out for |")
+        out.append("|---|---|---|---|---|---|")
+        for t in resolved["tools"]:
+            out.append("| %s | %s | %s | %s | %s | %s |" % (
+                t["name"] or t["slug"], t["kind"] or "—",
+                ", ".join(t["roles"]) or "—",
+                ", ".join("`%s`" % v for v in t["vocabulary"]) or "—",
+                t["checked"] or "—", t["hazard"] or ""))
+        out.append("")
+
+    out.append("## Token vocabularies")
+    out.append("")
+    if not resolved["vocabularies"]:
+        out.append("None declared.")
+        out.append("")
+    for v in resolved["vocabularies"]:
+        head = "### `%s` — %s" % (v["vocabulary"], v["format"] or "format unstated")
+        if v["status"]:
+            head += " · %s" % v["status"]
+        if v["of"]:
+            head += " of `%s`" % v["of"]
+        out.append(head)
+        out.append("")
+        if v["source"]:
+            out.append("Values in `%s`." % v["source"])
+        note = {
+            "unverifiable": "**Values not shown** — the naming repo was not scanned "
+                            "on this run. Unknown, not empty.",
+            "missing": "**Values not shown** — the source file does not exist. "
+                       "That is also reported as `DS-POINTER-DEAD`.",
+            "no-source": "**No source declared**, so there is nothing to read.",
+        }.get(v["values_status"])
+        if note:
+            out.append("")
+            out.append(note)
+        out.append("")
+        if v["values_status"] == "read":
+            out.append("| Token | Value | |")
+            out.append("|---|---|---|")
+            for t in v["tokens"]:
+                val, sw = t["value"], ""
+                if val:
+                    css = css_value(v["format"], val)
+                    if css:
+                        # Renders as a colour chip in Obsidian and on GitHub-style
+                        # viewers; degrades to nothing in a plain text reader, which
+                        # is why the value itself is its own column.
+                        sw = ('<span style="display:inline-block;width:2.5rem;'
+                              'height:1rem;background:%s;border:1px solid #767676;'
+                              'vertical-align:middle"></span>' % css)
+                out.append("| `%s` | %s | %s |"
+                           % (t["name"], "`%s`" % val if val else "*not declared*", sw))
+            out.append("")
+
+    if resolved["collisions"]:
+        out.append("## Names owned by more than one vocabulary")
+        out.append("")
+        out.append("The place drift starts. A shared name does **not** mean a shared "
+                   "value, and nothing in the code will tell you when it stops "
+                   "matching. Rows marked ⚠ also differ in colour space, which is "
+                   "reported as `DS-FORMAT-SPLIT`.")
+        out.append("")
+        out.append("| Token | Declared in | Formats | |")
+        out.append("|---|---|---|---|")
+        for c in resolved["collisions"]:
+            out.append("| `%s` | %s | %s | %s |" % (
+                c["token"], ", ".join("`%s`" % v for v in c["vocabularies"]),
+                ", ".join(c["formats"]), "⚠" if c["split"] else ""))
+        out.append("")
+
+    out.append("## Components")
+    out.append("")
+    if not resolved["components"]:
+        out.append("None declared.")
+    else:
+        out.append("A blank cell means that rung does not resolve, and that is a "
+                   "fact rather than an oversight — an omitted key is how this canon "
+                   "records an absence.")
+        out.append("")
+        out.append("| Component | Vocabulary | Image | Figma | Code | Status |")
+        out.append("|---|---|---|---|---|---|")
+        for c in resolved["components"]:
+            r = c["resolves"]
+            out.append("| %s | %s | %s | %s | %s | %s |" % (
+                c["name"] or c["slug"],
+                "`%s`" % c["vocabulary"] if c["vocabulary"] else "—",
+                "✓" if r["image"] else "", "✓" if r["figma"] else "",
+                "`%s`" % r["impl"] if r["impl"] else "",
+                c["status"] or "—"))
+    out.append("")
+    out.append("---")
+    out.append("")
+    out.append("No score is recorded, here or anywhere. For what has drifted, read "
+               "the newest `Design System Audit` beside this file.")
+    return "\n".join(out) + "\n"
+
+
 def render_report(when):
     stale = (when + datetime.timedelta(days=30)).date().isoformat()
     out = []
@@ -703,6 +1002,18 @@ def render_report(when):
     return "\n".join(out) + "\n"
 
 
+if mode == "export":
+    # The canon itself, not an opinion about it. Agents were otherwise each
+    # reimplementing the Reference/Design/ glob and the three fence regexes; this is
+    # that work done once, in the place the contract is already frozen.
+    print(json.dumps({
+        "tool_version": version,
+        "vault": vault,
+        "repos": repos,
+        "canon": resolved,
+    }, indent=2, sort_keys=True))
+    sys.exit(0)
+
 if mode == "json":
     payload = {
         "tool_version": version,
@@ -759,6 +1070,16 @@ if do_report:
         fh.write(render_report(when))
     if not quiet and mode != "json":
         print("  report: %s" % os.path.relpath(dest, vault))
+
+if do_view:
+    when = utc_now()
+    outdir = os.path.join(vault, "Outputs")
+    os.makedirs(outdir, exist_ok=True)
+    dest = os.path.join(outdir, "%s — Design System View.md" % when.date().isoformat())
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write(render_view(when))
+    if not quiet and mode != "json":
+        print("  view: %s" % os.path.relpath(dest, vault))
 
 if strict and regressions:
     sys.stderr.write("\ncanon-design-audit: VIOLATION counts above baseline\n")

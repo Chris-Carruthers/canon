@@ -30,17 +30,22 @@ This is the whole point of registering a tool rather than just using one:
 One-way on purpose. The canon does not round-trip back into a generator: these
 tools have no API, and their output is not reproducible from the same input.
 
-## Why a row carries no URL and no path
+## Why a row does not record where the tool lives
 
-Same reasoning as the Figma rule (rule 3): a vendor URL is rename-fragile the
-moment the product is renamed or folded into something else. And a path is worse —
-a skill lives at a different absolute path on every machine, so a committed one is
+Same reasoning as the Figma rule (rule 3): a vendor URL is rename-fragile the moment
+the product is renamed or folded into something else. An install path is worse — a
+skill sits at a different absolute path on every machine, so a committed one is
 somebody else's machine.
 
-The `slug` and `kind` are enough for a human or an agent to find the thing.
-Pointers belong in the prose note, where they can be wrong without failing a build.
+The `slug` and `kind` identify it; how to reach it belongs in the prose note, where
+being wrong costs nothing instead of failing a build.
 
-## Why `verified:` is mandatory
+This applies to the tool's own location only. `values-to` points at a file the tool
+*writes into*, and that is repo-prefixed and pointer-checked like `impl` and
+`source` — a tool aimed at a tokens file that does not exist is a broken
+instruction, and the audit says so.
+
+## Why `checked:` is mandatory
 
 Third-party capability rots faster than anything else in this canon. Features ship,
 limits change, export paths break, free tiers get metered. A capability claim with
@@ -68,7 +73,7 @@ repo itself.
 
 ## Entry: Google Stitch
 
-`kind: vendor` · `roles: [generator]` · verified 2026-08-15
+`kind: vendor` · `roles: [generator]` · checked 2026-08-15
 
 Prompt or image → UI screens, in a browser canvas.
 
@@ -78,7 +83,7 @@ Prompt or image → UI screens, in a browser canvas.
 | Theme controls | light/dark, accent colour, corner radius, font |
 | Outputs | HTML/CSS in a `.zip`; `design.md`; "Copy to Figma" |
 
-**Limits, as of the verified date.** Cannot define or enforce component libraries,
+**Limits, as of the checked date.** Cannot define or enforce component libraries,
 tokens or brand guidelines across projects — brand colours must be re-stated as hex
 in every prompt. Non-deterministic: the same prompt produces a different result
 each time, which suits exploration and fights production. Code export is HTML/CSS
@@ -131,7 +136,7 @@ so it is the one that keeps working when the others do not.
 
 ## Entry: impeccable
 
-`kind: skill` · `roles: [critic, implementer]` · verified 2026-08-15
+`kind: skill` · `roles: [critic, implementer]` · checked 2026-08-15
 
 A Claude Code skill that critiques and builds production frontend UI. Apache 2.0,
 so unlike a hosted vendor it can be pinned and read.
@@ -144,8 +149,10 @@ rules (≥4.5:1 body text, ≥3:1 large).
 
 ### The hazard, and the wiring that removes it
 
-Its setup has a reasonable default that is wrong here: **if it finds no committed
-brand colours, it generates a palette seed.** Against a canon whose vocabularies
+Its setup has a reasonable default that is wrong here: **when it finds no committed
+brand colours, its step 6 seeds a brand colour and has you compose an OKLCH palette
+around it.** That step is skipped only if committed brand colours were found, so
+"found" is the whole ballgame. Against a canon whose vocabularies
 already disagree — and especially while a source-of-truth decision is open — that
 is precisely how the next vocabulary gets created, by a well-behaved tool doing
 what it was told.
@@ -154,10 +161,22 @@ Registering it does not fix that. **Wiring it does:**
 
 1. Copy `templates/repo/DESIGN.md` to the repo root and fill in the vocabulary slug
    and the path to the tokens file.
-2. Confirm the tool actually reads it before relying on it. The check is that the
-   context step prints your `DESIGN.md` rather than reporting no product context.
-3. Run `audit` on one component and confirm it cites the repo's existing tokens
+2. **A `DESIGN.md` on its own is inert — you also need a `PRODUCT.md`.** The context
+   loader returns early when no `PRODUCT.md` is present and never emits the
+   `DESIGN.md` body, so the guardrail reaches nothing. This is not documented by the
+   tool; it was found by running it, and it is the single most likely way to think
+   you are wired up when you are not.
+3. Confirm the tool actually reads it. The check is that the context step prints
+   your `DESIGN.md`, not that the file exists.
+4. Run `audit` on one component and confirm it cites the repo's existing tokens
    instead of proposing a palette.
+
+> **Watch the filename.** impeccable's own `document` command writes a root
+> `DESIGN.md` (and an `.impeccable/design.json` that *does* carry token values). So
+> canon's values-free pointer file sits at a path a registered tool owns and will
+> regenerate. Either do not run `document` in a repo wired this way, or move the
+> pointer content somewhere the tool does not own. Recorded here rather than
+> silently, because the collision is invisible until it overwrites you.
 
 Step 3 is the acceptance test. Everything else here is documentation; that is the
 part that either holds or does not.
@@ -178,8 +197,10 @@ the owner decide.
 - Fill in every key you actually have, and **omit the rest.** Never `TODO` —
   absence is the machine-readable signal, and the audit reports a placeholder as
   malformed.
-- `verified:` is the date **you** checked, not the date you copied it from a blog
-  post.
+- `checked:` is the date **you** confirmed it, not the date you copied it from a
+  blog post. It is deliberately not called `verified:` — that name is already load-
+  bearing in this kit, where it means *a human confirmed this note*, drives
+  `canon-trust`, and agents are told never to write it for themselves.
 - If the tool writes UI, name the vocabulary. If you do not know which vocabulary
   it should target, that is the finding — write it up as an open question instead of
   registering the tool.

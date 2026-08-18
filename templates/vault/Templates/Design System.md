@@ -97,7 +97,7 @@ What is approved for *making* or *fixing* UI here, and which vocabulary each one
 must target. Summary only; the full `design-tools` block lives in the companion
 note.
 
-| Tool | Kind | Roles | Targets | Verified |
+| Tool | Kind | Roles | Targets | Checked |
 |---|---|---|---|---|
 | `<slug>` | vendor | generator | `<vocabulary-slug>` | YYYY-MM-DD |
 
@@ -119,7 +119,8 @@ Summary only; the full `design-tokens` block lives in the companion note.
 |---|---|---|---|
 | `<slug>` | `repo/path` | hsl-triplet | canonical |
 
-`status` is one of `canonical`, `transcribed-copy`, `divergent`, `prototype`.
+`status` is one of `canonical`, `transcribed-copy`, `divergent`, `prototype`,
+`proposed` (imported from a tool, not yet accepted).
 If nothing is `canonical`, say so here — that is the single most useful fact in
 the note.
 
@@ -185,7 +186,7 @@ from the template failed the check.
   scope: ":root"                      # the selector the declarations sit on
   catalog: repo/path/to/palette.md    # optional human-readable catalog
   names: [--background, --foreground] # the token NAMES. never values.
-  status: canonical                   # canonical | transcribed-copy | divergent | prototype
+  status: canonical                   # canonical | transcribed-copy | divergent | prototype | proposed
   of: <vocabulary-slug>               # required when status is transcribed-copy
 ```
 
@@ -209,9 +210,9 @@ from the template failed the check.
   emits: [design-md, html-css]        # what you get out of it
   ingest: proposed                    # status the rows imported from it carry
   values-to: repo/path/to/tokens.css  # where its VALUES must land
-  vocabulary: <vocabulary-slug>       # required for generator / implementer
+  vocabulary: [<slug>, <slug>]        # required for generator / implementer; a LIST
   version: "1.2.3"                    # optional — for a pinned skill or script
-  verified: YYYY-MM-DD                # required — capability rots
+  checked: YYYY-MM-DD                 # required — capability rots
   hazard: "one short phrase"          # optional — the single trap
   note: "[[Design System — Tooling]]" # only if a prose note exists
 ```
@@ -232,9 +233,9 @@ TEN RULES. Each one exists because it is the thing that gets got wrong.
    scanner will not catch. Store file + node; render the URL when you need it:
      https://www.figma.com/design/<file>/x?node-id=<node>&m=dev
 
-4. impl / source / catalog are repo-prefixed and RELATIVE — repo/path.tsx:42 —
-   matching the vault's existing convention for pointing at code. Never absolute,
-   never a URL. Absolute paths are somebody else's machine.
+4. impl / source / catalog / values-to are repo-prefixed and RELATIVE —
+   repo/path.tsx:42 — matching the vault's existing convention for pointing at
+   code. Never absolute, never a URL. Absolute paths are somebody else's machine.
 
 5. NAMES IN THE VAULT, VALUES IN THE REPO. Stated again because it is the rule
    people break first and it is the whole reason this shape exists.
@@ -247,23 +248,31 @@ TEN RULES. Each one exists because it is the thing that gets got wrong.
    Attachments/ — a path that silently cannot resolve is worse than a declared
    absence, because the tool can report an absence.
 
-8. A design-tools ROW CARRIES AN IDENTIFIER, NOT A LOCATION. No URL — same
+8. A design-tools ROW DOES NOT RECORD WHERE THE TOOL ITSELF LIVES. No URL — same
    reasoning as rule 3, and a vendor URL is rename-fragile the moment the product
-   is renamed. No filesystem path either: a skill lives at a different absolute
-   path on every machine, and absolute paths are somebody else's machine (rule 4).
-   The slug and kind are enough to find it; pointers belong in the prose note.
+   is renamed. No install path either: a skill sits at a different absolute path on
+   every machine. The slug and kind are enough to identify it; how to reach it
+   belongs in the prose note, where being wrong costs nothing.
+   This is about the TOOL's location only. `values-to` points at a file the tool
+   writes into, and it is repo-prefixed and checked like any other pointer (rule 4).
 
-9. `verified:` IS REQUIRED, AND IT IS A DATE YOU CHECKED. Third-party capability
+9. `checked:` IS REQUIRED, AND IT IS A DATE SOMEBODY CHECKED. Third-party capability
    rots faster than anything else in this canon — features ship, limits change,
    export paths break. A capability claim with no date is one somebody acts on a
    year after it stopped being true. canon-design-audit reports a stale row as a
    GAP, so an unchecked claim decays into a visible absence instead of a lie.
 
-10. `vocabulary:` IS REQUIRED WHEN roles CONTAINS generator OR implementer, and it
-   must name a vocabulary that exists in the design-tokens block. A tool that
-   writes UI without a named target vocabulary does not decline to pick one — it
-   invents one, and you find out when the fifth `--primary` appears. This is rule
-   5's enforcement arm: the tool is told which names to use, and reads the values
-   from the repo itself.
+10. `vocabulary:` IS REQUIRED WHEN roles CONTAINS generator OR implementer, and
+   every slug in it must exist in the design-tokens block. A tool that writes UI
+   without a named target does not decline to pick one — it invents one, and you
+   find out when the fifth `--primary` appears. This is rule 5's enforcement arm:
+   the tool is told which names to use, and reads the values from the repo itself.
+
+   It is a LIST because one tool legitimately serves several surfaces: a code-
+   editing skill run across three repos targets three vocabularies, and a single
+   value would force either a lie or three near-duplicate rows. List every
+   vocabulary the tool is approved to target; which one applies in a given repo is
+   decided by that repo's own DESIGN.md, not here. A single unbracketed slug is
+   still accepted and reads as a one-item list.
 -->
 

@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-228%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-254%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -744,9 +744,9 @@ it first looks:
 Copy values into the vault and you have built a second source of truth that drifts
 silently while reading as authoritative.
 
-**For coding agents, the useful part is that assets resolve deterministically.**
-Frozen fenced blocks — `design-tokens`, `design-components` and `design-tools` —
-give a three-rung ladder, and *every rung's absence is detectable*:
+**For coding agents, the useful part is that assets resolve deterministically.** Two
+frozen fenced blocks — `design-tokens` and `design-components` — give a three-rung
+ladder, and *every rung's absence is detectable*:
 
 | Rung | Field | Needs |
 |---|---|---|

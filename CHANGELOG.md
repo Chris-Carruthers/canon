@@ -18,8 +18,8 @@ public surface is the CLI flags, the config variables, and the file formats
   that nothing was canonical and stopped there.
 
   The block follows the kit's only existing precedent for an external design vendor.
-  Figma is not registered anywhere: it is a typed pointer field validated by
-  `canon-design-audit`, with a hard rule against storing the URL. So a tool row
+  Figma has no registry entry — it is a typed pointer field on a component row,
+  validated by `canon-design-audit`, with a hard rule against storing the URL. So a tool row
   carries an identifier and never a location — no URL to rot when a product gets
   renamed, no filesystem path, because a skill sits at a different absolute path on
   every machine.
@@ -43,9 +43,12 @@ public surface is the CLI flags, the config variables, and the file formats
   `values-to` is resolved like `impl` and `source`, so a tool aimed at a tokens file
   that does not exist reports `DS-POINTER-DEAD`.
 
-  **A vault that registers no tools produces byte-identical output to a build
-  without this feature**, in every mode including `--json`. An unused registry
-  should be invisible, not a row of zeroes.
+  **A vault whose blocks are valid and which registers no tools produces
+  byte-identical findings to a build without this feature.** An unused registry
+  should be invisible, not a row of zeroes. Scoped deliberately: `--help` gained
+  three lines, and `PLACEHOLDER_KEYS` grew by five names that also apply to token
+  and component rows, so a pre-existing row with `status: TODO` can now report one
+  more finding than it used to.
 
 - **`canon-sync --only <path>`** (repeatable) stages just the paths you name.
 
