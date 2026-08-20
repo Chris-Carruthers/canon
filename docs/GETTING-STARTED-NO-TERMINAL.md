@@ -130,6 +130,46 @@ Ask whether your team also enabled their host's own secret scanning. On GitHub t
 a repository setting, and on private repositories it can require a paid plan — worth
 confirming rather than assuming.
 
+## If your team designs or builds screens
+
+There is a folder called **`Reference/Design`** that answers the questions people
+usually have to ask an engineer: what colours and sizes are we supposed to use, does
+a shared version of this component already exist, and is this tool allowed.
+
+Four things worth knowing before you open it.
+
+The notes list *names*, not values. You will find `--primary` and not a hex code.
+That is on purpose: the colour lives in the code, where it can change, and a copy of
+it in a note would quietly go stale while still looking authoritative. So the notes
+tell you the names; the code stays the single source of the values.
+
+Which leaves the obvious problem, and a second file that solves it. In `Outputs/`,
+look for the newest **Design System View**. Somebody generates it, and it
+lists every token with its current value and a small colour swatch you can actually
+see, plus which components exist and where. It has a date on it and it is built from
+the code — so if it looks out of date, it is, and the fix is asking for a fresh one
+rather than correcting it by hand.
+
+> [!WARNING]
+> **Do not edit anything in `Outputs/` that says "Do not hand-edit".** Those files are
+> regenerated from scratch, so a correction you type in gets wiped the next time
+> somebody runs it — and in the meantime it reads as fact. If something in there is
+> wrong, the note or the code is wrong; say so rather than patching the output.
+
+*"Is there already a component for this?"* has a real answer. The component list
+marks some things as deliberately **absent** — meaning there is no shared version and
+that was a decision, not an oversight. That is worth as much as the ones that exist,
+because it stops two people building the fourth slightly-different empty state.
+
+*"Can I use this tool?"* is answerable too. The tooling note lists what has
+been approved for making or fixing screens, and it records the ones that were
+**rejected** too. Each entry carries the date somebody last checked what the tool can
+actually do — if that date is old, treat the description as a guess.
+
+If any of this is missing or wrong, that *is* the useful finding. Say so in the note
+itself or to whoever owns the design system; an honest gap is worth more than a
+confident-looking page nobody trusts.
+
 ## When something looks wrong
 
 **"There's weird text in a note with `<<<<<<<` in it."**
