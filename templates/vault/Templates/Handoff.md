@@ -15,6 +15,7 @@ updated: YYYY-MM-DD
 > what the next person or agent needs to pick this up cold.
 
 <!--
+Voice: skills/house-voice/references/handoff.md — your own map wins: Reference/Writing/House Voice.md
 The test for this document: someone who has never seen the work reads only this
 and can continue it without asking you anything. If you would have to explain
 something out loud, it belongs here.

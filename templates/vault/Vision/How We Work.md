@@ -140,6 +140,41 @@ drifted. It never runs your tests and it never computes coverage. It measures; i
 does not enforce. Enforcement is a required status check, in the forge, set by
 somebody with admin.
 
+## How our documents read
+
+The templates say what sections a document has. They do not say how it
+should read, and an improvised register defaults to whatever the writer last
+saw — which is how a Decision note becomes meeting minutes, a Handoff
+becomes a status report, and a Design System note becomes adjectives. Each
+of those passes its template check and is useless to the next person.
+
+So each document type is mapped to somebody who already writes it well, in
+`Reference/Writing/House Voice.md`. Two things about that map are
+deliberate.
+
+**The selection criterion is a retrievable corpus of that exact document
+type, not fame.** An agent cannot imitate a sensibility it has never read;
+it can imitate a corpus. The most influential designer of the last thirty
+years left almost nothing written, so asking for his voice yields reverent
+adjectives — the model fills the gap with the idea of the person. A design
+system's documentation should read like GOV.UK's, because ten thousand pages
+of exactly that exist.
+
+**Every row names an anti-model**, and it is doing more work than the
+exemplar. "Write it like Nygard" is advice. "Do not write it like meeting
+minutes, which record what was discussed rather than what was chosen" names
+the failure the writer is otherwise about to commit.
+
+`Reference/Writing/Choosing a Document.md` is the other half: which document
+to write at which stage, and the standing instruction to pick the cheapest
+rung that still works. The commonest failure here is not writing badly — it
+is reaching for the full spec before anyone has agreed the idea survives.
+
+canon ships defaults in its `house-voice` skill so a new vault is not blank.
+**The vault note overrides them**, and a team that has named its own
+exemplars — a regulator's guidance, a predecessor's document everyone
+already imitates — has done the more valuable thing.
+
 ## Size budgets
 
 Index notes ≤200 lines / 25 KB · detail notes <500 lines · references one level

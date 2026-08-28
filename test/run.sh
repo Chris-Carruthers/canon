@@ -665,6 +665,102 @@ is "BOTH rules files mention it" "${missing_cc:-none}" "none"
 has "justifies storing the result" "$(cat "$CC")" "cannot be recomputed"
 
 # ---------------------------------------------------------------------------
+section "house voice"
+# The reference files are prose, so what CI can check is that they are WIRED: every
+# template points at one, every one is reachable from the skill, and none of the
+# pointers dangle. A registry entry only declares — the pointer is the thing that has
+# to resolve, and a dead pointer is invisible until somebody follows it.
+HV="$KIT/skills/house-voice/SKILL.md"
+HVR="$KIT/skills/house-voice/references"
+is "ships the skill" "$([ -f "$HV" ] && echo y)" "y"
+
+# Skills are matched on their description, so a skill nobody can trigger is inert.
+has "frontmatter names the skill"  "$(sed -n '1,6p' "$HV")" "name: house-voice"
+has "description carries triggers" "$(sed -n '1,6p' "$HV")" "product spec"
+has "description names more types" "$(sed -n '1,6p' "$HV")" "postmortem"
+
+# One reference file per note template, plus the vision/strategy genre, which has no
+# template of its own and is exactly the genre people wrongly write as a spec.
+is "one reference file per doc type" \
+   "$(find "$HVR" -name '*.md' | wc -l | tr -d ' ')" "11"
+is "covers the strategy genre" "$([ -f "$HVR/strategy-narrative.md" ] && echo y)" "y"
+
+# The six-part shape is what makes the files interchangeable. A file missing a part is
+# still readable, which is why nothing else would catch it.
+missing_part=""
+for f in "$HVR"/*.md; do
+  for part in "## Write it like" "## Why them" "## Do not write it like" \
+              "## The moves" "## Go read" "## Before saving"; do
+    LC_ALL=C grep -q "^$part" "$f" || missing_part="$missing_part $(basename "$f"):${part##* }"
+  done
+done
+is "every reference file has all six parts" "${missing_part:-none}" "none"
+
+# The anti-model does more work than the exemplar — it names the failure the writer is
+# otherwise about to commit. A file that lost it has lost the teaching half.
+short_anti=""
+for f in "$HVR"/*.md; do
+  n="$(awk '/^## Do not write it like/{g=1;next} /^## The moves/{g=0} g' "$f" | wc -w | tr -d ' ')"
+  [ "$n" -ge 60 ] || short_anti="$short_anti $(basename "$f"):${n}w"
+done
+is "every anti-model is argued, not named" "${short_anti:-none}" "none"
+
+# Five pre-save checks, answered literally on the draft. Fewer means the check was
+# trimmed rather than written.
+thin_check=""
+for f in "$HVR"/*.md; do
+  n="$(awk '/^## Before saving/{g=1;next} g' "$f" | LC_ALL=C grep -c '^[1-9]\.')"
+  [ "$n" -eq 5 ] || thin_check="$thin_check $(basename "$f"):${n}"
+done
+is "every file ends in five checks" "${thin_check:-none}" "none"
+
+# WIRING, BOTH WAYS. Every template points at a reference file that exists, and every
+# reference file is reachable from the skill's table. Either direction alone passes
+# while the feature is unusable.
+dangling=""
+pointed=""
+for t in "$KIT"/templates/vault/Templates/*.md; do
+  ref="$(LC_ALL=C sed -n 's|.*skills/house-voice/references/\([a-z-]*\.md\).*|\1|p' "$t" | head -1)"
+  if [ -z "$ref" ]; then
+    dangling="$dangling $(basename "$t"):no-pointer"
+  elif [ ! -f "$HVR/$ref" ]; then
+    dangling="$dangling $(basename "$t"):$ref"
+  else
+    pointed="$pointed $ref"
+  fi
+done
+is "every template points at a real reference file" "${dangling:-none}" "none"
+
+unreachable=""
+for f in "$HVR"/*.md; do
+  LC_ALL=C grep -q "references/$(basename "$f")" "$HV" || unreachable="$unreachable $(basename "$f")"
+done
+is "every reference file is reachable from the skill" "${unreachable:-none}" "none"
+
+# The team's own note overrides the shipped defaults, and the skill has to say so or
+# nobody will ever write one.
+has "skill defers to the vault note" "$(cat "$HV")" "Reference/Writing/House Voice.md"
+has "skill states the selection rule" "$(cat "$HV")" "Not fame"
+has "skill warns against costume"     "$(cat "$HV")" "Costume"
+
+# Seeded into a real scaffolded vault, or the override note is theory.
+is "scaffolds House Voice into a vault" \
+   "$([ -f "$V/Reference/Writing/House Voice.md" ] && echo y)" "y"
+is "scaffolds the document ladder" \
+   "$([ -f "$V/Reference/Writing/Choosing a Document.md" ] && echo y)" "y"
+
+# Routed, or agents never find it.
+has "router advertises the folder" \
+    "$(cat "$KIT/templates/vault/Vision/Agent Router.md")" "Reference/Writing/"
+has "How We Work carries the doctrine" \
+    "$(cat "$KIT/templates/vault/Vision/How We Work.md")" "How our documents read"
+
+# House Voice is an index note and index notes are read in full.
+HVL="$(wc -l < "$V/Reference/Writing/House Voice.md" | tr -d ' ')"
+if [ "$HVL" -le 200 ]; then ok "House Voice is within the index budget ($HVL lines)"
+else bad "House Voice is within the index budget" "$HVL lines > 200"; fi
+
+# ---------------------------------------------------------------------------
 section "design canon"
 # The design canon is the one note type whose machine-readable half ships with a
 # validator, so the template and the tool must agree on the fence names. These

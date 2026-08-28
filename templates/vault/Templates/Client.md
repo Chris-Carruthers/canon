@@ -9,6 +9,7 @@ tags: [client/<slug>]
 # <Client / Customer / Account Name>
 
 <!--
+Voice: skills/house-voice/references/client.md — your own map wins: Reference/Writing/House Voice.md
 Use this for whatever your team's recurring external entity is — customer,
 client, partner, tenant, market. Rename the folder if "Clients" is wrong for you.
 

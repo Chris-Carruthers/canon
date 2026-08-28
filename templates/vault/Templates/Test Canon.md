@@ -7,6 +7,7 @@ generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
 <!--
+Voice: skills/house-voice/references/test-canon.md — your own map wins: Reference/Writing/House Voice.md
 File as: Reference/Testing/<Name> — Current State.md
 
 WHY THIS SHAPE. Tests are code, and code stays out of the vault. So this note

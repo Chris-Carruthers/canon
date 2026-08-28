@@ -8,6 +8,40 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **House voice** — a map from each document type to a writer with a real corpus, the
+  moves to imitate, and the anti-model to avoid.
+
+  The templates said what sections a document has and nothing said how it should
+  *read*, so structure got enforced and prose got improvised — and improvised prose
+  defaults to whatever register the writer last saw. A Decision note becomes meeting
+  minutes: who attended, what was discussed, no statement of what was chosen or what it
+  cost. A Handoff becomes a status report, with the unmerged branch marked "in
+  progress", an adjective standing where a fact should be. Both pass the template check
+  and are useless to the next person.
+
+  Ships as the `house-voice` skill with eleven reference files, one per document type,
+  each in six fixed parts: who to write like · why them · who **not** to write like and
+  what goes wrong · the moves · what to go read · a five-question pre-save check.
+
+  **The selection criterion is a retrievable corpus of that exact document type, not
+  fame**, and that decides most of the picks. An agent cannot imitate a sensibility it
+  has never read; it can imitate a corpus. The most celebrated designer of the last
+  thirty years left almost nothing written, so asking for his voice yields reverent
+  adjectives — the model fills the gap with the *idea* of the person. GOV.UK's design
+  system has ten thousand pages of exactly the document you are writing.
+
+  **Every file names an anti-model, and it does more work than the exemplar.** "Write it
+  like Nygard's ADR" is advice; "do not write it like meeting minutes, which record what
+  was discussed rather than what was chosen" names the failure the writer is otherwise
+  about to commit.
+
+  Two new vault notes, seeded by `canon-init-vault`: `Reference/Writing/House Voice.md`,
+  which **overrides** the shipped defaults because a team's own exemplars are the more
+  valuable thing, and `Reference/Writing/Choosing a Document.md`, the escalation ladder —
+  which document at which stage, pick the cheapest rung that still works. Plus a voice
+  pointer in the header of all ten note templates, a router row, and a `How We Work`
+  section. No template was added, so the template count stays at 10.
+
 - **A testing canon, and `canon-test-audit`** — what is tested, the floor it may not
   fall below, and whether the gate that checks it can actually block a merge.
 
