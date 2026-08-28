@@ -53,11 +53,14 @@ done
 # Vendor the tools INTO the vault so a fresh clone can bootstrap itself with no
 # other checkout present. This is what makes onboarding a single command.
 mkdir -p "$VAULT/.canon"
-for tool in canon-scan canon-guard canon-path canon-install-vault-hooks canon-trust canon-verify canon-status canon-design-audit; do
+# This list is hand-maintained, which means a new tool is one forgotten edit
+# away from never reaching a vault. test/run.sh asserts every canon-*-audit in
+# bin/ appears here, so the omission fails a build instead of going unnoticed.
+for tool in canon-scan canon-guard canon-path canon-install-vault-hooks canon-trust canon-verify canon-status canon-design-audit canon-test-audit; do
   [ -f "$KIT_DIR/bin/$tool" ] && cp "$KIT_DIR/bin/$tool" "$VAULT/.canon/$tool"
   [ -f "$VAULT/.canon/$tool" ] && chmod +x "$VAULT/.canon/$tool"
 done
-echo "  vendored .canon/{canon-scan,canon-guard,canon-path,canon-install-vault-hooks,canon-trust,canon-verify,canon-status,canon-design-audit}"
+echo "  vendored .canon/{canon-scan,canon-guard,canon-path,canon-install-vault-hooks,canon-trust,canon-verify,canon-status,canon-design-audit,canon-test-audit}"
 
 if [ ! -d "$VAULT/.git" ]; then
   git -C "$VAULT" init --quiet 2>/dev/null && echo "  initialised git repo"

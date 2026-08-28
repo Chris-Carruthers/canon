@@ -21,6 +21,7 @@ map, not a manual.
 | Durable facts, schemas, APIs, pricing | `Reference/` |
 | Design system: tokens, components, design assets | `Reference/Design/` |
 | Who can explain a feature, and when they were last checked | `Reference/Cognitive Coverage/` |
+| What is tested, the floor, and whether the gate can block | `Reference/Testing/` |
 | Intent for a feature (what & why) | `Specs/` |
 | Ops state to pick work up cold | `Handoffs/` |
 | What happened in past sessions | `Sessions/YYYY-MM-DD — <title> (<initials>).md` |

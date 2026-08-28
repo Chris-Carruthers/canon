@@ -1,0 +1,945 @@
+#!/usr/bin/env bash
+# canon-test-audit — is this tested, and does the check that says so actually run?
+#
+#   canon-test-audit <repo> [<repo>...]
+#
+#   --vault PATH       vault to read the canon from (default: via canon-path)
+#   --report           write a dated report into <vault>/Outputs/
+#   --strict           exit 1 when a VIOLATION count exceeds its baseline
+#   --json             machine-readable findings on stdout
+#   --ratchet          print the floor each suite could claim today; writes nothing
+#   --max-report-age N days before a coverage report is called stale (default 30)
+#   --baseline-write   print a .canon-test-baseline for redirection
+#   --quiet            counts only
+#
+# It reads the CONTRACT from the vault — the test-suites and test-gates blocks
+# under Reference/Testing/ — and the FACTS from your code repos, and recomputes
+# everything on every run. Nothing is cached in frontmatter, no note holds a
+# percentage, and there is no scorecard to keep current.
+#
+# READ-ONLY in every repo it scans. The single file it ever writes is the report,
+# and only with --report.
+#
+# Two severities, and only one can fail a build:
+#   VIOLATION  a fact you can verify by opening the cited file
+#   GAP        a judgement call. Never fails anything, even with --strict.
+#
+# ---------------------------------------------------------------------------
+# WHAT IT DELIBERATELY DOES NOT DO. Each of these is the design, not an omission.
+# ---------------------------------------------------------------------------
+#
+# 1. IT NEVER RUNS YOUR TESTS. Executing an arbitrary repo's suite is slow, needs
+#    that repo's dependencies installed, and is a code-execution surface pointed
+#    at whatever the canon happens to name. So it reads the report your suite
+#    already wrote, and tells you how old that report is.
+#
+# 2. IT NEVER COMPUTES COVERAGE. It parses what your tooling emitted — cobertura
+#    XML, lcov, or an istanbul json-summary. An unrecognised `format:` is a clean
+#    error rather than a guess, because a guessed denominator is a confident
+#    wrong number.
+#
+# 3. IT CANNOT SEE BRANCH PROTECTION. Whether a status check is *required* lives
+#    on the forge's server, not in your repo, and is not knowable from a
+#    checkout. So `required:` is a HUMAN ATTESTATION recorded with canon-verify,
+#    and TEST-GATE-ADVISORY is a GAP that can never fail a build. A tool that
+#    inferred this would produce confident false results, and a report with
+#    known-false lines in it is a report nobody reads.
+#
+# 4. IT DOES NOT JUDGE WHETHER COVERAGE IS MEANINGFUL. A boot test that imports
+#    a router takes that file from 0% to 100% while testing no behaviour at all.
+#    That trap is documented in the Test Canon template as a caveat for the human
+#    writing the floor. Faking it as a check here would be inventing a signal.
+#
+# The one check worth the whole tool is TEST-GATE-BRANCH-MISMATCH. Forge branch
+# filters are case-sensitive: a workflow filtered on `dev` against a branch named
+# `Dev` runs on nothing, reports nothing, and looks green for as long as you let
+# it. It is a string comparison, and it is the difference between a gate and a
+# decoration.
+
+set -uo pipefail
+
+CANON_VERSION="0.2.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VAULT=""; MODE="text"; DO_REPORT=0; STRICT=0; QUIET=0; BASELINE_WRITE=0; RATCHET=0
+MAX_AGE=30
+# An indexed array, not a newline-joined string piped on stdin: the python body
+# arrives via `python3 - <<'PY'`, which IS stdin, so anything piped in is
+# swallowed by the heredoc and the repo list silently arrives empty.
+REPOS=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --vault) VAULT="${2:-}"; shift 2 ;;
+    --report) DO_REPORT=1; shift ;;
+    --strict) STRICT=1; shift ;;
+    --json) MODE="json"; shift ;;
+    --ratchet) RATCHET=1; shift ;;
+    --max-report-age) MAX_AGE="${2:-30}"; shift 2 ;;
+    --baseline-write) BASELINE_WRITE=1; shift ;;
+    --quiet) QUIET=1; shift ;;
+    -h|--help) sed -n '2,58p' "$0"; exit 0 ;;
+    -*) echo "canon-test-audit: unknown option: $1" >&2; exit 2 ;;
+    *) REPOS[${#REPOS[@]}]="$1"; shift ;;
+  esac
+done
+
+if [ "${#REPOS[@]}" -eq 0 ]; then
+  echo "canon-test-audit: name at least one repo to scan" >&2
+  echo "usage: canon-test-audit [options] <repo> [<repo>...]" >&2
+  exit 2
+fi
+
+# --- locate the vault --------------------------------------------------------
+if [ -z "$VAULT" ]; then
+  R="$HERE/canon-path"; [ -x "$R" ] || R="$(command -v canon-path 2>/dev/null || true)"
+  [ -n "$R" ] && [ -x "$R" ] && VAULT="$("$R" 2>/dev/null || true)"
+fi
+[ -n "$VAULT" ] || { echo "canon-test-audit: no vault configured (set \$CANON_HOME or pass --vault)" >&2; exit 2; }
+[ -d "$VAULT" ] || { echo "canon-test-audit: not a directory: ${VAULT}" >&2; exit 2; }
+
+python3 - \
+  "$VAULT" "$MODE" "$DO_REPORT" "$STRICT" "$QUIET" "$BASELINE_WRITE" "$RATCHET" \
+  "$MAX_AGE" "$CANON_VERSION" "${REPOS[@]}" <<'PY'
+import datetime, fnmatch, json, os, re, sys, time
+import xml.etree.ElementTree as ET
+
+vault, mode, do_report, strict, quiet, baseline_write, ratchet = (
+    sys.argv[1], sys.argv[2], sys.argv[3] == "1", sys.argv[4] == "1",
+    sys.argv[5] == "1", sys.argv[6] == "1", sys.argv[7] == "1")
+try:
+    max_age = int(sys.argv[8])
+except ValueError:
+    sys.stderr.write("canon-test-audit: --max-report-age wants a whole number of days\n")
+    sys.exit(2)
+version = sys.argv[9]
+repos = [os.path.abspath(os.path.expanduser(r)) for r in sys.argv[10:]]
+now_epoch = time.time()
+
+# ---------------------------------------------------------------------------
+# FROZEN key sets. These must match templates/vault/Templates/Test Canon.md.
+# The kit already carries one scar from letting a template and its validator
+# drift: a Product Spec template whose fence names never matched the validator
+# written against it, so every file made from the template failed the check.
+# If you change a key here, change it in the template in the SAME commit.
+# ---------------------------------------------------------------------------
+SUITE_KEYS = {"suite", "repo", "command", "report", "format", "metric", "floor",
+              "status", "note"}
+GATE_KEYS = {"gate", "repo", "workflow", "job", "branches", "required",
+             "verified", "note"}
+
+FORMATS = {"cobertura", "lcov", "json-summary"}
+METRICS = {"lines", "statements", "branches", "functions"}
+SUITE_STATUS = {"enforced", "advisory", "absent"}
+
+# Which metrics each report format can actually answer. Asking cobertura for
+# `statements` is not a small inaccuracy — cobertura has no statement counter, so
+# any number returned would be a different metric wearing the label you asked
+# for. A clean error beats a plausible one.
+METRIC_SUPPORT = {
+    "cobertura":    {"lines", "branches"},
+    "lcov":         {"lines", "branches", "functions"},
+    "json-summary": {"lines", "statements", "branches", "functions"},
+}
+
+SKIP_DIR = {".git", "node_modules", "dist", "build", "out", ".next", ".nuxt",
+            ".output", "coverage", "vendor", "target", ".turbo", ".cache",
+            "__pycache__", ".venv", "venv", ".tox", ".mypy_cache",
+            ".pytest_cache", "site-packages"}
+
+# Markers that say "somebody tests this repo". Used only to notice a repo the
+# canon says nothing about — see TEST-SUITE-UNDECLARED below for why the bar is
+# deliberately this high.
+TEST_MARKER_FILES = [
+    "pytest.ini", "jest.config.js", "jest.config.ts", "jest.config.mjs",
+    "jest.config.cjs", "jest.config.json", "vitest.config.js", "vitest.config.ts",
+    "vitest.config.mjs", "karma.conf.js", "playwright.config.ts",
+    "playwright.config.js", "phpunit.xml", "phpunit.xml.dist",
+]
+TEST_MARKER_DIRS = ["tests", "test", "__tests__", "spec", "specs"]
+
+
+def read_text(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def records(body):
+    """Split a fenced block into `- key: value` records. Same shape the kit's
+    other fenced blocks use: one record starts at a `- ` in column zero.
+
+    Trailing ` # comment` is stripped, because the contract in the template is
+    ANNOTATED — every key carries a comment explaining it. The kit has already
+    shipped one block its own validator could not parse for exactly this reason,
+    which silently disabled the rule it was documenting. If the documented
+    example does not validate, the documentation is a trap."""
+    out, cur = [], None
+    for raw in body.split("\n"):
+        if raw.startswith("- "):
+            if cur is not None:
+                out.append(cur)
+            cur = [raw[2:]]
+        elif cur is not None and raw.strip():
+            cur.append(raw.strip())
+    if cur is not None:
+        out.append(cur)
+    parsed = []
+    for rec in out:
+        d = {}
+        for line in rec:
+            if ":" not in line:
+                continue
+            k, v = line.split(":", 1)
+            d[k.strip()] = decomment(v).strip()
+        parsed.append(d)
+    return parsed
+
+
+def decomment(v):
+    """Strip a trailing comment, but only when the `#` is preceded by
+    whitespace. A value can legitimately contain one — `branches: [release/#1]`,
+    a colour, an anchor — and eating from the first `#` would silently truncate
+    it. Inside a quoted or bracketed value, leave it alone entirely."""
+    out, quote, depth = [], None, 0
+    prev = " "
+    for ch in v:
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "\"'":
+            quote = ch
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth = max(0, depth - 1)
+        elif ch == "#" and depth == 0 and prev in " \t":
+            break
+        out.append(ch)
+        prev = ch
+    return "".join(out).rstrip()
+
+
+def listval(v):
+    v = v.strip()
+    if v.startswith("[") and v.endswith("]"):
+        v = v[1:-1]
+    return [x.strip().strip("\"'") for x in v.split(",") if x.strip()]
+
+
+def mapval(v):
+    """Parse `{ by: human:cc, at: 2026-01-01 }` — the same inline-mapping shape
+    the kit already uses for `generated: { by:, at: }`. Values here contain
+    colons (`human:cc`, an ISO timestamp), so split on the FIRST colon only."""
+    v = v.strip().lstrip("{").rstrip("}")
+    d = {}
+    for part in v.split(","):
+        if ":" in part:
+            k, val = part.split(":", 1)
+            d[k.strip()] = val.strip()
+    return d
+
+
+# Placeholder text defeats the whole design: absence is the signal, and coverage
+# is derived from it, so a TODO reports as complete-but-broken.
+PLACEHOLDER = {"todo", "tbd", "?", "n/a", "na", "-", "none", "xxx", "fixme"}
+
+findings = []       # (severity, rule, location, detail)
+
+
+def add(sev, rule, loc, detail):
+    findings.append((sev, rule, loc, detail))
+
+
+# ---------------------------------------------------------------------------
+# 1. Read the contract out of the vault.
+#    Globbed, not a fixed filename, so a block can move to a sibling note when
+#    the index note outgrows its 200-line budget.
+# ---------------------------------------------------------------------------
+testing_dir = os.path.join(vault, "Reference", "Testing")
+canon_files = []
+for root, dirs, files in os.walk(testing_dir):
+    dirs[:] = sorted(d for d in dirs if d not in SKIP_DIR)
+    for f in sorted(files):
+        if f.endswith(".md"):
+            canon_files.append(os.path.join(root, f))
+
+suites, gates = [], []
+for path in canon_files:
+    rel = os.path.relpath(path, vault)
+    text = read_text(path)
+    for kind, body in re.findall(r"```(test-suites|test-gates)\n(.*?)```",
+                                text, flags=re.S):
+        for rec in records(body):
+            keys = SUITE_KEYS if kind == "test-suites" else GATE_KEYS
+            unknown = sorted(set(rec) - keys)
+            if unknown:
+                add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                    "unknown key(s) in %s: %s" % (kind, ", ".join(unknown)))
+            rec["_note"] = rel
+            if kind == "test-suites":
+                if not rec.get("suite") or not rec.get("repo"):
+                    add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                        "test-suites record missing suite or repo")
+                    continue
+                fmt, metric = rec.get("format"), rec.get("metric")
+                if fmt and fmt not in FORMATS:
+                    add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                        "unknown format %r for %s — one of: %s"
+                        % (fmt, rec["suite"], ", ".join(sorted(FORMATS))))
+                if metric and metric not in METRICS:
+                    add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                        "unknown metric %r for %s — one of: %s"
+                        % (metric, rec["suite"], ", ".join(sorted(METRICS))))
+                st = rec.get("status")
+                if st and st not in SUITE_STATUS:
+                    add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                        "unknown status %r for %s — one of: %s"
+                        % (st, rec["suite"], ", ".join(sorted(SUITE_STATUS))))
+                fl_raw = rec.get("floor")
+                # A placeholder floor is caught by the placeholder pass below,
+                # which says the more useful thing. Reporting it here as well
+                # would count one typo twice.
+                if fl_raw and fl_raw.strip().lower() not in PLACEHOLDER:
+                    try:
+                        float(fl_raw.rstrip("%"))
+                    except ValueError:
+                        add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                            "floor %r for %s is not a number"
+                            % (fl_raw, rec["suite"]))
+                if fmt and metric and fmt in METRIC_SUPPORT \
+                        and metric not in METRIC_SUPPORT[fmt]:
+                    add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                        "%s cannot report %r — %s carries: %s"
+                        % (rec["suite"], metric, fmt,
+                           ", ".join(sorted(METRIC_SUPPORT[fmt]))))
+                suites.append(rec)
+            else:
+                if not rec.get("gate") or not rec.get("repo") \
+                        or not rec.get("workflow"):
+                    add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                        "test-gates record missing gate, repo or workflow")
+                    continue
+                req = rec.get("required")
+                if req and req.lower() not in ("true", "false"):
+                    add("VIOLATION", "TEST-BLOCK-MALFORMED", rel,
+                        "required must be true or false, got %r for %s"
+                        % (req, rec["gate"]))
+                gates.append(rec)
+
+for coll, key, label in ((suites, "suite", "suite"), (gates, "gate", "gate")):
+    seen = set()
+    for rec in coll:
+        if rec[key] in seen:
+            add("VIOLATION", "TEST-BLOCK-MALFORMED", rec["_note"],
+                "duplicate %s slug: %s" % (label, rec[key]))
+        seen.add(rec[key])
+
+# Checked on pointer and enum keys only. `command` and `note` are free text, and
+# a suite whose command legitimately contains the word "none" is not a
+# placeholder — flagging it would be the tool's own first false positive.
+PLACEHOLDER_KEYS = {"suite", "repo", "report", "format", "metric", "floor",
+                    "status", "gate", "workflow", "job", "branches", "required"}
+for rec in suites + gates:
+    for k, v in sorted(rec.items()):
+        if k.startswith("_") or k not in PLACEHOLDER_KEYS:
+            continue
+        if v.strip().lower() in PLACEHOLDER:
+            add("VIOLATION", "TEST-BLOCK-MALFORMED", rec["_note"],
+                "%s: %r — omit the key instead; absence is the signal"
+                % (k, v.strip()))
+
+# ---------------------------------------------------------------------------
+# 2. Resolve repos by basename.
+#    A canon row naming a repo that was NOT scanned reports nothing. An
+#    unscanned repo is unverifiable, not broken; calling it broken would be the
+#    tool's first false positive.
+# ---------------------------------------------------------------------------
+repo_by_name = {}
+for p in repos:
+    repo_by_name[os.path.basename(p.rstrip("/"))] = p
+
+unverifiable = []
+
+
+def repo_root(name, what):
+    root = repo_by_name.get(name)
+    if root is None:
+        unverifiable.append("%s (%s)" % (name, what))
+    return root
+
+
+# ---------------------------------------------------------------------------
+# 3. Coverage report parsers.
+#    Each returns {metric: percentage}. Only what the format actually carries —
+#    a missing metric is absent from the dict, never zero. Zero is a measurement
+#    and "the file does not record this" is not.
+# ---------------------------------------------------------------------------
+def parse_cobertura(text):
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as exc:
+        raise ValueError("not parseable as cobertura XML: %s" % exc)
+    out = {}
+    for attr, metric in (("line-rate", "lines"), ("branch-rate", "branches")):
+        if root.get(attr) is not None:
+            try:
+                out[metric] = float(root.get(attr)) * 100.0
+            except ValueError:
+                pass
+    # Counter attributes win when present: a rate is rounded in the file, and the
+    # ratio is what the tool actually measured.
+    for cov, val, metric in (("lines-covered", "lines-valid", "lines"),
+                             ("branches-covered", "branches-valid", "branches")):
+        c, v = root.get(cov), root.get(val)
+        if c is not None and v is not None:
+            try:
+                c, v = float(c), float(v)
+            except ValueError:
+                continue
+            out[metric] = (c / v * 100.0) if v else 100.0
+    if not out:
+        raise ValueError("cobertura XML carries no line-rate or lines-valid")
+    return out
+
+
+def parse_lcov(text):
+    tot = {}
+    for line in text.split("\n"):
+        line = line.strip()
+        if ":" not in line:
+            continue
+        tag, val = line.split(":", 1)
+        if tag in ("LF", "LH", "BRF", "BRH", "FNF", "FNH"):
+            try:
+                tot[tag] = tot.get(tag, 0) + int(val.strip())
+            except ValueError:
+                continue
+    out = {}
+    for found, hit, metric in (("LF", "LH", "lines"), ("BRF", "BRH", "branches"),
+                               ("FNF", "FNH", "functions")):
+        if found in tot:
+            out[metric] = (tot[hit] / tot[found] * 100.0) if tot[found] else 100.0
+    if not out:
+        raise ValueError("no LF/LH records found — is this lcov?")
+    return out
+
+
+def parse_json_summary(text):
+    try:
+        data = json.loads(text)
+    except ValueError as exc:
+        raise ValueError("not parseable as JSON: %s" % exc)
+    total = data.get("total")
+    if not isinstance(total, dict):
+        raise ValueError("no `total` key — this looks like coverage-final.json "
+                         "(per-file raw data), not coverage-summary.json")
+    out = {}
+    for metric in METRICS:
+        block = total.get(metric)
+        if isinstance(block, dict) and isinstance(block.get("pct"), (int, float)):
+            out[metric] = float(block["pct"])
+    if not out:
+        raise ValueError("`total` carries no pct for any of: %s"
+                         % ", ".join(sorted(METRICS)))
+    return out
+
+
+PARSERS = {"cobertura": parse_cobertura, "lcov": parse_lcov,
+           "json-summary": parse_json_summary}
+
+# ---------------------------------------------------------------------------
+# 4. Measure each declared suite.
+# ---------------------------------------------------------------------------
+measured = {}       # suite slug -> {"pct":, "metric":, "floor":, "report":}
+
+for s in suites:
+    slug, name = s["suite"], s["repo"]
+    if s.get("status") == "absent":
+        # A deliberate, recorded absence. "There is no frontend suite" stops an
+        # agent hunting for one AND stops this tool reporting a gap that is
+        # really a decision somebody made on purpose.
+        continue
+    root = repo_root(name, "suite %s" % slug)
+    if root is None:
+        continue
+    if not s.get("report"):
+        add("GAP", "TEST-REPORT-UNDECLARED", "%s (%s)" % (slug, s["_note"]),
+            "no report: — the floor cannot be checked, only trusted")
+        continue
+
+    rel = s["report"]
+    path = os.path.join(root, rel)
+    if not os.path.isfile(path):
+        add("VIOLATION", "TEST-REPORT-MISSING", "%s/%s" % (name, rel),
+            "suite %s declares this report and it is not there — an "
+            "unverifiable floor reads as a passing one" % slug)
+        continue
+
+    fmt = s.get("format")
+    if not fmt:
+        add("VIOLATION", "TEST-BLOCK-MALFORMED", "%s (%s)" % (slug, s["_note"]),
+            "report: without format: — nothing can parse it")
+        continue
+
+    try:
+        pcts = PARSERS[fmt](read_text(path))
+    except KeyError:
+        continue        # unknown format, already reported as malformed
+    except ValueError as exc:
+        add("VIOLATION", "TEST-REPORT-UNPARSEABLE", "%s/%s" % (name, rel),
+            "declared format %s: %s" % (fmt, exc))
+        continue
+
+    metric = s.get("metric") or "lines"
+    if metric not in pcts:
+        add("VIOLATION", "TEST-REPORT-UNPARSEABLE", "%s/%s" % (name, rel),
+            "declared metric %r is not in this report (it carries: %s)"
+            % (metric, ", ".join(sorted(pcts))))
+        continue
+    pct = pcts[metric]
+
+    # How old is the number? A percentage carries no date, so a coverage report
+    # from three months ago reads exactly like one from this morning.
+    #
+    # This is an explicit AGE against a stated window, not an inference. The
+    # obvious-looking alternative — "is the report older than HEAD's commit?" —
+    # is wrong: commit time is when somebody committed, not when the code
+    # changed, so running the suite and then committing would flag a report that
+    # is perfectly current. A rule that fires on correct behaviour is a rule
+    # people switch off.
+    try:
+        age_days = int((now_epoch - os.path.getmtime(path)) // 86400)
+    except OSError:
+        age_days = None
+    if age_days is not None and age_days > max_age:
+        add("VIOLATION", "TEST-REPORT-STALE", "%s/%s" % (name, rel),
+            "%d days old (window is %d) — %s %.1f%% may describe code that has "
+            "since changed; re-run the suite" % (age_days, max_age, metric, pct))
+
+    floor = s.get("floor")
+    if floor is None:
+        add("GAP", "TEST-FLOOR-ABSENT", "%s (%s)" % (slug, s["_note"]),
+            "measured but not ratcheted — nothing stops it falling")
+    else:
+        try:
+            fl = float(str(floor).rstrip("%"))
+        except ValueError:
+            fl = None
+        if fl is not None and pct < fl:
+            add("VIOLATION", "TEST-FLOOR-BREACH", "%s (%s)" % (slug, name),
+                "%s %.1f%% is below the declared floor of %s"
+                % (metric, pct, floor))
+
+    measured[slug] = {"pct": pct, "metric": metric, "floor": floor,
+                      "report": "%s/%s" % (name, rel), "repo": name,
+                      "all": pcts}
+
+# ---------------------------------------------------------------------------
+# 5. Check each declared gate.
+#
+#    The workflow is read with a TARGETED EXTRACTION, not a YAML parser: python3
+#    has no yaml in its standard library, and the kit installs nothing. So this
+#    pulls the branch filters and job keys out textually, and is deliberately
+#    conservative — it reports a mismatch only when a filter EXISTS and the
+#    declared branch is absent from it. A workflow with no branch filter runs on
+#    everything, which is not a bug and is not reported.
+# ---------------------------------------------------------------------------
+RE_JOB = re.compile(r"^(\s{2,4})([A-Za-z0-9_.-]+):\s*$")
+
+
+def workflow_branches(text):
+    """Every branch pattern named in any `branches:` / `branches-ignore:` filter.
+    Returns (patterns, saw_filter)."""
+    pats, saw = [], False
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        m = re.match(r"^(\s*)(branches|branches-ignore)\s*:\s*(.*)$", line)
+        if not m:
+            continue
+        saw = True
+        indent, rest = len(m.group(1)), m.group(3).strip()
+        if rest and rest != "|" and rest != ">":
+            pats.extend(listval(rest))
+            continue
+        for nxt in lines[i + 1:]:
+            if not nxt.strip():
+                continue
+            ind = len(nxt) - len(nxt.lstrip())
+            stripped = nxt.strip()
+            if ind <= indent or not stripped.startswith("- "):
+                break
+            pats.append(stripped[2:].strip().strip("\"'"))
+    return pats, saw
+
+
+def workflow_jobs(text):
+    jobs, in_jobs = [], False
+    for line in text.split("\n"):
+        if re.match(r"^jobs\s*:\s*$", line):
+            in_jobs = True
+            continue
+        if in_jobs:
+            if line.strip() and not line[0].isspace():
+                break
+            m = RE_JOB.match(line)
+            if m and len(m.group(1)) <= 4:
+                jobs.append(m.group(2))
+    return jobs
+
+
+for g in gates:
+    slug, name = g["gate"], g["repo"]
+    root = repo_root(name, "gate %s" % slug)
+    if root is None:
+        continue
+    wf = g["workflow"]
+    wpath = os.path.join(root, wf)
+    if not os.path.isfile(wpath):
+        add("VIOLATION", "TEST-GATE-WORKFLOW-MISSING", "%s/%s" % (name, wf),
+            "gate %s names this workflow and it is not there — the gate does not "
+            "exist" % slug)
+        continue
+    text = read_text(wpath)
+
+    if g.get("job"):
+        jobs = workflow_jobs(text)
+        if jobs and g["job"] not in jobs:
+            add("VIOLATION", "TEST-GATE-JOB-MISSING", "%s/%s" % (name, wf),
+                "gate %s names job %r; this workflow defines: %s"
+                % (slug, g["job"], ", ".join(jobs)))
+
+    if g.get("branches"):
+        declared = listval(g["branches"])
+        pats, saw = workflow_branches(text)
+        if saw and pats:
+            for b in declared:
+                if any(fnmatch.fnmatchcase(b, p) for p in pats):
+                    continue
+                near = [p for p in pats if p.lower() == b.lower()]
+                if near:
+                    detail = ("filter says %r, canon declares %r — forge branch "
+                              "filters are CASE-SENSITIVE, so this gate has never "
+                              "run" % (near[0], b))
+                else:
+                    detail = ("branch %r matches no filter in this workflow (%s) "
+                              "— the gate does not run on it"
+                              % (b, ", ".join(repr(p) for p in pats)))
+                add("VIOLATION", "TEST-GATE-BRANCH-MISMATCH",
+                    "%s/%s" % (name, wf), detail)
+
+    # Advisory unless somebody with admin made it required — and that state is
+    # server-side, so this is a GAP resting on a human attestation, never an
+    # inference. See non-goal 3 in the header.
+    req = (g.get("required") or "false").lower() == "true"
+    ver = mapval(g.get("verified", "")) if g.get("verified") else {}
+    if not req:
+        add("GAP", "TEST-GATE-ADVISORY", "%s (%s)" % (slug, g["_note"]),
+            "required: %s — a red run can still merge; this gate reports, it "
+            "does not block" % (g.get("required") or "absent"))
+    elif not ver.get("by", "").startswith("human"):
+        add("GAP", "TEST-GATE-ADVISORY", "%s (%s)" % (slug, g["_note"]),
+            "required: true with no human attestation — record it with "
+            "canon-verify; nothing in a checkout can confirm branch protection")
+
+# ---------------------------------------------------------------------------
+# 6. Repos the canon says nothing about.
+#
+#    Fires only when a scanned repo has ZERO declared suites and does have test
+#    machinery. A repo with one declared suite and a second undeclared framework
+#    is a judgement this tool cannot make without guessing, and a rule that
+#    guesses is a rule people switch off.
+# ---------------------------------------------------------------------------
+declared_repos = set(s["repo"] for s in suites) | set(g["repo"] for g in gates)
+for root in repos:
+    name = os.path.basename(root.rstrip("/"))
+    if name in declared_repos:
+        continue
+    found = []
+    for f in TEST_MARKER_FILES:
+        if os.path.isfile(os.path.join(root, f)):
+            found.append(f)
+    for d in TEST_MARKER_DIRS:
+        if os.path.isdir(os.path.join(root, d)):
+            found.append(d + "/")
+    pp = os.path.join(root, "pyproject.toml")
+    if os.path.isfile(pp) and "[tool.pytest" in read_text(pp):
+        found.append("pyproject.toml [tool.pytest]")
+    sc = os.path.join(root, "setup.cfg")
+    if os.path.isfile(sc) and "[tool:pytest]" in read_text(sc):
+        found.append("setup.cfg [tool:pytest]")
+    pj = os.path.join(root, "package.json")
+    if os.path.isfile(pj) and re.search(r'"test"\s*:', read_text(pj)):
+        found.append("package.json test script")
+    if os.path.isfile(os.path.join(root, "go.mod")):
+        for r, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIR]
+            if any(f.endswith("_test.go") for f in files):
+                found.append("*_test.go")
+                break
+    if found:
+        add("GAP", "TEST-SUITE-UNDECLARED", name,
+            "tested (%s) but no test-suites row declares it — the floor is "
+            "whatever it happens to be today" % ", ".join(sorted(set(found))[:4]))
+
+# ---------------------------------------------------------------------------
+# 7. Counts, coverage, ratchet, baseline.
+# ---------------------------------------------------------------------------
+counts, severity = {}, {}
+for sev, rule, _, _ in findings:
+    counts[rule] = counts.get(rule, 0) + 1
+    severity[rule] = sev
+
+live = [s for s in suites if s.get("status") != "absent"]
+cov = {
+    "suites": len(live),
+    "report": sum(1 for s in live if s["suite"] in measured),
+    "floor": sum(1 for s in live if s.get("floor")),
+    "absent": sum(1 for s in suites if s.get("status") == "absent"),
+    "gates": len(gates),
+    "gate_resolved": sum(
+        1 for g in gates
+        if repo_by_name.get(g["repo"])
+        and os.path.isfile(os.path.join(repo_by_name[g["repo"]], g["workflow"]))),
+    "required": sum(
+        1 for g in gates
+        if (g.get("required") or "false").lower() == "true"
+        and mapval(g.get("verified", "")).get("by", "").startswith("human")),
+}
+
+if ratchet:
+    # Prints. Never writes. The vault is the contract and a tool that edits its
+    # own contract is not a check.
+    print("# canon-test-audit --ratchet — the floor each suite could claim today.")
+    print("# Copy into the test-suites block yourself. Nothing was written.")
+    print("#")
+    print("# A floor only ever goes UP. Where measured is BELOW the declared")
+    print("# floor no number is suggested: that is a breach to fix, not a floor")
+    print("# to lower, and lowering it is how a ratchet quietly becomes a target.")
+    if not measured:
+        print("#\n# nothing measured — no suite resolved to a parseable report")
+    for slug in sorted(measured):
+        m = measured[slug]
+        now = m["pct"]
+        declared = m["floor"]
+        canclaim = int(now)         # floored, never rounded up
+        if declared is None:
+            note = "no floor declared"
+            suggest = "floor: %d" % canclaim
+        else:
+            try:
+                fl = float(str(declared).rstrip("%"))
+            except ValueError:
+                fl = None
+            if fl is None:
+                note, suggest = "declared floor is not a number", "—"
+            elif now < fl:
+                note = "BREACH — below declared %s; fix the suite" % declared
+                suggest = "—"
+            elif canclaim > fl:
+                note = "can rise from %s" % declared
+                suggest = "floor: %d" % canclaim
+            else:
+                note = "already at the floor it can claim"
+                suggest = "floor: %s" % declared
+        print("%-24s %-10s %6.1f%%  %-12s  %s"
+              % (slug, m["metric"], now, suggest, note))
+    sys.exit(0)
+
+baseline = {}
+for repo in repos:
+    for line in read_text(os.path.join(repo, ".canon-test-baseline")).split("\n"):
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) == 2 and parts[1].isdigit():
+            baseline[parts[0]] = baseline.get(parts[0], 0) + int(parts[1])
+
+if baseline_write:
+    print("# canon-test-audit baseline. --strict fails only when a count EXCEEDS")
+    print("# these. Lower them as you clean up; that is the whole point.")
+    for rule in sorted(counts):
+        if severity.get(rule) == "VIOLATION":
+            print("%s %d" % (rule, counts[rule]))
+    sys.exit(0)
+
+regressions = []
+for rule in sorted(counts):
+    if severity.get(rule) != "VIOLATION":
+        continue
+    allowed = baseline.get(rule, 0)
+    if counts[rule] > allowed:
+        regressions.append((rule, counts[rule], allowed))
+
+CAP = 20
+findings.sort(key=lambda f: (f[0] != "VIOLATION", f[1], f[2]))
+
+
+def measured_table():
+    rows = []
+    for slug in sorted(measured):
+        m = measured[slug]
+        rows.append("| `%s` | %s | %s | %.1f%% | %s |"
+                    % (slug, m["repo"], m["metric"], m["pct"],
+                       m["floor"] if m["floor"] is not None else "—"))
+    return rows
+
+
+def render_report(when):
+    stale = (when + datetime.timedelta(days=30)).date().isoformat()
+    out = []
+    out.append("---")
+    out.append("type: output")
+    out.append("status: stable")
+    out.append("date: %s" % when.date().isoformat())
+    out.append("generated:")
+    out.append("  by: process:canon-test-audit")
+    out.append("  at: %sZ" % when.replace(microsecond=0, tzinfo=None).isoformat())
+    out.append("stale_after: %s" % stale)
+    out.append("tool_version: %s" % version)
+    out.append("repos_scanned: [%s]"
+               % ", ".join(os.path.basename(r.rstrip("/")) for r in repos))
+    out.append("---")
+    out.append("")
+    out.append("# Test Canon Audit — %s" % when.date().isoformat())
+    out.append("")
+    out.append("Derived from the testing canon in `Reference/Testing/` plus the "
+               "coverage reports your suites wrote, recomputed on this run. "
+               "**Nothing here is stored anywhere else.** Do not hand-edit — "
+               "change the canon or change the code, and re-run.")
+    out.append("")
+    out.append("Checked %d suite(s) and %d gate(s) across %d repo(s)."
+               % (len(suites), len(gates), len(repos)))
+    out.append("")
+    out.append("| Rule | Severity | Count | Baseline |")
+    out.append("|---|---|---|---|")
+    for rule in sorted(counts):
+        out.append("| `%s` | %s | %d | %s |"
+                   % (rule, severity.get(rule, "?"), counts[rule],
+                      baseline.get(rule, "—") if severity.get(rule) == "VIOLATION" else "n/a"))
+    if not counts:
+        out.append("| — | — | 0 | — |")
+    out.append("")
+    if measured:
+        out.append("## Measured")
+        out.append("")
+        out.append("Read from the report each suite already wrote. This tool did "
+                   "not run anything.")
+        out.append("")
+        out.append("| Suite | Repo | Metric | Measured | Floor |")
+        out.append("|---|---|---|---|---|")
+        out.extend(measured_table())
+        out.append("")
+        out.append("**Read a percentage carefully.** A boot test that imports a "
+                   "router takes that file from 0% to 100% while testing no "
+                   "behaviour. The number is a fact; what it means is a judgement.")
+        out.append("")
+    out.append("## Coverage of the canon itself")
+    out.append("")
+    out.append("Derived from which keys are present, so an omitted key reads as a "
+               "gap rather than as done:")
+    out.append("")
+    out.append("- **%d of %d** live suites resolve to a parseable report"
+               % (cov["report"], cov["suites"]))
+    out.append("- **%d of %d** declare a floor" % (cov["floor"], cov["suites"]))
+    out.append("- **%d** are recorded as deliberately absent" % cov["absent"])
+    out.append("- **%d of %d** gates resolve to a workflow that exists"
+               % (cov["gate_resolved"], cov["gates"]))
+    out.append("- **%d of %d** gates are attested required by a human — the rest "
+               "report without blocking" % (cov["required"], cov["gates"]))
+    out.append("")
+    for rule in sorted(counts):
+        rows = [f for f in findings if f[1] == rule]
+        out.append("## %s — %s (%d)" % (rule, severity.get(rule, "?"), len(rows)))
+        out.append("")
+        for _, _, loc, detail in rows[:CAP]:
+            out.append("- `%s` — %s" % (loc, detail))
+        if len(rows) > CAP:
+            out.append("- … and %d more" % (len(rows) - CAP))
+        out.append("")
+    if unverifiable:
+        out.append("## Unverifiable rows")
+        out.append("")
+        out.append("Named repos that were not scanned. Not reported as broken — "
+                   "an unscanned repo is unknown, not broken.")
+        out.append("")
+        for u in sorted(set(unverifiable))[:CAP]:
+            out.append("- `%s`" % u)
+        out.append("")
+    out.append("---")
+    out.append("")
+    out.append("No score is recorded, here or anywhere. Counts are facts with "
+               "locations; a grade would be a stored judgement that is wrong the "
+               "next day. Re-run to refresh.")
+    return "\n".join(out) + "\n"
+
+
+if mode == "json":
+    print(json.dumps({
+        "tool_version": version,
+        "vault": vault,
+        "repos": repos,
+        "counts": counts,
+        "severity": severity,
+        "coverage": cov,
+        "measured": measured,
+        "baseline": baseline,
+        "regressions": [{"rule": r, "count": c, "baseline": b} for r, c, b in regressions],
+        "unverifiable": sorted(set(unverifiable)),
+        "findings": [{"severity": s, "rule": r, "location": l, "detail": d}
+                     for s, r, l, d in findings],
+    }, indent=2, sort_keys=True))
+elif not quiet:
+    print("canon-test-audit %s" % version)
+    print("  vault: %s" % vault)
+    print("  canon: %d suite(s), %d gate(s) across %d repo(s)"
+          % (len(suites), len(gates), len(repos)))
+    print("")
+    if not counts:
+        print("  no findings")
+    for rule in sorted(counts):
+        print("  %-9s %-28s %d" % (severity.get(rule, "?"), rule, counts[rule]))
+        for _, _, loc, detail in [f for f in findings if f[1] == rule][:5]:
+            print("              %s  %s" % (loc, detail))
+        if counts[rule] > 5:
+            print("              … and %d more" % (counts[rule] - 5))
+    print("")
+    for slug in sorted(measured):
+        m = measured[slug]
+        print("  measured  %-22s %s %.1f%% (floor %s)"
+              % (slug, m["metric"], m["pct"],
+                 m["floor"] if m["floor"] is not None else "—"))
+    print("  coverage: report %d/%d · floor %d/%d · gate %d/%d · required %d/%d "
+          "· absent %d"
+          % (cov["report"], cov["suites"], cov["floor"], cov["suites"],
+             cov["gate_resolved"], cov["gates"], cov["required"], cov["gates"],
+             cov["absent"]))
+    if unverifiable:
+        print("  %d row(s) unverifiable (repo not scanned)" % len(set(unverifiable)))
+else:
+    for rule in sorted(counts):
+        print("%s %d" % (rule, counts[rule]))
+
+if do_report:
+    when = datetime.datetime.now(datetime.timezone.utc)
+    outdir = os.path.join(vault, "Outputs")
+    os.makedirs(outdir, exist_ok=True)
+    dest = os.path.join(outdir, "%s — Test Canon Audit.md" % when.date().isoformat())
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write(render_report(when))
+    if not quiet and mode != "json":
+        print("  report: %s" % os.path.relpath(dest, vault))
+
+if strict and regressions:
+    sys.stderr.write("\ncanon-test-audit: VIOLATION counts above baseline\n")
+    for rule, c, b in regressions:
+        sys.stderr.write("  %s: %d (baseline %d)\n" % (rule, c, b))
+    sys.stderr.write("Write a baseline with --baseline-write if this is the "
+                     "starting point rather than a regression.\n")
+    sys.exit(1)
+sys.exit(0)
+PY
