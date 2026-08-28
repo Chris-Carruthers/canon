@@ -57,6 +57,24 @@ imitable.
 | Cognitive Coverage | Its own register — diagnostic, banded, dated | A performance review — the thing that kills the practice |
 | Vision, strategy memo | Satya Nadella's reframe; Fidji Simo's commitment; Ravi Mehta's stack | Sundar Pichai's shareholder register — engineered not to create news |
 
+### From optional packs
+
+Installed with `canon-pack add <pack>`. The voice files ship either way.
+
+| Document | Write it like | And not like |
+|---|---|---|
+| One-pager | The Amazon narrative one-pager | A flattened slide deck — assertions with the reasoning removed |
+| PR-FAQ | Amazon's working-backwards PR-FAQ | Marketing — an FAQ of only comfortable questions |
+| Six-pager | The Amazon six-pager | A deck reformatted into sentences |
+| Shape Up Pitch | Ryan Singer, *Shape Up* ch. 6 | An estimate — the appetite derived from the solution |
+| RFC | Oxide RFDs; Russ Cox's Go proposals | An ADR — recording a decision the team has not had yet |
+| Architecture Overview | James Hamilton; Kleppmann | A diagram with captions and no failure modes |
+| Runbook | Google SRE playbooks; aviation checklists | A tutorial — paragraphs, at 3am |
+| Postmortem | Google SRE postmortem + its worked example | A blame narrative ending at "human error" |
+| Research Findings | Erika Hall, *Just Enough Research* | A quote-dump with a conclusion bolted on |
+| Design Critique | Julie Zhuo, "How to Do a Design Critique" | Preference stated as principle |
+| Content & UX Copy Guide | The GOV.UK content style guide | A brand adjective list — nothing a reviewer can act on |
+
 Depth for each row — why them, the moves, what to read, the pre-save check — is in
 `skills/house-voice/references/<doctype>.md`.
 

@@ -35,6 +35,28 @@ obviously does not apply to them.
 | Work in flight | `Handoffs/<slug>.handoff.md` | ~30 min, ongoing | Anyone but you might have to pick it up |
 | Work finished for today | `Sessions/` | 5 min | Every session. This is the one that must stay cheap |
 
+## Rungs from optional packs
+
+Present only if the pack is installed — `canon-pack list` says which are.
+
+| Stage | Document | Cost | Pack |
+|---|---|---|---|
+| An idea worth a decision, not yet a plan | One-pager | ~30 min | `product-ladder` |
+| Will anybody care? | PR-FAQ | ~2 hours | `product-ladder` |
+| The problem is agreed; what fits the appetite? | Shape Up Pitch | ~2 hours | `product-ladder` |
+| A real decision, and the room must reason | Six-pager | ~half a day | `product-ladder` |
+| A change that needs agreement before it is built | RFC | hours–days | `engineering` |
+| A newcomer needs the whole shape | Architecture Overview | hours | `engineering` |
+| A procedure will be run again, possibly at 3am | Runbook | ~1 hour | `engineering` |
+| Something broke | Postmortem | ~2 hours | `engineering` |
+| You talked to people | Research Findings | ~1 hour | `research-craft` |
+| A design was reviewed | Design Critique | ~20 min | `research-craft` |
+| Interface text is argued about more than once | Content & UX Copy Guide | ~half a day | `research-craft` |
+
+**An RFC and a Decision are both, not either.** The RFC is the argument and changes
+under review; the ADR is the immutable record of what it settled. They are read at
+different times by different people.
+
 ## The two questions that decide it
 
 **Will somebody ask "why is it like this?"** → a `Decisions/` note, now, while the

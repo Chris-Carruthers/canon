@@ -8,6 +8,44 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **Template packs, and `canon-pack`** — optional note templates, asked for rather than
+  installed.
+
+  `canon-init-vault` copied every file under `templates/vault/` into every vault, which
+  is right for the core and wrong for everything else. Growing the catalogue to
+  twenty-one templates so that three teams each find four useful would have made
+  `Templates/` unreadable for all of them — the same failure the design canon names,
+  *thirty notes for thirty primitives is boilerplate, not knowledge*.
+
+  Three packs. **`product-ladder`** (One-pager, PR-FAQ, Six-pager, Shape Up Pitch) is the
+  cheap rungs below the heavyweight `Product Spec`, which was the only product document
+  the core shipped and is the wrong first artefact for an unproven idea.
+  **`engineering`** (RFC, Architecture Overview, Runbook, Postmortem) closes the biggest
+  structural gap: `Decision` is an ADR, retrospective by design, so canon could record a
+  decision but not **argue** for one. **`research-craft`** (Research Findings, Design
+  Critique, Content & UX Copy Guide).
+
+  `canon-pack list | add | remove`, plus `canon-init-vault --pack <name>` through the
+  same code path. **`add` never overwrites** — identical contract to init, so re-running
+  is how you pick up new templates after an upgrade. **`remove` only deletes what it
+  shipped**: a file goes only if it is still byte-identical to the kit's template, and
+  an edited one is kept and reported. Without that rule an `add` typo followed by a
+  `remove` silently destroys somebody's note.
+
+  `canon-pack` is **not** vendored into vaults. Unlike the other bins it is not
+  self-contained — it copies out of `templates/packs/`, which is not in the vault — so a
+  vendored copy would resolve an empty directory and report "no packs available" as
+  though that were a fact. A detached copy now refuses to run and says why.
+
+  Eleven more `house-voice` reference files, one per pack template, shipping whether or
+  not the pack is installed: a skill costs nothing until it loads, and a template
+  arriving without its voice is the worse failure. CI walks `templates/packs/` in the
+  same both-directions wiring check as the core — every template points at a reference
+  file that exists, and every reference file is reachable from the skill.
+
+  The bare-init template count stays asserted at 10, which is now the regression guard
+  that packs are genuinely opt-in.
+
 - **House voice** — a map from each document type to a writer with a real corpus, the
   moves to imitate, and the anti-model to avoid.
 

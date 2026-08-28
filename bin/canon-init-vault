@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # canon-init-vault — scaffold a new knowledge vault, or top up an existing one.
 #
-#   canon-init-vault /path/to/vault
+#   canon-init-vault [--pack <name>]... /path/to/vault
+#
+# Optional template packs are NOT installed by default. The core set is small on
+# purpose; see canon-pack for what is available and why.
 #
 # Non-destructive: never overwrites an existing file. Safe to re-run to pick up
 # new templates after upgrading the kit.
@@ -15,8 +18,16 @@ case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; e
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TPL="$KIT_DIR/templates/vault"
 
-VAULT="${1:-}"
-[ -n "$VAULT" ] || { echo "usage: canon-init-vault /path/to/vault" >&2; exit 2; }
+VAULT=""; WANT_PACKS=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --pack) shift; [ -n "${1:-}" ] || { echo "canon-init-vault: --pack needs a name" >&2; exit 2; }
+            WANT_PACKS="$WANT_PACKS $1"; shift ;;
+    --pack=*) WANT_PACKS="$WANT_PACKS ${1#--pack=}"; shift ;;
+    *) VAULT="$1"; shift ;;
+  esac
+done
+[ -n "$VAULT" ] || { echo "usage: canon-init-vault [--pack <name>]... /path/to/vault" >&2; exit 2; }
 mkdir -p "$VAULT"
 VAULT="$(cd "$VAULT" && pwd)"
 
@@ -52,6 +63,10 @@ done
 
 # Vendor the tools INTO the vault so a fresh clone can bootstrap itself with no
 # other checkout present. This is what makes onboarding a single command.
+# canon-pack is deliberately NOT in this list: unlike the others it is not
+# self-contained — it copies files out of the kit's templates/packs/, which is not
+# in the vault. A vendored copy would resolve an empty pack directory and report
+# "no packs available", which reads as a fact rather than a broken install.
 mkdir -p "$VAULT/.canon"
 # This list is hand-maintained, which means a new tool is one forgotten edit
 # away from never reaching a vault. test/run.sh asserts every canon-*-audit in
@@ -61,6 +76,13 @@ for tool in canon-scan canon-guard canon-path canon-install-vault-hooks canon-tr
   [ -f "$VAULT/.canon/$tool" ] && chmod +x "$VAULT/.canon/$tool"
 done
 echo "  vendored .canon/{canon-scan,canon-guard,canon-path,canon-install-vault-hooks,canon-trust,canon-verify,canon-status,canon-design-audit,canon-test-audit}"
+
+# Optional packs, through canon-pack so there is exactly one copy path and one set
+# of semantics. Same non-destructive contract as everything above.
+for pk in $WANT_PACKS; do
+  echo "  pack: $pk"
+  "$KIT_DIR/bin/canon-pack" add "$pk" "$VAULT" | sed 's/^/  /'
+done
 
 if [ ! -d "$VAULT/.git" ]; then
   git -C "$VAULT" init --quiet 2>/dev/null && echo "  initialised git repo"
