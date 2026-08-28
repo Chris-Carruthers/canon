@@ -1,6 +1,6 @@
 ---
 name: house-voice
-description: This skill should be used before writing or revising any vault document — a product spec, decision note, RFC, handoff, postmortem, design system or component note, project or client note, session note, research findings, design critique, or a strategy memo or vision document. Also use it when the user asks how a document should read, asks for a rewrite, says a draft "reads wrong", or asks which writer to imitate. Maps each document type to a named exemplar with a real corpus, the moves to imitate, and the anti-model to avoid.
+description: This skill should be used before writing or revising any vault document — a product spec, one-pager, PR-FAQ, six-pager or Shape Up pitch, decision note or RFC, handoff, runbook, postmortem, architecture overview, design system or component note, design critique, research findings, content style guide, project or client note, session note, or a strategy memo or vision document. Also use it when the user asks how a document should read, asks for a rewrite, says a draft "reads wrong", or asks which writer to imitate. Maps each document type to a named exemplar with a real corpus, the moves to imitate, and the anti-model to avoid.
 version: 0.1.0
 ---
 
@@ -93,6 +93,24 @@ Otherwise, open the matching file:
 | Test Canon | [references/test-canon.md](references/test-canon.md) |
 | Cognitive Coverage | [references/cognitive-coverage.md](references/cognitive-coverage.md) |
 | Vision, strategy memo | [references/strategy-narrative.md](references/strategy-narrative.md) |
+
+Optional template packs (`canon-pack add <pack>`) bring more document types. Their
+reference files ship here whether or not the pack is installed — a skill costs nothing
+until it loads, and a template arriving without its voice is the worse failure:
+
+| Document | Pack | Reference |
+|---|---|---|
+| One-pager | `product-ladder` | [references/one-pager.md](references/one-pager.md) |
+| PR-FAQ | `product-ladder` | [references/pr-faq.md](references/pr-faq.md) |
+| Six-pager | `product-ladder` | [references/six-pager.md](references/six-pager.md) |
+| Shape Up Pitch | `product-ladder` | [references/shape-up-pitch.md](references/shape-up-pitch.md) |
+| RFC / Design Proposal | `engineering` | [references/rfc.md](references/rfc.md) |
+| Architecture Overview | `engineering` | [references/architecture-overview.md](references/architecture-overview.md) |
+| Runbook | `engineering` | [references/runbook.md](references/runbook.md) |
+| Postmortem | `engineering` | [references/postmortem.md](references/postmortem.md) |
+| Research Findings | `research-craft` | [references/research-findings.md](references/research-findings.md) |
+| Design Critique | `research-craft` | [references/design-critique.md](references/design-critique.md) |
+| Content & UX Copy Guide | `research-craft` | [references/content-style-guide.md](references/content-style-guide.md) |
 
 Each file is the same six parts: who to write like · why them · who **not** to write
 like and what goes wrong · the moves · what to go read · the pre-save check.

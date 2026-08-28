@@ -682,7 +682,7 @@ has "description names more types" "$(sed -n '1,6p' "$HV")" "postmortem"
 # One reference file per note template, plus the vision/strategy genre, which has no
 # template of its own and is exactly the genre people wrongly write as a spec.
 is "one reference file per doc type" \
-   "$(find "$HVR" -name '*.md' | wc -l | tr -d ' ')" "11"
+   "$(find "$HVR" -name '*.md' | wc -l | tr -d ' ')" "22"
 is "covers the strategy genre" "$([ -f "$HVR/strategy-narrative.md" ] && echo y)" "y"
 
 # The six-part shape is what makes the files interchangeable. A file missing a part is
@@ -719,7 +719,7 @@ is "every file ends in five checks" "${thin_check:-none}" "none"
 # while the feature is unusable.
 dangling=""
 pointed=""
-for t in "$KIT"/templates/vault/Templates/*.md; do
+for t in "$KIT"/templates/vault/Templates/*.md "$KIT"/templates/packs/*/Templates/*.md; do
   ref="$(LC_ALL=C sed -n 's|.*skills/house-voice/references/\([a-z-]*\.md\).*|\1|p' "$t" | head -1)"
   if [ -z "$ref" ]; then
     dangling="$dangling $(basename "$t"):no-pointer"
@@ -759,6 +759,77 @@ has "How We Work carries the doctrine" \
 HVL="$(wc -l < "$V/Reference/Writing/House Voice.md" | tr -d ' ')"
 if [ "$HVL" -le 200 ]; then ok "House Voice is within the index budget ($HVL lines)"
 else bad "House Voice is within the index budget" "$HVL lines > 200"; fi
+
+# ---------------------------------------------------------------------------
+section "template packs"
+# The core set has to be right for every team, so everything else is asked for. What
+# CI can check is the two properties that make that safe: add never destroys, and
+# remove only reclaims what it shipped.
+PK="$KIT/bin/canon-pack"
+is "ships canon-pack" "$([ -x "$PK" ] && echo y)" "y"
+is "three packs" "$(find "$KIT/templates/packs" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" "3"
+
+# Every pack needs the one-line description canon-pack list prints, or the catalogue
+# is a list of names nobody can choose from.
+nodesc=""
+for d in "$KIT"/templates/packs/*/; do
+  [ -f "$d/pack.md" ] && LC_ALL=C grep -q '^> ' "$d/pack.md" || nodesc="$nodesc $(basename "$d")"
+done
+is "every pack describes itself" "${nodesc:-none}" "none"
+
+V9="$SB/vault9"; "$KIT/bin/canon-init-vault" "$V9" >/dev/null 2>&1
+CORE="$(find "$V9/Templates" -name '*.md' | wc -l | tr -d ' ')"
+
+# THE REGRESSION GUARD FOR THE WHOLE IDEA. A bare init must not gain a pack template;
+# if packs ever leak into the core, every vault silently grows and the reason packs
+# exist is gone.
+is "a bare init installs no packs" "$CORE" "10"
+
+"$PK" add product-ladder "$V9" >/dev/null 2>&1
+is "add installs the pack" \
+   "$(find "$V9/Templates" -name '*.md' | wc -l | tr -d ' ')" "14"
+is "and the template is real" "$([ -f "$V9/Templates/One-pager.md" ] && echo y)" "y"
+
+# Re-running must be safe — it is how you pick up new templates after an upgrade.
+echo "MINE" >> "$V9/Templates/One-pager.md"
+"$PK" add product-ladder "$V9" >/dev/null 2>&1
+has "add never overwrites an edit" "$(cat "$V9/Templates/One-pager.md")" "MINE"
+
+# remove reclaims only what it shipped. Without this an `add` typo followed by a
+# `remove` silently destroys somebody's note.
+OUT="$("$PK" remove product-ladder "$V9" 2>&1)"
+is "remove keeps the edited file" "$([ -f "$V9/Templates/One-pager.md" ] && echo y)" "y"
+has "and says why it kept it"     "$OUT" "edited"
+is "remove reclaims the untouched" "$([ -f "$V9/Templates/PR-FAQ.md" ] && echo n || echo y)" "y"
+is "back to the core count"        "$(find "$V9/Templates" -name '*.md' | wc -l | tr -d ' ')" "11"
+
+# --pack on init is the same code path, so it must behave identically.
+VA="$SB/vaultA"; "$KIT/bin/canon-init-vault" --pack engineering --pack research-craft "$VA" >/dev/null 2>&1
+is "init --pack installs both" \
+   "$(find "$VA/Templates" -name '*.md' | wc -l | tr -d ' ')" "17"
+
+# An unknown pack must fail before it announces anything, and say what exists.
+BAD="$("$PK" add nosuchpack "$VA" 2>&1 || true)"
+has "unknown pack names the real ones" "$BAD" "available:"
+is  "and announces nothing first"      "$(printf '%s' "$BAD" | LC_ALL=C grep -c 'adding nosuchpack')" "0"
+
+# canon-pack is NOT self-contained, so it is not vendored. A vendored copy would
+# resolve an empty pack directory and report "no packs" as though that were a fact.
+is "not vendored into the vault" "$([ -f "$VA/.canon/canon-pack" ] && echo n || echo y)" "y"
+cp "$PK" "$VA/.canon/canon-pack"
+DETACHED="$("$VA/.canon/canon-pack" list "$VA" 2>&1 || true)"
+has "a detached copy refuses loudly" "$DETACHED" "no pack directory"
+rm -f "$VA/.canon/canon-pack"
+
+# Pack templates are documents too — the voice pointer has to be there, and the
+# wiring assertions above walk templates/packs as well as the core.
+nopointer=""
+for t in "$KIT"/templates/packs/*/Templates/*.md; do
+  LC_ALL=C grep -q 'skills/house-voice/references/' "$t" || nopointer="$nopointer $(basename "$t")"
+done
+is "every pack template carries a voice pointer" "${nopointer:-none}" "none"
+
+has "docs explain the packs" "$(cat "$KIT/docs/PACKS.md")" "only deletes what it shipped"
 
 # ---------------------------------------------------------------------------
 section "design canon"
