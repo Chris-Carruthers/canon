@@ -80,6 +80,19 @@ jobs:
             got="$("$f" --version | awk '{print $2}')"
             [ "$got" = "$want" ] || { echo "$f reports $got, VERSION says $want"; fail=1; }
           done
+          # Everything else that declares a version. This loop used to cover the
+          # shell entry points only, and two of the four below had already drifted
+          # to 0.1.0 while the rest of the kit moved on.
+          for f in .claude-plugin/plugin.json connectors/mcpb/manifest.json \
+                   connectors/mcp/package.json connectors/slack/package.json \
+                   connectors/discord/package.json; do
+            got="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('version'))" "$f")"
+            [ "$got" = "$want" ] || { echo "$f reports $got, VERSION says $want"; fail=1; }
+          done
+          # The MCP server advertises its own version over the protocol, so a
+          # client sees this string rather than package.json. It was hardcoded.
+          got="$(sed -n 's/.*name: "canon", version: "\([^"]*\)".*/\1/p' connectors/mcp/src/server.mjs)"
+          [ "$got" = "$want" ] || { echo "mcp server advertises $got, VERSION says $want"; fail=1; }
           exit $fail
 
       - name: README test badge matches reality

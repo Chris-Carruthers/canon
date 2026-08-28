@@ -23,8 +23,10 @@
  *    traversal and symlinks pointing out of the vault. That is the entire
  *    security boundary and it is unit-tested in test/paths.test.mjs.
  *
- * 4. Large vendored subtrees are skipped by default. A vault with a 79 MB vendor
- *    documentation mirror will otherwise drown every search in irrelevance.
+ * 4. Only .git, .canon and node_modules are skipped by default. A vault with a
+ *    large vendored documentation mirror will drown every search in irrelevance
+ *    until that tree is named in CANON_MCP_EXCLUDE — there is no way to guess it,
+ *    because it is an ordinary folder of markdown and looks like content.
  */
 
 import fs from "node:fs";
@@ -154,7 +156,7 @@ const TOOLS = [
 ];
 
 const server = new Server(
-  { name: "canon", version: "0.1.0" },
+  { name: "canon", version: "0.2.0" },   // keep in step with package.json; CI asserts it
   { capabilities: { tools: {} } },
 );
 
