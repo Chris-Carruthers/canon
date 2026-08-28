@@ -8,6 +8,78 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **Template packs, and `canon-pack`** — optional note templates, asked for rather than
+  installed.
+
+  `canon-init-vault` copied every file under `templates/vault/` into every vault, which
+  is right for the core and wrong for everything else. Growing the catalogue to
+  twenty-one templates so that three teams each find four useful would have made
+  `Templates/` unreadable for all of them — the same failure the design canon names,
+  *thirty notes for thirty primitives is boilerplate, not knowledge*.
+
+  Three packs. **`product-ladder`** (One-pager, PR-FAQ, Six-pager, Shape Up Pitch) is the
+  cheap rungs below the heavyweight `Product Spec`, which was the only product document
+  the core shipped and is the wrong first artefact for an unproven idea.
+  **`engineering`** (RFC, Architecture Overview, Runbook, Postmortem) closes the biggest
+  structural gap: `Decision` is an ADR, retrospective by design, so canon could record a
+  decision but not **argue** for one. **`research-craft`** (Research Findings, Design
+  Critique, Content & UX Copy Guide).
+
+  `canon-pack list | add | remove`, plus `canon-init-vault --pack <name>` through the
+  same code path. **`add` never overwrites** — identical contract to init, so re-running
+  is how you pick up new templates after an upgrade. **`remove` only deletes what it
+  shipped**: a file goes only if it is still byte-identical to the kit's template, and
+  an edited one is kept and reported. Without that rule an `add` typo followed by a
+  `remove` silently destroys somebody's note.
+
+  `canon-pack` is **not** vendored into vaults. Unlike the other bins it is not
+  self-contained — it copies out of `templates/packs/`, which is not in the vault — so a
+  vendored copy would resolve an empty directory and report "no packs available" as
+  though that were a fact. A detached copy now refuses to run and says why.
+
+  Eleven more `house-voice` reference files, one per pack template, shipping whether or
+  not the pack is installed: a skill costs nothing until it loads, and a template
+  arriving without its voice is the worse failure. CI walks `templates/packs/` in the
+  same both-directions wiring check as the core — every template points at a reference
+  file that exists, and every reference file is reachable from the skill.
+
+  The bare-init template count stays asserted at 10, which is now the regression guard
+  that packs are genuinely opt-in.
+
+- **House voice** — a map from each document type to a writer with a real corpus, the
+  moves to imitate, and the anti-model to avoid.
+
+  The templates said what sections a document has and nothing said how it should
+  *read*, so structure got enforced and prose got improvised — and improvised prose
+  defaults to whatever register the writer last saw. A Decision note becomes meeting
+  minutes: who attended, what was discussed, no statement of what was chosen or what it
+  cost. A Handoff becomes a status report, with the unmerged branch marked "in
+  progress", an adjective standing where a fact should be. Both pass the template check
+  and are useless to the next person.
+
+  Ships as the `house-voice` skill with eleven reference files, one per document type,
+  each in six fixed parts: who to write like · why them · who **not** to write like and
+  what goes wrong · the moves · what to go read · a five-question pre-save check.
+
+  **The selection criterion is a retrievable corpus of that exact document type, not
+  fame**, and that decides most of the picks. An agent cannot imitate a sensibility it
+  has never read; it can imitate a corpus. The most celebrated designer of the last
+  thirty years left almost nothing written, so asking for his voice yields reverent
+  adjectives — the model fills the gap with the *idea* of the person. GOV.UK's design
+  system has ten thousand pages of exactly the document you are writing.
+
+  **Every file names an anti-model, and it does more work than the exemplar.** "Write it
+  like Nygard's ADR" is advice; "do not write it like meeting minutes, which record what
+  was discussed rather than what was chosen" names the failure the writer is otherwise
+  about to commit.
+
+  Two new vault notes, seeded by `canon-init-vault`: `Reference/Writing/House Voice.md`,
+  which **overrides** the shipped defaults because a team's own exemplars are the more
+  valuable thing, and `Reference/Writing/Choosing a Document.md`, the escalation ladder —
+  which document at which stage, pick the cheapest rung that still works. Plus a voice
+  pointer in the header of all ten note templates, a router row, and a `How We Work`
+  section. No template was added, so the template count stays at 10.
+
 - **A testing canon, and `canon-test-audit`** — what is tested, the floor it may not
   fall below, and whether the gate that checks it can actually block a merge.
 

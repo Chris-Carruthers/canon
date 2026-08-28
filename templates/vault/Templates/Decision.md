@@ -5,6 +5,10 @@ date: YYYY-MM-DD
 generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
+<!--
+Voice: skills/house-voice/references/decision.md — your own map wins: Reference/Writing/House Voice.md
+-->
+
 # Decision: <title>
 
 ## Context

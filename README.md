@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-267%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-304%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -41,6 +41,8 @@ reading the vault with two apps and no commands.
 - [Works with agents that are not Claude](#works-with-agents-that-are-not-claude) — seven runtimes from one template
 - [The testing canon](#the-testing-canon-a-ratchet-and-a-gate-that-actually-runs) — a floor that only rises
 - [Cognitive coverage](#cognitive-coverage-can-you-explain-what-your-agent-built) — the quiz nobody else runs
+- [House voice](#house-voice-who-each-document-should-read-like) — who each document should read like, and who it must not
+- [Template packs](#template-packs-the-core-stays-small) — optional documents, asked for rather than installed
 - [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
 - [Design, and why](#design-and-why) — the limits that shaped it
 - [Sync](#sync-automatic-inbound-deliberate-outbound) · [The gate](#the-gate) · [Trust](#trust-telling-an-agent-draft-from-a-checked-fact) · [Ownership](#ownership-not-everything-should-be-everyones)
@@ -284,6 +286,8 @@ flowchart LR
 | **A design canon** | `Reference/Design/` — token names, a component inventory, and design assets an agent can resolve. Names and pointers, never values |
 | **A testing canon** | `Reference/Testing/` — what is tested, the floor it must not fall below, and whether the gate can actually block a merge |
 | **Cognitive coverage** | A quiz on what your agent just built, graded against the real code, recorded with a date. Tests whether *you* can explain it |
+| **House voice** | Each document type mapped to a writer with a real corpus, the moves to imitate, and the anti-model to avoid. Overridable per team |
+| **`canon-pack`** | Optional template packs — the product ladder, engineering documents, research craft. Add never overwrites; remove only reclaims what it shipped |
 | **A router note** | The one small file agents load every session — a map of what lives where |
 | **Repo wiring** | `CLAUDE.md`, `AGENTS.md` and four more, all from one template, so agents find the vault from any repo — plus a `This repo` section for the build, test and gotchas |
 | **A session-note check** | A `Stop` hook that notices when work happened but nothing got written down |
@@ -991,6 +995,103 @@ hides.
 It is a coverage report for a system, not a performance review — and it says so,
 because if it reads as a scorecard on a colleague then nobody asks for it twice and
 the people who need it stop first.
+
+## House voice: who each document should read like
+
+The templates say what sections a document has. Nothing says how it should **read** —
+so the structure gets enforced and the prose gets improvised, and improvised prose
+defaults to whatever register the writer last saw. A Decision note becomes meeting
+minutes: who attended, what was discussed, no statement of what was chosen or what it
+cost. A Handoff becomes a status report, with the unmerged branch marked "in progress",
+which is an adjective standing where a fact should be. Both pass their template check.
+Both are useless to the next person.
+
+So canon ships a map: each document type to somebody who already writes it well, the
+four to six **moves** to imitate, what to go read, and a pre-save check.
+
+```
+/house-voice
+```
+
+**The selection criterion is a retrievable corpus of that exact document type — not
+fame.** This is the whole trick, and it is why the map names some people you would not
+expect and refuses some you would. An agent cannot imitate a sensibility it has never
+read; it can imitate a corpus. Ask for the most celebrated designer of the last thirty
+years and you get reverent adjectives about materials, because he spoke in product
+films and left almost nothing written — there is no corpus behind the name, so the
+model fills the gap with the *idea* of him. Ask for a GOV.UK Design System component
+page and you get *when to use this / when not to use this / how it works / research on
+this component*, because ten thousand pages of exactly that exist.
+
+**Every entry names an anti-model, and the anti-model is doing more work than the
+exemplar.** "Write it like Nygard's ADR" is advice. "Do not write it like meeting
+minutes, which record what was discussed rather than what was chosen" names the
+specific failure the writer is otherwise about to commit. The reference files spend as
+much space on the failing register as on the good one.
+
+The defaults are opinionated so a new vault is not blank, and they lose to yours:
+`Reference/Writing/House Voice.md` in the vault overrides them, and a team that has
+named its own exemplars — a regulator's published guidance, a predecessor's document
+everybody already imitates — has done the more valuable thing. Alongside it,
+`Reference/Writing/Choosing a Document.md` is the escalation ladder: which document at
+which stage, and the standing instruction to pick the cheapest rung that still works.
+The commonest documentation failure is not writing badly, it is reaching for the full
+spec before anybody has agreed the idea survives.
+
+Two things it deliberately does not do. It does not make a document good — it makes it
+the right *kind* of document, and a well-voiced spec with no evidence in it is still a
+bad spec. And it is never announced: a document that mentions which writer it is
+imitating has failed at imitating them.
+
+## Template packs: the core stays small
+
+`canon-init-vault` ships ten note templates. Everything else you ask for.
+
+```
+canon-pack list
+canon-pack add engineering
+canon-init-vault --pack product-ladder /path/to/vault
+```
+
+The core has to be right for every team that installs canon, so it holds only the
+documents almost everybody writes. A template that four teams in ten would use is not
+free: it lands in the other six vaults, where it makes `Templates/` harder to read and
+quietly implies somebody ought to be filling it in. Same rule the design canon states
+about component notes — *thirty notes for thirty primitives is boilerplate, not
+knowledge*. A folder is a recommendation; make it long enough and it stops being one.
+
+| Pack | Templates | The gap it fills |
+|---|---|---|
+| `product-ladder` | One-pager · PR-FAQ · Six-pager · Shape Up Pitch | The core ships one product document and it is the heavyweight one. These are the cheap rungs below it |
+| `engineering` | RFC · Architecture Overview · Runbook · Postmortem | canon can *record* a decision but not *argue* for one |
+| `research-craft` | Research Findings · Design Critique · Content & UX Copy Guide | Three documents that shape what gets built without describing it |
+
+**The RFC is the one worth singling out.** canon's `Decision` template is an ADR:
+retrospective by design, recording what was chosen after the choosing. There was no
+template for the document that does the persuading — the Oxide RFD, the Go proposal,
+the design doc that goes round for two weeks before anyone writes code. Teams without
+one either decide in chat and lose the reasoning, or write an ADR pre-emptively and
+pretend the argument already happened. An accepted RFC then produces a `Decisions/`
+note: the RFC is the argument, the ADR is the record of what it settled.
+
+**`add` never overwrites** — an existing file is left alone and reported, exactly like
+`canon-init-vault`, so re-running is how you pick up new templates after an upgrade.
+**`remove` only deletes what it shipped**: a file goes only if it is still
+byte-identical to the kit's template. The moment you have edited it, it is your note
+and not ours, so it is kept and reported. Without that rule an `add` typo followed by a
+`remove` would silently destroy somebody's work.
+
+The `house-voice` reference files for pack templates ship whether or not the pack is
+installed. A skill costs nothing until it loads, so gating them saves nothing — and a
+template arriving without the guidance for how to write it is the worse failure.
+
+`canon-pack` is deliberately **not** vendored into vaults. Unlike `canon-scan` and the
+rest it is not self-contained: it copies out of the kit's `templates/packs/`, which is
+not in your vault. A vendored copy would resolve an empty pack directory and report "no
+packs available", which reads as a fact about canon rather than a broken install. It
+refuses to run instead, and says why.
+
+Full detail, and how to add your own: [docs/PACKS.md](docs/PACKS.md).
 
 ## Ownership: not everything should be everyone's
 

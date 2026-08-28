@@ -8,6 +8,7 @@ generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
 <!--
+Voice: skills/house-voice/references/cognitive-coverage.md — your own map wins: Reference/Writing/House Voice.md
 File as: Reference/Cognitive Coverage/<feature-slug>.md
 
 WHY THIS EXISTS. Code review asks "is this correct". Tests ask "does it work".

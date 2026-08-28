@@ -5,6 +5,10 @@ updated: YYYY-MM-DD
 generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
+<!--
+Voice: skills/house-voice/references/project.md — your own map wins: Reference/Writing/House Voice.md
+-->
+
 # <Project Name>
 
 One paragraph: what this workstream is and why it exists. Written so someone
