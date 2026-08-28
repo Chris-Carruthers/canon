@@ -43,6 +43,31 @@ for f in "$KIT"/bin/canon-* "$KIT"/install.sh; do
 done
 is "every script reports VERSION ($VER)" "${mismatch:-none}" "none"
 
+# --help was tested nowhere, and five of the twelve bins mishandled it: they took
+# the flag as a positional argument. canon-init-vault got as far as `mkdir --help`
+# and surfaced "mkdir: illegal option -- -", which reads as a crash rather than a
+# usage error. Asserted on the three things a reader actually needs.
+badhelp=""
+for f in "$KIT"/bin/canon-* "$KIT"/install.sh; do
+  b="$(basename "$f")"
+  out="$("$f" --help 2>&1)" || { badhelp="$badhelp $b:exit"; continue; }
+  case "$out" in
+    "")     badhelp="$badhelp $b:empty" ;;
+    "#"*)   badhelp="$badhelp $b:leaks-comment-marker" ;;
+    "$b"*)  : ;;
+    *)      badhelp="$badhelp $b:does-not-name-itself" ;;
+  esac
+done
+is "every script has usable --help" "${badhelp:-none}" "none"
+
+# -h must be the same thing. A short flag that silently does something else is
+# worse than one that does not exist.
+shorthelp=""
+for f in "$KIT"/bin/canon-* "$KIT"/install.sh; do
+  [ "$("$f" -h 2>&1)" = "$("$f" --help 2>&1)" ] || shorthelp="$shorthelp $(basename "$f")"
+done
+is "-h matches --help" "${shorthelp:-none}" "none"
+
 # bash 3.2 compatibility — stock macOS ships 3.2.57
 if grep -qnE 'declare -A|mapfile|readarray|\$\{[a-zA-Z_]+,,\}|globstar' \
      "$KIT"/bin/canon-* "$KIT"/install.sh 2>/dev/null; then

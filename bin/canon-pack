@@ -29,7 +29,10 @@
 set -euo pipefail
 
 CANON_VERSION="0.2.0"
-case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+case "${1:-}" in
+  --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;;
+  -h|--help)    sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//'; exit 0 ;;
+esac
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKS="$KIT_DIR/templates/packs"
@@ -45,7 +48,7 @@ PACKS="$KIT_DIR/templates/packs"
   exit 2
 }
 
-usage() { sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//' | sed 's/^# \{0,1\}//'; }
 
 # Resolve the vault the same way every other bin does, so a bare command works.
 resolve_vault() {

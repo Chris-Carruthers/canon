@@ -37,7 +37,10 @@
 set -euo pipefail
 
 CANON_VERSION="0.2.0"
-case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+case "${1:-}" in
+  --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;;
+  -h|--help)    sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//'; exit 0 ;;
+esac
 
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,7 +67,7 @@ while [ $# -gt 0 ]; do
     --no-cline) WANT_CLINE=0; shift ;;
     --claude-only) WANT_GEMINI=0; WANT_COPILOT=0; WANT_WINDSURF=0; WANT_CLINE=0; shift ;;
     --design) WANT_DESIGN=1; shift ;;
-    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//'; exit 0 ;;
     *) TARGET="$1"; shift ;;
   esac
 done

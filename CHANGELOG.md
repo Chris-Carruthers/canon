@@ -8,6 +8,23 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **`--help` works on every script, and is asserted.** Five of the twelve bins took
+  the flag as a positional argument: `canon-init-vault --help` got as far as
+  `mkdir --help` and printed `mkdir: illegal option -- -`, which reads as a crash
+  rather than a usage error; `canon-scan` and `canon-install-vault-hooks` failed
+  with "not a directory" / "not a git repo"; `canon-guard` printed nothing and
+  exited 0; `canon-path` ignored the flag and printed the vault path.
+
+  All thirteen entry points now share one idiom, extending the `--version` case
+  that was already uniform. Help renders the file's own header comment with the
+  `#` markers stripped, so it terminates wherever the header does instead of at a
+  hardcoded line number — the seven scripts that did have `-h` used
+  `sed -n '2,NNp'`, which silently truncates the moment somebody adds a paragraph.
+
+  CI asserts what a reader actually needs: exit 0, non-empty, no leaked comment
+  marker, first line names the script, and `-h` is byte-identical to `--help`.
+  Nothing tested `--help` before; only `--version` was covered.
+
 - **Template packs, and `canon-pack`** — optional note templates, asked for rather than
   installed.
 
