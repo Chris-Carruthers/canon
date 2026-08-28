@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-305%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-362%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -300,6 +300,9 @@ flowchart LR
 | **`canon-verify`** | Records that a human read a note and stands behind it |
 | **`canon-test-audit`** | Is it tested, and does the check that says so actually run? Reads the report your suite wrote; never runs your tests |
 | **`canon-design-audit`** | Does the code match the design canon? Derives violations and coverage every run; never compares token values |
+| **…`--export`** | The whole canon as JSON, values read from the code at call time — so an agent reads one document instead of re-parsing the vault |
+| **…`--view`** | The same thing as markdown for people: every token with its value and a colour chip, what resolves, and which names two vocabularies both claim |
+| **`DESIGN.md`** | Per-repo pointer file (`install.sh --design`) telling a design tool which vocabulary this repo uses, so it doesn't invent one |
 | **Chat connectors** | Ask the canon questions from **Slack** or **Discord**; read-only, cites its sources |
 | **MCP server** | Exposes the vault to **any MCP client** — Claude Desktop, Cursor, VS Code. One connector, not one per editor |
 
@@ -402,7 +405,8 @@ conventional filename, all generated from one template so they cannot disagree:
 | Cline | `.clinerules/knowledge-vault.md` |
 
 All on by default; opt out with `--no-gemini`, `--no-copilot`, `--no-windsurf`,
-`--no-cline`, or `--claude-only`. `--uninstall` removes every one of them **without
+`--no-cline`, or `--claude-only`. `--design` is the one that is *off* by default —
+see [the design canon](#the-design-canon-names-and-pointers-never-values). `--uninstall` removes every one of them **without
 needing the same flags you installed with**, and deletes files it created outright
 rather than leaving empty ones behind.
 
@@ -428,6 +432,7 @@ cd ~/team-vault && ./.canon/bootstrap.sh && cd -
 # 3. Wire up the folder you work in. Pick ONE — see "Two ways to set it up".
 ./install.sh ~/team-vault            # a. no code repo: the vault IS your workspace
 ./install.sh /path/to/your/repo      # b. a code repo — safe if it already has a CLAUDE.md
+./install.sh /path/to/ui/repo --design   # ...and it has UI: also write a DESIGN.md
 
 # 4. Confirm it resolves
 ~/team-vault/.claude/hooks/canon-path           # prints the vault path
@@ -769,23 +774,73 @@ never `TODO`.** Absence is the signal, and coverage is derived from it. `status:
 absent` is a legitimate row: *"there is no shared `PageHeader`"* stops an agent
 hunting for one and stops it silently inventing a fourth.
 
+### What you are allowed to build UI *with*
+
+A third block, `design-tools`, records the tools approved for making or fixing UI.
+It exists because the other two blocks answer *what exists* and leave *what do I
+build one with* to whoever is guessing that day.
+
+Any tool whose `roles:` write UI must name the vocabularies it targets, and the
+audit checks each one exists. That rule is the whole point: **a generator given no
+target vocabulary does not abstain from choosing one — it invents one**, and you
+find out months later when a fifth `--primary` appears in a diff that looked fine.
+Which vocabulary applies in a given repo needs no key, because every vocabulary's
+`source` is repo-prefixed: the one whose source lives in the repo you are editing is
+the one to use.
+
+`install.sh --design` writes the `DESIGN.md` that tells a tool which that is. It is
+off by default — a stray `CLAUDE.md` costs nothing, but a stray `DESIGN.md` in a
+repo with no UI points a design tool at an unrelated vocabulary. Once you fill in
+the slug it is your file: never overwritten, and left in place by `--uninstall`.
+
+Rows also carry `status: approved | trial | rejected`. A **rejected** row is the
+useful one — it says somebody evaluated this and said no, where silence says nobody
+has looked. Full contract and two worked entries:
+**[`docs/DESIGN-TOOLS.md`](docs/DESIGN-TOOLS.md)**.
+
+### Reading the canon back out
+
+The blocks are easy to write and were, for a while, hard to read. Two flags fix
+that, and both derive everything on the spot:
+
+**`--export`** prints the canon as JSON — every token name with the value read out
+of the repo *at call time*, which rungs each component resolves to, the registered
+tools with their targets joined per repo, and the names more than one vocabulary
+claims. An agent reads one document instead of re-implementing the subtree walk and
+the fence parsing. Where a repo was not scanned, values come back `unverifiable`
+rather than absent: unscanned is unknown, not empty.
+
+**`--view`** writes the same model to `Outputs/<date> — Design System View.md`.
+Plain markdown, so an agent can grep it and a person can read it in Obsidian, with a
+colour chip beside every value. Colours are emitted as the CSS function their
+declared format implies and left for the renderer to resolve — the same reason the
+audit never compares two values itself.
+
+The section people actually open it for is **the tokens more than one vocabulary
+declares**, flagged where they also differ in colour space. That is where "I assumed
+they matched" starts, and before this it could only be asserted in prose.
+
+Values appear in both outputs and are still not stored: each is dated, derived and
+regenerated, exactly like the audit report. Do not hand-edit either — change the
+canon or change the code and re-run.
+
 ### `canon-design-audit`
 
 ```
 $ canon-design-audit ~/code/web-app
 canon-design-audit 0.2.0
-  scanned 412 file(s) in 1 repo(s)
-  canon: 2 vocabular(ies), 18 component(s)
+  scanned 695 file(s) in 1 repo(s)
+  canon: 3 vocabular(ies), 12 component(s)
 
-  VIOLATION DS-PALETTE-UTILITY     1240
+  VIOLATION DS-PALETTE-UTILITY     1204
               web-app/src/Page.tsx:31  bg-blue-500
-              … and 1239 more
-  VIOLATION DS-COLOR-LITERAL       86
-  GAP       DS-FORMAT-SPLIT        3
-              --primary  declared in core-tokens, legacy-tokens across
+              … and 1199 more
+  VIOLATION DS-COLOR-LITERAL       88
+  GAP       DS-FORMAT-SPLIT        4
+              --primary  declared in web-app, design-system, mobile across
                          formats hsl-triplet, oklch
 
-  coverage: image 4/18 · figma 9/18 · impl 15/18 · absent 3
+  coverage: image 0/12 · figma 3/12 · impl 9/12 · absent 2
 ```
 
 *Illustrative figures from a made-up repo.* Your first run against an existing

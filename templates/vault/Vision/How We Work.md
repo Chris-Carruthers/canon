@@ -99,10 +99,21 @@ an exported image under `Attachments/Design/` (cheapest — no network, no auth)
 Figma `{ file, node }`, then `impl: repo/path`. Omit a key you do not have rather
 than writing `TODO` — absence is the signal, and coverage is *derived* from it.
 
-Unlike the spec blocks above, these two **do** ship with a validator:
+Unlike the spec blocks above, these **do** ship with a validator:
 `canon-design-audit` parses them, and its key list is frozen against the template.
 It also scans the code repos and reports what has drifted. It measures; it does not
 enforce. Enforcement is CODEOWNERS on the token files plus branch protection.
+
+**Where new designs come from** is the third block, `design-tools`: what is approved
+for making or fixing UI, and — for anything that writes UI — which vocabulary it
+must target. That key is required because a generator given no target does not
+abstain from choosing one, it invents one, and the extra `--primary` surfaces months
+later in a diff that looked fine. Whatever the tool produces comes back the same way
+everything else does: **names in the vault, values in the repo**, with names landing
+as `status: proposed` rows. Generated markup is a structural draft and does not get
+pasted into a repo as-is. An empty block is a fine answer — it says nobody has
+agreed on a tool yet, which stops an agent adopting one on your behalf. Details and
+worked entries: `docs/DESIGN-TOOLS.md`.
 
 ## The testing canon
 

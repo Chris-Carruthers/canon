@@ -858,6 +858,7 @@ is "ships a Design System template"    "$([ -f "$DSY" ] && echo y)" "y"
 is "ships a Design Component template" "$([ -f "$DCO" ] && echo y)" "y"
 has "declares the design-tokens fence"     "$(cat "$DSY")" '```design-tokens'
 has "declares the design-components fence" "$(cat "$DSY")" '```design-components'
+has "declares the design-tools fence"      "$(cat "$DSY")" '```design-tools'
 has "marks the contract frozen"            "$(cat "$DSY")" "FROZEN"
 
 # The component note's frontmatter IS one block row. If they drift, promoting a
@@ -869,6 +870,22 @@ done
 is "component frontmatter carries the row keys" "${missing_keys:-none}" "none"
 has "component template uses dash-form node ids" "$(cat "$DCO")" "dash-form-node-id"
 
+# DESIGN.md is what makes a design tool target this repo's vocabulary instead of
+# inventing one. It shipped as a template nothing installed.
+is "does NOT write DESIGN.md by default" "$([ -e "$R2/DESIGN.md" ] && echo y || echo n)" "n"
+RD="$SB/designrepo"; mkdir -p "$RD"; git -C "$RD" init -q 2>/dev/null
+"$KIT/install.sh" "$RD" --vault "$V8" --design >/dev/null 2>&1
+is "--design writes one"          "$([ -f "$RD/DESIGN.md" ] && echo y)" "y"
+has "naming the vocabulary slot"  "$(cat "$RD/DESIGN.md")" "vocabulary-slug"
+has "and pointing at the canon"   "$(cat "$RD/DESIGN.md")" "Reference/Design/"
+# It becomes the user's content the moment they fill it in, so it is never
+# clobbered and never removed.
+printf 'MINE\n' > "$RD/DESIGN.md"
+"$KIT/install.sh" "$RD" --vault "$V8" --design >/dev/null 2>&1
+is "never overwrites an edited DESIGN.md" "$(cat "$RD/DESIGN.md")" "MINE"
+"$KIT/install.sh" "$RD" --uninstall >/dev/null 2>&1
+is "--uninstall leaves it in place"       "$(cat "$RD/DESIGN.md")" "MINE"
+
 # The whole reason the canon can live in a vault: names, never values.
 has "system template forbids token values" "$(cat "$DSY")" "Names in the vault"
 missing_rules=""
@@ -877,6 +894,25 @@ for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vau
     || missing_rules="$missing_rules $(basename "$f")"
 done
 is "BOTH rules files ban token values" "${missing_rules:-none}" "none"
+
+# Same discipline for the tools instruction. Six files carry a version of "read the
+# design-tools block and target the vocabulary it names", and install.sh's own
+# comment says six hand-maintained copies of an instruction is six chances to
+# disagree, silently. Until they are generated from one source, assert they agree
+# on the load-bearing words.
+missing_tools=""
+for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
+  LC_ALL=C grep -q "design-tools" "$f" 2>/dev/null \
+    || missing_tools="$missing_tools $(basename "$f"):block"
+  LC_ALL=C grep -q "vocabulary" "$f" 2>/dev/null \
+    || missing_tools="$missing_tools $(basename "$f"):vocab"
+done
+is "BOTH rules files name the design-tools block and the vocabulary rule" \
+  "${missing_tools:-none}" "none"
+# The generated runtime files inherit it from agent-instructions.md, so if the
+# template loses the instruction every one of the seven loses it at once.
+has "the generated instruction template carries it too" \
+  "$(cat "$KIT/templates/repo/agent-instructions.md")" "design-tools"
 
 # Router must advertise it, and must still fit the budget it advertises.
 has "router routes Reference/Design"  "$(cat "$V8/Vision/Agent Router.md")" "Reference/Design/"
@@ -1238,6 +1274,344 @@ TJ="$("$TA" --vault "$TR/vault" --json "$TR/api" 2>/dev/null)"
 is "a row for an unscanned repo is not called broken" "$(Q=count R=TEST-REPORT-MISSING tpick)" "0"
 
 "$TA" >/dev/null 2>&1; is "refuses to run with no repo" "$?" "2"
+section "design tools registry"
+# The registry answers "what do I use to MAKE one", which the token and component
+# blocks do not. Its own fixture vault, not V8's: these assertions turn on exact
+# counts, and sharing a vault with the section above would couple them.
+#
+# The rule that carries the weight is `vocabulary` being mandatory for a tool that
+# writes UI. A generator with no named target does not abstain from choosing — it
+# invents a vocabulary, and you meet the extra --primary months later, in a diff
+# that looked fine.
+V9="$SB/vault9"; "$KIT/bin/canon-init-vault" "$V9" >/dev/null 2>&1
+RT="$SB/toolrepo"; mkdir -p "$RT/src/styles"
+printf ':root {\n  --primary: 222 47%% 11%%;\n}\n' > "$RT/src/styles/tokens.css"
+mkdir -p "$V9/Reference/Design"
+
+# A vault that registers NO tools must behave exactly as one built without the
+# feature. An unused registry should be invisible, not a row of zeroes.
+cat > "$V9/Reference/Design/canon.md" <<'CANON'
+```design-tokens
+- vocabulary: demo
+  source: toolrepo/src/styles/tokens.css
+  format: hsl-triplet
+  names: [--primary]
+  status: canonical
+```
+CANON
+TJ="$("$DA" --vault "$V9" --json "$RT" 2>/dev/null)"
+tpick() { printf '%s' "$TJ" | python3 -c "
+import json,os,sys
+d=json.load(sys.stdin); q=os.environ['Q']
+if q=='count': print(d['counts'].get(os.environ['R'],0))
+elif q=='details': print(' | '.join(x['detail'] for x in d['findings'] if x['rule']==os.environ['R']))
+elif q=='sev': print(d['severity'].get(os.environ['R'],''))
+elif q=='haskey': print('y' if os.environ['R'] in d else 'n')
+elif q=='tools': print(d.get('tools',{}).get(os.environ['R'],''))
+" 2>/dev/null; }
+is "omits the tools key when none are registered" "$(Q=haskey R=tools tpick)" "n"
+
+# A well-formed row: parses silently and is counted.
+cat >> "$V9/Reference/Design/canon.md" <<'CANON'
+
+```design-tools
+- slug: stitch
+  name: Google Stitch
+  kind: vendor
+  roles: [generator]
+  emits: [design-md, html-css]
+  ingest: proposed
+  vocabulary: demo
+  checked: 2026-08-01
+  hazard: "cannot hold a brand; re-state hex every time"
+- slug: impeccable
+  name: impeccable
+  kind: skill
+  roles: [critic]
+  version: "3.9.1"
+  checked: 2026-08-01
+```
+CANON
+TJ="$("$DA" --vault "$V9" --json "$RT" 2>/dev/null)"
+is "accepts a well-formed registry"      "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+is "counts registered tools"             "$(Q=tools R=registered tpick)" "2"
+is "counts only the ones that write UI"  "$(Q=tools R=writing tpick)" "1"
+is "a critic-only tool needs no vocabulary" "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+
+# Each malformed case on its own run: overlapping fixtures make a count assertion
+# prove nothing about which rule actually fired.
+tools_only() { printf '```design-tools\n%s\n```\n' "$1" > "$V9/Reference/Design/tools.md"
+  TJ="$("$DA" --vault "$V9" --json "$RT" 2>/dev/null)"; }
+
+tools_only "- slug: t1
+  name: T1
+  kind: vendor
+  roles: [generator]
+  vocabulary: demo
+  checked: 2026-08-01
+  bogus-key: x"
+is "rejects an unknown key" "$(Q=count R=DS-BLOCK-MALFORMED tpick)" "1"
+
+tools_only "- slug: t2
+  name: T2
+  kind: teleporter
+  roles: [critic]
+  checked: 2026-08-01"
+has "rejects an unknown kind" "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown kind"
+
+tools_only "- slug: t3
+  name: T3
+  kind: skill
+  roles: [critic, soothsayer]
+  checked: 2026-08-01"
+has "rejects an unknown role" "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown role"
+
+tools_only "- slug: t4
+  name: T4
+  kind: vendor
+  roles: [generator]
+  vocabulary: demo"
+has "requires checked — a claim needs a date" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "checked is required"
+
+tools_only "- slug: t5
+  name: T5
+  kind: vendor
+  roles: [generator]
+  checked: 2026-08-01"
+has "requires a vocabulary when the tool writes UI" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "vocabulary is required"
+
+tools_only "- slug: t6
+  name: T6
+  kind: vendor
+  roles: [implementer]
+  vocabulary: nosuchvocab
+  checked: 2026-08-01"
+has "rejects a vocabulary no design-tokens block declares" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "not declared in any design-tokens block"
+
+# vocabulary is a LIST: one tool run across three repos targets three vocabularies,
+# and a single value would force either a lie or three near-duplicate rows.
+tools_only "- slug: t6b
+  name: T6b
+  kind: skill
+  roles: [implementer]
+  vocabulary: [demo, alsodemo]
+  checked: 2026-08-01"
+is "accepts a list of vocabularies" \
+  "$(Q=count R=DS-TOOL-MALFORMED tpick)" "1"
+has "and names only the one that does not exist" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "'alsodemo'"
+tools_only "- slug: t6c
+  name: T6c
+  kind: skill
+  roles: [implementer]
+  vocabulary: demo
+  checked: 2026-08-01"
+is "a bare slug still reads as a one-item list" \
+  "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+
+tools_only "- slug: t7
+  name: T7
+  kind: skill
+  roles: [critic]
+  checked: last Tuesday"
+has "rejects a checked date that is not YYYY-MM-DD" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "not a YYYY-MM-DD date"
+
+tools_only "- slug: t8
+  name: T8
+  kind: skill
+  roles: [critic]
+  checked: TODO"
+is "refuses TODO in checked" "$(Q=count R=DS-BLOCK-MALFORMED tpick)" "1"
+tools_only "- slug: t8b
+  name: T8b
+  kind: skill
+  roles: [critic]
+  emits: TBD
+  version: TODO
+  checked: 2026-08-01"
+is "refuses a placeholder in emits or version" \
+  "$(Q=count R=DS-BLOCK-MALFORMED tpick)" "2"
+
+# Where a tool writes values is DERIVED from the vocabulary's own source, not
+# declared on the tool. An earlier draft had a values-to key that was a verbatim
+# copy of one vocabulary's source, which is how it ended up single-valued for a
+# tool used across three repos.
+tools_only "- slug: t9
+  name: T9
+  kind: vendor
+  roles: [generator]
+  vocabulary: demo
+  values-to: toolrepo/src/styles/nope.css
+  checked: 2026-08-01"
+has "refuses a hand-declared values-to" \
+  "$(Q=details R=DS-BLOCK-MALFORMED tpick)" "values-to"
+
+# A tool you evaluated and turned down is a row worth keeping, and it needs no
+# target — recording the rejection is the whole point.
+tools_only "- slug: t9b
+  name: Rejected Thing
+  kind: vendor
+  roles: [generator]
+  status: rejected
+  owner: A Person
+  checked: 2026-08-01"
+is "a rejected tool needs no vocabulary" "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+tools_only "- slug: t9c
+  name: T9c
+  kind: vendor
+  roles: [critic]
+  status: mulling-it-over
+  checked: 2026-08-01"
+has "rejects an unknown status" "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown status"
+
+# A future date is not a check that happened.
+tools_only "- slug: t9d
+  name: T9d
+  kind: vendor
+  roles: [critic]
+  checked: 2099-01-01"
+has "refuses a checked date in the future" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "in the future"
+
+# Duplicates were reported and then silently overwritten, so every later check ran
+# against the second row only and the first row's defects vanished.
+tools_only "- slug: dup
+  name: First
+  kind: teleporter
+  roles: [critic]
+  checked: 2026-01-01
+- slug: dup
+  name: Second
+  kind: vendor
+  roles: [critic]
+  checked: 2026-01-01"
+has "still checks the first of two duplicate rows" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "unknown kind"
+
+# Staleness is a GAP on purpose. A rule that can fail a build through the mere
+# passage of time is a rule someone switches off, so an unchecked claim decays
+# into a visible absence rather than a broken pipeline.
+tools_only "- slug: t10
+  name: T10
+  kind: vendor
+  roles: [critic]
+  checked: 2001-01-01"
+is  "flags a stale tool claim"            "$(Q=count R=DS-TOOL-STALE tpick)" "1"
+is  "as a GAP, never a violation"         "$(Q=sev R=DS-TOOL-STALE tpick)" "GAP"
+has "and says how long ago it was checked" "$(Q=details R=DS-TOOL-STALE tpick)" "2001-01-01"
+"$DA" --vault "$V9" --strict "$RT" >/dev/null 2>&1
+is "a stale claim cannot fail --strict" "$?" "0"
+
+# THE COPY-PASTE TEST. The frozen contract in the template is annotated, and the
+# obvious way to author a row is to copy it. Before comments were stripped, doing
+# exactly that produced four malformed findings AND silently left `roles:`
+# unparsed, which turned the vocabulary rule off — the Product Spec scar, again.
+tools_only "- slug: my-tool                       # required, unique
+  name: My Tool                       # required
+  kind: vendor                        # vendor | skill | script
+  roles: [generator]                  # generator | critic | implementer
+  vocabulary: [demo]                  # required for generator / implementer
+  checked: 2026-08-01                # required — capability rots"
+is "accepts the annotated contract block, copied verbatim" \
+  "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+# 2, not 1: canon.md in this fixture already registers a generator alongside a
+# critic, so the copied row is the second writing tool. The number is the point —
+# before the fix `roles:` came back empty and this was 1.
+is "and still parses roles through the comments" "$(Q=tools R=writing tpick)" "2"
+
+# A `#` is only a comment when whitespace follows, so real values survive.
+tools_only "- slug: hexy
+  name: Hexy
+  kind: vendor
+  roles: [generator]
+  vocabulary: [demo]
+  hazard: \"defaults to #ffffff, see #123\"
+  checked: 2026-08-01"
+is "does not eat a hex value or an issue reference" \
+  "$(Q=count R=DS-TOOL-MALFORMED tpick)" "0"
+
+# rule 10 must not be disableable by omitting a key. Rule 1 ("omit a key you do
+# not have") actively taught authors that leaving roles out was fine.
+tools_only "- slug: rogue
+  name: Rogue Generator
+  kind: vendor
+  checked: 2026-08-01"
+has "requires roles, so the vocabulary rule cannot be switched off" \
+  "$(Q=details R=DS-TOOL-MALFORMED tpick)" "roles is required"
+
+rm -f "$V9/Reference/Design/tools.md"
+
+# ---------------------------------------------------------------------------
+section "canon as one document"
+# Two audiences were each re-deriving the canon: a human by opening several notes
+# and then a CSS file, an agent by reimplementing the subtree glob and the fence
+# regexes. --export and --view are that work done once.
+EJ="$("$DA" --vault "$V9" --export "$RT" 2>/dev/null)"
+epick() { printf '%s' "$EJ" | python3 -c "
+import json,os,sys
+d=json.load(sys.stdin); c=d.get('canon',{}); q=os.environ['Q']
+if q=='vocabs': print(len(c.get('vocabularies',[])))
+elif q=='tools': print(len(c.get('tools',[])))
+elif q=='val': print([t['value'] for v in c['vocabularies'] for t in v['tokens'] if t['name']==os.environ['R']][0])
+elif q=='vstatus': print(c['vocabularies'][0]['values_status'])
+elif q=='haskey': print('y' if os.environ['R'] in d else 'n')
+" 2>/dev/null; }
+is "exports the canon itself, not findings" "$(Q=haskey R=canon epick)" "y"
+isnt "and not the findings list"            "$(Q=haskey R=findings epick)" "y"
+is "exports every vocabulary"              "$(Q=vocabs epick)" "1"
+is "exports registered tools"              "$(Q=tools epick)" "2"
+# The point of the export: an agent gets the VALUE without reading the CSS itself.
+is "resolves the value from the repo"      "$(Q=val R=--primary epick)" "222 47% 11%"
+is "and records that it read it"           "$(Q=vstatus epick)" "read"
+
+# An unscanned repo is unknown, not empty — the same distinction the pointer checks
+# make. Exporting a null value for a repo nobody scanned would read as "no value".
+EJ="$("$DA" --vault "$V9" --export "$SB/nonexistent-elsewhere" 2>/dev/null)"
+is "marks values unverifiable when the repo was not scanned" "$(Q=vstatus epick)" "unverifiable"
+
+# The view is one markdown file both audiences read: plain text so an agent greps
+# it, tables so a human reads it in Obsidian.
+"$DA" --vault "$V9" --view --quiet "$RT" >/dev/null 2>&1
+VW="$(find "$V9/Outputs" -name '*Design System View*' | head -1)"
+is  "writes exactly one dated view" "$(find "$V9/Outputs" -name '*Design System View*' | wc -l | tr -d ' ')" "1"
+has "stamps it as a process"        "$(cat "$VW")" "process:canon-design-audit"
+has "tells the reader not to hand-edit" "$(cat "$VW")" "Do not hand-edit"
+has "lists the approved tools"      "$(cat "$VW")" "What to build UI with"
+has "shows a resolved value"        "$(cat "$VW")" "222 47% 11%"
+has "renders a browser-resolvable swatch" "$(cat "$VW")" "background:hsl(222 47% 11%)"
+# With one vocabulary nothing can collide, so the section must NOT appear. A
+# collision table listing nothing reads as "checked and fine" on a canon that has
+# not been checked.
+isnt "omits the collision table when nothing collides" \
+  "$(cat "$VW")" "owned by more than one vocabulary"
+
+# Now give it a second vocabulary that shares a name in a different colour space —
+# the actual condition this whole canon exists to make visible.
+cat >> "$V9/Reference/Design/canon.md" <<'CANON2'
+
+```design-tokens
+- vocabulary: rival
+  source: toolrepo/src/styles/tokens.css
+  format: oklch
+  names: [--primary]
+  status: divergent
+```
+CANON2
+rm -f "$V9/Outputs"/*"Design System View"*
+"$DA" --vault "$V9" --view --quiet "$RT" >/dev/null 2>&1
+VW="$(find "$V9/Outputs" -name '*Design System View*' | head -1)"
+has "surfaces a name two vocabularies both own" \
+  "$(cat "$VW")" "owned by more than one vocabulary"
+has "and flags the colour-space split"  "$(cat "$VW")" "hsl-triplet, oklch"
+is  "stores no score"               "$(LC_ALL=C grep -cE '^(compliance_score|design_coverage|score):' "$VW" | tr -d ' ')" "0"
+# The quotes in `hazard: "..."` are syntax that keeps a colon from splitting the
+# record; rendering them looks like a typo.
+isnt "strips the quotes from a quoted value" "$(cat "$VW")" '| "cannot'
+
 
 # ---------------------------------------------------------------------------
 section "concurrent writers"

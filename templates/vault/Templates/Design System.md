@@ -13,6 +13,7 @@ Companion detail notes, one hop away, each under 500 lines:
   Reference/Design/<Name> — Token Vocabularies.md    the design-tokens block
   Reference/Design/<Name> — Component Index.md       the design-components block
   Reference/Design/<Name> — Design Assets.md         Figma register, image convention
+  Reference/Design/<Name> — Tooling.md               the design-tools block
 
 WHY THIS SHAPE. A design system is mostly code, and code stays out of the vault.
 So this note holds the part that is NOT code: what the system is for, who owns it,
@@ -91,6 +92,26 @@ Three pointers an agent needs, and nothing else:
 
 "None — see the Open Question" is a valid answer for any of the three.
 
+## Design tools
+
+What is approved for *making* or *fixing* UI here, and which vocabulary each one
+must target. Summary only; the full `design-tools` block lives in the companion
+note.
+
+| Tool | Kind | Roles | Status | Targets | Checked |
+|---|---|---|---|---|---|
+| `<slug>` | vendor | generator | approved | `<vocabulary-slug>` | YYYY-MM-DD |
+
+An empty table is a valid and useful answer — it says nobody has agreed on a tool
+yet, which stops an agent adopting one on your behalf.
+
+**Ingest is one-way.** A generated or refactored design enters as *names in the
+vault, values in the repo*: token names become a `design-tokens` row with
+`status: proposed`, values land in the repo's tokens file, screens become
+`Attachments/Design/` images. Generated markup does **not** enter a repo as-is —
+it is a structural draft, and pasting it is how a codebase acquires thousands of
+hardcoded colour utilities.
+
 ## Token vocabularies
 
 Summary only; the full `design-tokens` block lives in the companion note.
@@ -99,7 +120,8 @@ Summary only; the full `design-tokens` block lives in the companion note.
 |---|---|---|---|
 | `<slug>` | `repo/path` | hsl-triplet | canonical |
 
-`status` is one of `canonical`, `transcribed-copy`, `divergent`, `prototype`.
+`status` is one of `canonical`, `transcribed-copy`, `divergent`, `prototype`,
+`proposed` (imported from a tool, not yet accepted).
 If nothing is `canonical`, say so here — that is the single most useful fact in
 the note.
 
@@ -145,7 +167,7 @@ One level deep. Do not build a link ladder.
 ================================================================================
 BLOCK CONTRACTS — FROZEN. Must match bin/canon-design-audit exactly.
 ================================================================================
-These two fenced blocks are the machine-readable half of the canon. They live in
+These three fenced blocks are the machine-readable half of the canon. They live in
 the companion detail notes, not here, because they outgrow an index note's 200
 lines. canon-design-audit GLOBS the Reference/Design/ subtree for them rather
 than reading a fixed filename, so a block can move to a sibling note freely.
@@ -165,7 +187,7 @@ from the template failed the check.
   scope: ":root"                      # the selector the declarations sit on
   catalog: repo/path/to/palette.md    # optional human-readable catalog
   names: [--background, --foreground] # the token NAMES. never values.
-  status: canonical                   # canonical | transcribed-copy | divergent | prototype
+  status: canonical                   # canonical | transcribed-copy | divergent | prototype | proposed
   of: <vocabulary-slug>               # required when status is transcribed-copy
 ```
 
@@ -181,7 +203,23 @@ from the template failed the check.
   note: "[[Component — <Name>]]"      # only if a per-component note exists
 ```
 
-SEVEN RULES. Each one exists because it is the thing that gets got wrong.
+```design-tools
+- slug: <kebab-slug>                  # required, unique
+  name: <Display Name>                # required
+  kind: vendor                        # vendor | skill | script
+  roles: [generator]                  # REQUIRED. generator | critic | implementer | design-source | style-guide
+  vocabulary: [<slug>, <slug>]        # a LIST. required unless status is rejected
+  status: approved                    # approved | trial | rejected
+  owner: <name>                       # who approved it, and who un-approves it
+  emits: [design-md, html-css]        # what you get out of it
+  ingest: proposed                    # status the rows imported from it carry
+  version: "1.2.3"                    # optional — for a pinned skill or script
+  checked: YYYY-MM-DD                 # required — capability rots
+  hazard: "one short phrase"          # optional — the single trap
+  note: "[[Design System — Tooling]]" # only if a prose note exists
+```
+
+TEN RULES. Each one exists because it is the thing that gets got wrong.
 
 1. OMIT A KEY YOU DO NOT HAVE. Never TODO, TBD, ?, or an empty value. Absence is
    the machine-readable signal, and coverage is DERIVED from it. A row full of
@@ -207,9 +245,46 @@ SEVEN RULES. Each one exists because it is the thing that gets got wrong.
 6. `status: absent` IS A LEGITIMATE, HIGH-VALUE ROW. A row saying there is no
    shared PageHeader stops an agent hunting for one AND stops it silently
    inventing a fourth one. Absence recorded is cheaper than absence rediscovered.
+   The tool block applies the same idea with `status: rejected`: "we looked at this
+   and said no" is worth more than silence, which reads as "nobody has looked".
 
 7. One image per component per theme, PNG, under 200 KB. Do not gitignore
    Attachments/ — a path that silently cannot resolve is worse than a declared
    absence, because the tool can report an absence.
+
+8. A design-tools ROW CARRIES NO PATH AND NO URL AT ALL. No URL — same reasoning
+   as rule 3, and a vendor URL is rename-fragile the moment the product is renamed.
+   No install path — a skill sits at a different absolute path on every machine.
+   And no destination path either: where a tool writes values is DERIVED from the
+   `source` of each vocabulary it targets, because that is where those values
+   already live. An earlier draft had a `values-to` key and it was a verbatim copy
+   of one vocabulary's `source`, which is exactly how it ended up single-valued for
+   a tool used across three repos. Derive it; do not restate it.
+
+9. `checked:` IS REQUIRED, AND IT IS A DATE SOMEBODY CHECKED. Third-party capability
+   rots faster than anything else in this canon — features ship, limits change,
+   export paths break. A capability claim with no date is one somebody acts on a
+   year after it stopped being true. canon-design-audit reports a stale row as a
+   GAP, so an unchecked claim decays into a visible absence instead of a lie.
+
+10. `vocabulary:` IS REQUIRED WHEN roles CONTAINS generator OR implementer, and
+   every slug in it must exist in the design-tokens block. A tool that writes UI
+   without a named target does not decline to pick one — it invents one, and you
+   find out when the fifth `--primary` appears. This is rule 5's enforcement arm:
+   the tool is told which names to use, and reads the values from the repo itself.
+
+   It is a LIST because one tool legitimately serves several surfaces: a code-
+   editing skill run across three repos targets three vocabularies, and a single
+   value would force either a lie or three near-duplicate rows. A single unbracketed
+   slug is still accepted and reads as a one-item list.
+
+   WHICH ONE APPLIES IN A GIVEN REPO NEEDS NO KEY. Every vocabulary's `source` is
+   repo-prefixed, so the vocabulary whose source lives in the repo you are editing
+   IS the one to target. "Vocabulary X for surface Y" is therefore already fully
+   expressed by the two blocks together, and the tool row only has to say which
+   ones it is allowed near.
+
+   `status: rejected` is exempt: a tool you evaluated and turned down needs no
+   target, and recording the rejection is the point — see rule 6.
 -->
 
