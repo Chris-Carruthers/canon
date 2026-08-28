@@ -659,7 +659,7 @@ missing_cc=""
 for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
   LC_ALL=C grep -q "Cognitive Coverage" "$f" 2>/dev/null || missing_cc="$missing_cc $(basename "$f")"
 done
-is "BOTH rules files mention it" "${missing_cc:-none}" "none"
+is "BOTH rules files mention cognitive coverage" "${missing_cc:-none}" "none"
 
 # It stores a result, against the kit's derived-never-stored rule, so it must say why.
 has "justifies storing the result" "$(cat "$CC")" "cannot be recomputed"
@@ -763,7 +763,7 @@ missing_hv=""
 for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
   LC_ALL=C grep -q "Reference/Writing" "$f" 2>/dev/null || missing_hv="$missing_hv $(basename "$f")"
 done
-is "BOTH rules files mention it" "${missing_hv:-none}" "none"
+is "BOTH rules files mention house voice" "${missing_hv:-none}" "none"
 
 # House Voice is an index note and index notes are read in full.
 HVL="$(wc -l < "$V/Reference/Writing/House Voice.md" | tr -d ' ')"
