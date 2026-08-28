@@ -7,6 +7,7 @@ generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 
 <!--
 Voice: skills/house-voice/references/decision.md — your own map wins: Reference/Writing/House Voice.md
+File as: Decisions/YYYY-MM-DD — <Title>.md
 -->
 
 # Decision: <title>

@@ -6,6 +6,7 @@ spec_revision: 1
 author: "<name>"
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
+generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
 <!--

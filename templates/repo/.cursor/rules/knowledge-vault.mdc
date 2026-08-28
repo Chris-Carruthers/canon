@@ -51,6 +51,11 @@ yourself** — that field means a human confirmed the content and is theirs to a
   place. Check `.canon-owners` in the vault for who owns what.
 - Do not commit or push the vault on someone's behalf unless asked.
 
+Use `Templates/` rather than inventing a shape — a vault may have installed
+optional packs (one-pager, PR-FAQ, RFC, runbook, postmortem, research findings and
+more). Each template header says where the note is filed. An RFC and a Decision are
+both, not either: the RFC argues, the decision note records what it settled.
+
 Before writing a vault document, check how that type should read.
 `Reference/Writing/House Voice.md` maps each document type to a writer worth
 imitating and to the register it must not land in. `Choosing a Document.md` says

@@ -6,6 +6,7 @@ spec_revision: 1
 project: "[[Project Name]]"
 repo: path/to/repo
 updated: YYYY-MM-DD
+generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
 # Handoff: <title>
@@ -16,6 +17,7 @@ updated: YYYY-MM-DD
 
 <!--
 Voice: skills/house-voice/references/handoff.md — your own map wins: Reference/Writing/House Voice.md
+File as: Handoffs/<slug>.handoff.md    Cites its spec: Specs/<slug>.product-spec.md
 The test for this document: someone who has never seen the work reads only this
 and can continue it without asking you anything. If you would have to explain
 something out loud, it belongs here.

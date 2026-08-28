@@ -1,6 +1,6 @@
 {
   "name": "canon",
-  "description": "A shared knowledge vault your team's agents read before work and write to after. Loads the team's context at session start, notices when a session ends without a note, and gates credentials before they reach git history. Includes cognitive-coverage: a graded quiz on what your agent just built. Includes house-voice: which writer each of your documents should read like, and who it must not.",
+  "description": "A shared knowledge vault your team's agents read before work and write to after. Loads the team's context at session start, notices when a session ends without a note, and gates credentials before they reach git history. Ships three skills: cognitive-coverage (a graded quiz on what your agent just built), repo-context (derives how a repo is built, run and tested, from the repo), and house-voice (which writer each of your documents should read like, and who it must not).",
   "version": "0.2.0",
   "author": {
     "name": "Chris Carruthers",

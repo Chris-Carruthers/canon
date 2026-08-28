@@ -21,9 +21,24 @@ into context automatically; if it didn't, resolve the path and read
   where each resolves to a Figma node and an implementation. If you are about to
   run a design tool, read the `design-tools` block first and target the vocabulary
   the row names — a generator left to pick its own invents a new one.
+- `Reference/Writing/` — **before writing any vault document.** `House Voice.md`
+  says how each document type should read and, more usefully, the register it must
+  *not* land in. `Choosing a Document.md` says which document to write at which
+  stage — pick the cheapest one that still works.
+- `Reference/Testing/` — before changing test setup or claiming something is
+  covered. A floor is a ratchet, and `required:` is a human attestation that is
+  never inferred: branch protection is not visible from a checkout.
+- `Reference/Cognitive Coverage/` — whether anyone can actually explain a feature,
+  as dated assessments, newest first. Never overwrite an entry.
 
 Reach vault content **on demand** with glob and grep against the vault path.
 Do not try to load the vault; it is far larger than a context window.
+
+**Use the vault's `Templates/`** rather than inventing a shape. Beyond the core
+set a vault may have installed optional packs — one-pager, PR-FAQ, six-pager,
+pitch, RFC, architecture overview, runbook, postmortem, research findings, design
+critique, content guide. Read the template's header: it says where the note is
+filed and which writer it should read like.
 
 **After meaningful work**, write a dated note to the vault's `Sessions/`:
 goal, what changed with `repo-path:line` references, decisions, open follow-ups —

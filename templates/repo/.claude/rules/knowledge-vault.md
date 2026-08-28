@@ -78,6 +78,13 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
   `required:`; whether a check can block a merge is server-side state that no
   checkout can see, so it is a human attestation. Percentages live in the coverage
   report and in dated `Outputs/` audits, never in the note.
+- **Use `Templates/` rather than inventing a shape.** Beyond the core set a vault
+  may have installed optional packs — the product ladder (one-pager, PR-FAQ,
+  six-pager, pitch), engineering (RFC, architecture overview, runbook, postmortem)
+  or research craft (findings, design critique, content guide). Every template's
+  header says where the note is filed and which reference file governs its voice.
+  An RFC and a Decision are both, not either: the RFC argues and changes under
+  review, the decision note is the immutable record of what it settled.
 - **Before writing a vault document, check how that type should read.**
   `Reference/Writing/House Voice.md` maps each document type to a writer worth
   imitating and, more usefully, to the register it must **not** land in — a Decision
