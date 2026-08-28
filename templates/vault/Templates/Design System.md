@@ -7,6 +7,7 @@ generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
 <!--
+Voice: skills/house-voice/references/design-system.md — your own map wins: Reference/Writing/House Voice.md
 File as: Reference/Design/<Name> — Current State.md
 Companion detail notes, one hop away, each under 500 lines:
   Reference/Design/<Name> — Token Vocabularies.md    the design-tokens block

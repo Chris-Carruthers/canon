@@ -95,3 +95,34 @@ immediately.
 Found a way for the gate to leak a credential into history? Please don't open a
 public issue. Report it privately via GitHub's security advisory form on the
 repository.
+
+## 6. Never paste real output into the docs
+
+Every number, slug and path in an example must be invented. This rule exists
+because it was broken: the `canon-design-audit` sample in the README was a verbatim
+paste of a private vault — real vocabulary slugs, real component count, real
+violation totals — and only the *file path* had been genericised, which is exactly
+what made it look finished. It was public for five days before anyone noticed.
+
+Run a real command to check your work, then **retype the output** with invented
+values. Keep it internally consistent so it still teaches, and say it is
+illustrative.
+
+Before opening a PR, grep the whole kit — not just the file you edited:
+
+```bash
+grep -rniE "<your-org>|<your-repos>|<your-token-prefixes>" \
+  --include='*.md' --include='*.sh' --include='*.json' --include='canon-*' .
+```
+
+## 7. The kit is generic; the vault it manages is not
+
+canon is public and the vaults it manages are private. Anything that describes *a*
+vault belongs in the docs; anything that describes *your* vault belongs in your
+vault. The failure is not usually a secret — it is a slug, a repo name, a headcount
+or a count of violations, any of which tells an outside reader something about a
+private codebase.
+
+Related: never claim something you have verified privately but a reader cannot
+check. "Measured across every repo we pointed it at" is unfalsifiable to them; state
+what the tool does and let them run it.

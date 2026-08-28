@@ -42,7 +42,45 @@ Skip this for trivial questions; use judgment.
 Detailed write conventions load automatically when you touch vault files
 (see `.claude/rules/`).
 
-<!-- Add repo-specific guidance below this line: build commands, architecture,
-     testing, gotchas. Keep this whole file under ~200 lines — it loads in full
-     on every request. Push reference material into skills or .claude/rules/
-     instead of inlining it here. -->
+## This repo
+
+<!-- REAL HEADINGS ON PURPOSE, not a comment. An empty section is VISIBLE: an
+     agent that reads this file sees that nobody has written down how to build
+     this repo, and can say so. The same words hidden in an HTML comment are
+     invisible in every rendered view and get skipped for years.
+
+     Run `/repo-context` to fill this in from the repo itself, or write it by
+     hand. Keep the whole file under ~200 lines — it loads in full on every
+     request. Push reference material into skills or .claude/rules/ instead of
+     inlining it here. -->
+
+**If this section is still empty, fill it in.** You are about to learn most of it
+anyway in order to do the work; writing it down is the difference between learning
+it once and every agent after you re-deriving it. Propose it in your PR — a
+teammate should correct it, not merely inherit it.
+
+### Build and run
+
+<!-- The exact commands, and where they are defined (package.json script, Makefile
+     target, justfile). Cite the file so the next reader can check it hasn't
+     drifted. Include how to run it locally, and the port. -->
+
+### Test
+
+<!-- How to run the suite, how to run ONE test, and how coverage is produced.
+     If this repo is declared in the vault's testing canon
+     (Reference/Testing/), name the suite slug — the floor and the CI gate live
+     there, not here, so they cannot drift out of sync with the audit. -->
+
+### Architecture in three sentences
+
+<!-- Entry point, the one or two boundaries that matter, and where the data lives.
+     Three sentences, not a diagram. If it needs more, it needs a vault note —
+     link that instead. -->
+
+### Gotchas
+
+<!-- The things that cost someone half a day and are not visible from the code:
+     the migration that must be applied by hand, the env var with no default, the
+     test that only passes from the repo root, the service you must start first.
+     This is the highest-value part of this file. Write what surprised you. -->

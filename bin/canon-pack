@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# canon-pack — install optional note templates into a vault, a pack at a time.
+#
+#   canon-pack list [/path/to/vault]
+#   canon-pack add    <pack> [/path/to/vault]
+#   canon-pack remove <pack> [/path/to/vault]
+#
+# WHY PACKS EXIST. canon-init-vault copies every file under templates/vault/ into
+# every vault, which is right for the core set and wrong for everything else. A
+# vault that ships twenty templates so that three teams each find four of them
+# useful has made the folder unreadable for all of them — it is the same failure
+# the design canon warns about, thirty notes for thirty primitives. So the core
+# stays small and the rest is asked for.
+#
+# ADD IS NON-DESTRUCTIVE, exactly like canon-init-vault: an existing file is left
+# alone and reported, never overwritten. Re-running is safe and is how you pick up
+# new templates after upgrading the kit.
+#
+# REMOVE ONLY DELETES WHAT IT SHIPPED. A file is removed only if it is still
+# byte-identical to the template in the kit. The moment somebody has edited it, it
+# is their work and not ours, so it is kept and reported. Without that rule an
+# `add` typo followed by a `remove` would silently destroy a note somebody wrote,
+# which is not a trade any convenience is worth.
+#
+# Voice guidance is NOT packed. The house-voice reference files live in the kit and
+# always ship: a skill costs nothing until it loads, so gating them buys no space
+# and risks a template arriving without the guidance for how to write it.
+
+set -euo pipefail
+
+CANON_VERSION="0.2.0"
+case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
+
+KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PACKS="$KIT_DIR/templates/packs"
+
+# Fail loudly rather than reporting an empty catalogue. The way to reach this is to
+# run a copy of this script that was moved away from the kit — a vendored one, say —
+# and "no packs available" would read as a fact about the kit instead of a broken
+# install.
+[ -d "$PACKS" ] || {
+  echo "canon-pack: no pack directory at $PACKS" >&2
+  echo "  This script must sit in a canon kit checkout, beside templates/packs/." >&2
+  echo "  It is not self-contained and is not vendored into vaults for that reason." >&2
+  exit 2
+}
+
+usage() { sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# Resolve the vault the same way every other bin does, so a bare command works.
+resolve_vault() {
+  if [ -n "${1:-}" ]; then printf '%s' "$1"; return 0; fi
+  HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  R="$HERE/canon-path"; [ -x "$R" ] || R="$(command -v canon-path 2>/dev/null || true)"
+  [ -n "$R" ] && [ -x "$R" ] && "$R" 2>/dev/null || true
+}
+
+pack_dir() {
+  d="$PACKS/$1"
+  [ -d "$d" ] || { echo "canon-pack: no such pack: $1" >&2
+                   echo "  available: $(cd "$PACKS" && ls -1 | tr '\n' ' ')" >&2; exit 2; }
+  printf '%s' "$d"
+}
+
+# The one copy path, shared with canon-init-vault --pack, so both have identical
+# semantics. Reports per file; never overwrites.
+pack_add() {
+  src="$(pack_dir "$1")"; dst="$2"
+  [ -d "$dst" ] || { echo "canon-pack: not a vault: $dst" >&2; exit 2; }
+  added=0; skipped=0
+  while IFS= read -r rel; do
+    s="$src/$rel"; d="$dst/$rel"
+    mkdir -p "$(dirname "$d")"
+    if [ -e "$d" ]; then
+      skipped=$((skipped+1)); printf '  = %s (already there, left alone)\n' "$rel"
+    else
+      cp "$s" "$d"; added=$((added+1)); printf '  + %s\n' "$rel"
+    fi
+  done < <(cd "$src" && find . -type f -name '*.md' ! -name 'pack.md' ! -name '.DS_Store' | sed 's|^\./||' | LC_ALL=C sort)
+  printf '  %d added, %d left alone\n' "$added" "$skipped"
+}
+
+pack_remove() {
+  src="$(pack_dir "$1")"; dst="$2"
+  [ -d "$dst" ] || { echo "canon-pack: not a vault: $dst" >&2; exit 2; }
+  removed=0; kept=0; absent=0
+  while IFS= read -r rel; do
+    s="$src/$rel"; d="$dst/$rel"
+    if [ ! -e "$d" ]; then
+      absent=$((absent+1))
+    elif cmp -s "$s" "$d"; then
+      rm "$d"; removed=$((removed+1)); printf '  - %s\n' "$rel"
+    else
+      kept=$((kept+1)); printf '  ! %s (edited — kept, remove it yourself)\n' "$rel"
+    fi
+  done < <(cd "$src" && find . -type f -name '*.md' ! -name 'pack.md' ! -name '.DS_Store' | sed 's|^\./||' | LC_ALL=C sort)
+  printf '  %d removed, %d kept because you changed them, %d not installed\n' \
+         "$removed" "$kept" "$absent"
+  [ "$kept" -eq 0 ] || echo "  (an edited template is your note, not ours — canon-pack will not delete it)"
+}
+
+pack_list() {
+  vault="${1:-}"
+  for d in "$PACKS"/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    total=0; have=0
+    while IFS= read -r rel; do
+      total=$((total+1))
+      [ -n "$vault" ] && [ -e "$vault/$rel" ] && have=$((have+1))
+    done < <(cd "$d" && find . -type f -name '*.md' ! -name 'pack.md' | sed 's|^\./||')
+    if [ -z "$vault" ]; then state="$total templates"
+    elif [ "$have" -eq 0 ]; then state="$total templates · not installed"
+    elif [ "$have" -eq "$total" ]; then state="$total templates · installed"
+    else state="$have of $total installed"; fi
+    printf '  %-16s %s\n' "$name" "$state"
+    [ -f "$d/pack.md" ] && sed -n 's/^> //p' "$d/pack.md" | head -1 | sed 's/^/                   /'
+  done
+  [ -n "$vault" ] || echo "  (no vault resolved — pass one to see what is installed)"
+}
+
+CMD="${1:-}"; shift || true
+case "$CMD" in
+  list)   V="$(resolve_vault "${1:-}")"; echo "canon-pack: available packs"; pack_list "$V" ;;
+  add)    P="${1:-}"; [ -n "$P" ] || { usage >&2; exit 2; }
+          pack_dir "$P" >/dev/null            # fail on a bad name before announcing anything
+          V="$(resolve_vault "${2:-}")"; [ -n "$V" ] || { echo "canon-pack: no vault" >&2; exit 2; }
+          echo "canon-pack: adding $P to $V"; pack_add "$P" "$V" ;;
+  remove) P="${1:-}"; [ -n "$P" ] || { usage >&2; exit 2; }
+          pack_dir "$P" >/dev/null
+          V="$(resolve_vault "${2:-}")"; [ -n "$V" ] || { echo "canon-pack: no vault" >&2; exit 2; }
+          echo "canon-pack: removing $P from $V"; pack_remove "$P" "$V" ;;
+  ""|-h|--help) usage ;;
+  *)      echo "canon-pack: unknown command: $CMD" >&2; usage >&2; exit 2 ;;
+esac

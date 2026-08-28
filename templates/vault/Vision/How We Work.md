@@ -115,6 +115,77 @@ pasted into a repo as-is. An empty block is a fine answer — it says nobody has
 agreed on a tool yet, which stops an agent adopting one on your behalf. Details and
 worked entries: `docs/DESIGN-TOOLS.md`.
 
+## The testing canon
+
+`Reference/Testing/` is where "is this tested?" gets a written answer. Like the
+design canon it holds **names, pointers and thresholds, never measurements** — the
+percentage lives in the coverage report your suite already writes, and a number
+typed into a note is wrong the next day while still reading as authoritative.
+
+Two rules carry most of the value, and both were learned the expensive way:
+
+- **A floor is a ratchet, not a target.** Set each floor to the coverage the branch
+  already has, rounded down. It only ever goes up, and raising it is a normal part
+  of a PR that adds tests. A floor set to where you *wish* you were fails on day
+  one, gets muted in a week, and then measures nothing while still looking like a
+  control.
+- **A gate nobody made required is a decoration.** A workflow that runs, reports,
+  and cannot block a merge is advice. That distinction is invisible from the repo —
+  branch protection is server-side — so it is recorded as a human attestation and
+  never inferred. Name the person who *has the rights* to make a check required,
+  because it is usually not the person who wants it done.
+
+Two failure modes worth naming, because neither shows up as a red build:
+
+- **Branch filters are case-sensitive.** A workflow filtered on `dev` against a
+  branch named `Dev` runs on nothing: no run, no failure, no signal, and a clean
+  PR list. This is the check `canon-test-audit` exists for.
+- **A percentage can be a lie in a predictable direction.** A test that merely
+  imports a module takes it from 0% to 100%. Put effort into the seams that have
+  actually caused incidents — in practice wiring rather than logic — and treat a
+  jump in the number as a question, not an achievement.
+
+Like the design canon, this one ships with a validator: `canon-test-audit` parses
+the blocks, reads the coverage report your suite wrote, and reports what has
+drifted. It never runs your tests and it never computes coverage. It measures; it
+does not enforce. Enforcement is a required status check, in the forge, set by
+somebody with admin.
+
+## How our documents read
+
+The templates say what sections a document has. They do not say how it
+should read, and an improvised register defaults to whatever the writer last
+saw — which is how a Decision note becomes meeting minutes, a Handoff
+becomes a status report, and a Design System note becomes adjectives. Each
+of those passes its template check and is useless to the next person.
+
+So each document type is mapped to somebody who already writes it well, in
+`Reference/Writing/House Voice.md`. Two things about that map are
+deliberate.
+
+**The selection criterion is a retrievable corpus of that exact document
+type, not fame.** An agent cannot imitate a sensibility it has never read;
+it can imitate a corpus. The most influential designer of the last thirty
+years left almost nothing written, so asking for his voice yields reverent
+adjectives — the model fills the gap with the idea of the person. A design
+system's documentation should read like GOV.UK's, because ten thousand pages
+of exactly that exist.
+
+**Every row names an anti-model**, and it is doing more work than the
+exemplar. "Write it like Nygard" is advice. "Do not write it like meeting
+minutes, which record what was discussed rather than what was chosen" names
+the failure the writer is otherwise about to commit.
+
+`Reference/Writing/Choosing a Document.md` is the other half: which document
+to write at which stage, and the standing instruction to pick the cheapest
+rung that still works. The commonest failure here is not writing badly — it
+is reaching for the full spec before anyone has agreed the idea survives.
+
+canon ships defaults in its `house-voice` skill so a new vault is not blank.
+**The vault note overrides them**, and a team that has named its own
+exemplars — a regulator's guidance, a predecessor's document everyone
+already imitates — has done the more valuable thing.
+
 ## Size budgets
 
 Index notes ≤200 lines / 25 KB · detail notes <500 lines · references one level

@@ -69,6 +69,20 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
   `status: proposed`, values land in the repo's tokens file. Generated markup is a
   structural draft — do not paste it in as-is, which is how a codebase acquires
   thousands of hardcoded colour utilities.
+- **The testing canon lives in `Reference/Testing/`.** Its machine-readable half is
+  two fenced blocks with frozen key sets — `test-suites` and `test-gates` — whose
+  contract is documented in the Test Canon template. **A floor is a ratchet, not a
+  target**: it is the coverage that already exists, rounded down, and it only rises.
+  `branches:` is **case-sensitive and verbatim** — a workflow filtered on `dev`
+  against a branch named `Dev` runs on nothing and still looks green. Never infer
+  `required:`; whether a check can block a merge is server-side state that no
+  checkout can see, so it is a human attestation. Percentages live in the coverage
+  report and in dated `Outputs/` audits, never in the note.
+- **`Reference/Cognitive Coverage/` records whether a person can explain a feature**,
+  as dated assessments, newest first. Never overwrite an entry — the history is the
+  point. One person per entry, and record the questions asked so a re-test can be
+  harder rather than identical. Stored rather than derived on purpose: it is a fact
+  about a person on a date, which nothing can recompute.
 
 ## Stamp what you write
 

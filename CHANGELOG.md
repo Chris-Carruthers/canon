@@ -8,6 +8,184 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **Template packs, and `canon-pack`** — optional note templates, asked for rather than
+  installed.
+
+  `canon-init-vault` copied every file under `templates/vault/` into every vault, which
+  is right for the core and wrong for everything else. Growing the catalogue to
+  twenty-one templates so that three teams each find four useful would have made
+  `Templates/` unreadable for all of them — the same failure the design canon names,
+  *thirty notes for thirty primitives is boilerplate, not knowledge*.
+
+  Three packs. **`product-ladder`** (One-pager, PR-FAQ, Six-pager, Shape Up Pitch) is the
+  cheap rungs below the heavyweight `Product Spec`, which was the only product document
+  the core shipped and is the wrong first artefact for an unproven idea.
+  **`engineering`** (RFC, Architecture Overview, Runbook, Postmortem) closes the biggest
+  structural gap: `Decision` is an ADR, retrospective by design, so canon could record a
+  decision but not **argue** for one. **`research-craft`** (Research Findings, Design
+  Critique, Content & UX Copy Guide).
+
+  `canon-pack list | add | remove`, plus `canon-init-vault --pack <name>` through the
+  same code path. **`add` never overwrites** — identical contract to init, so re-running
+  is how you pick up new templates after an upgrade. **`remove` only deletes what it
+  shipped**: a file goes only if it is still byte-identical to the kit's template, and
+  an edited one is kept and reported. Without that rule an `add` typo followed by a
+  `remove` silently destroys somebody's note.
+
+  `canon-pack` is **not** vendored into vaults. Unlike the other bins it is not
+  self-contained — it copies out of `templates/packs/`, which is not in the vault — so a
+  vendored copy would resolve an empty directory and report "no packs available" as
+  though that were a fact. A detached copy now refuses to run and says why.
+
+  Eleven more `house-voice` reference files, one per pack template, shipping whether or
+  not the pack is installed: a skill costs nothing until it loads, and a template
+  arriving without its voice is the worse failure. CI walks `templates/packs/` in the
+  same both-directions wiring check as the core — every template points at a reference
+  file that exists, and every reference file is reachable from the skill.
+
+  The bare-init template count stays asserted at 10, which is now the regression guard
+  that packs are genuinely opt-in.
+
+- **House voice** — a map from each document type to a writer with a real corpus, the
+  moves to imitate, and the anti-model to avoid.
+
+  The templates said what sections a document has and nothing said how it should
+  *read*, so structure got enforced and prose got improvised — and improvised prose
+  defaults to whatever register the writer last saw. A Decision note becomes meeting
+  minutes: who attended, what was discussed, no statement of what was chosen or what it
+  cost. A Handoff becomes a status report, with the unmerged branch marked "in
+  progress", an adjective standing where a fact should be. Both pass the template check
+  and are useless to the next person.
+
+  Ships as the `house-voice` skill with eleven reference files, one per document type,
+  each in six fixed parts: who to write like · why them · who **not** to write like and
+  what goes wrong · the moves · what to go read · a five-question pre-save check.
+
+  **The selection criterion is a retrievable corpus of that exact document type, not
+  fame**, and that decides most of the picks. An agent cannot imitate a sensibility it
+  has never read; it can imitate a corpus. The most celebrated designer of the last
+  thirty years left almost nothing written, so asking for his voice yields reverent
+  adjectives — the model fills the gap with the *idea* of the person. GOV.UK's design
+  system has ten thousand pages of exactly the document you are writing.
+
+  **Every file names an anti-model, and it does more work than the exemplar.** "Write it
+  like Nygard's ADR" is advice; "do not write it like meeting minutes, which record what
+  was discussed rather than what was chosen" names the failure the writer is otherwise
+  about to commit.
+
+  Two new vault notes, seeded by `canon-init-vault`: `Reference/Writing/House Voice.md`,
+  which **overrides** the shipped defaults because a team's own exemplars are the more
+  valuable thing, and `Reference/Writing/Choosing a Document.md`, the escalation ladder —
+  which document at which stage, pick the cheapest rung that still works. Plus a voice
+  pointer in the header of all ten note templates, a router row, and a `How We Work`
+  section. No template was added, so the template count stays at 10.
+
+- **A testing canon, and `canon-test-audit`** — what is tested, the floor it may not
+  fall below, and whether the gate that checks it can actually block a merge.
+
+  `Reference/Testing/` holds two frozen fenced blocks, `test-suites` and
+  `test-gates`, following the design canon's split: **thresholds and pointers, never
+  measurements.** The percentage lives in the coverage report your suite already
+  writes; a number typed into a note is wrong the next day and still reads as
+  authoritative. Ships with a `Test Canon` note template (templates 9 → 10), a
+  router row, `How We Work` doctrine, and a rule bullet in **both** the Claude and
+  Cursor rules files.
+
+  Two rules carry the value, and both were learned expensively. **A floor is a
+  ratchet, not a target** — set it to the coverage you already have, rounded down;
+  one set to where you wish you were fails on day one, gets muted within a week, and
+  then measures nothing while still looking like a control. **A gate nobody made
+  required is a decoration** — a workflow that runs, reports and cannot block a
+  merge is advice, and that difference is invisible from a checkout.
+
+  `canon-test-audit` reads the contract from the vault and the facts from your repos
+  and derives everything on every run. The check worth the whole tool is
+  **`TEST-GATE-BRANCH-MISMATCH`**: forge branch filters are case-sensitive, so a
+  workflow filtered on `dev` against a branch named `Dev` runs on nothing — no run,
+  no failure, no signal, and a PR list that looks clean. It is a string comparison,
+  and it is the difference between a gate and a decoration.
+
+  Also `TEST-FLOOR-BREACH`, `TEST-REPORT-MISSING` (an unverifiable floor reads as a
+  passing one), `TEST-REPORT-STALE`, `TEST-GATE-WORKFLOW-MISSING`,
+  `TEST-GATE-JOB-MISSING`, `TEST-BLOCK-MALFORMED`, and as GAPs —
+  `TEST-GATE-ADVISORY`, `TEST-SUITE-UNDECLARED`, `TEST-FLOOR-ABSENT`,
+  `TEST-REPORT-UNDECLARED`. `--strict` compares against a `.canon-test-baseline`
+  rather than zero, because on a repo with a long tail of untested code the only
+  useful signal is *did it get worse*. `--ratchet` prints the floor each suite could claim today and
+  **deliberately refuses to suggest a lower one**, since lowering a floor is how a
+  ratchet quietly becomes a target.
+
+  **Four deliberate non-goals**, each of them the design. It never runs your tests —
+  executing an arbitrary repo's suite is slow, needs its dependencies, and is a
+  code-execution surface pointed at whatever the canon names; it reads the report the
+  suite already wrote and reports its age. It never computes coverage — it parses
+  cobertura, lcov or an istanbul json-summary, and an unrecognised format is a clean
+  error, because a guessed denominator is a confident wrong number. It cannot see
+  branch protection, which is server-side, so `required:` is a **human attestation**
+  recorded with `canon-verify` and `TEST-GATE-ADVISORY` can never fail a build. And
+  it does not judge whether coverage is *meaningful* — a test that merely imports a
+  module takes it from 0% to 100%, which is a documented caveat for the human
+  setting the floor rather than a faked check.
+
+  Read-only in every repo it scans, asserted by a test. In no pre-commit hook: it
+  scans code repos, not the vault. `TEST-REPORT-STALE` is an explicit
+  `--max-report-age` window rather than a comparison against HEAD's commit time —
+  commit time is when somebody committed, not when the code changed, so the
+  obvious-looking version fires on "ran the suite, then committed", and a rule that
+  fires on correct behaviour is a rule people switch off.
+
+- **`repo-context` skill, and the other half of `CLAUDE.md`** — the repo-specific
+  section of the generated instruction files was an HTML comment, so canon
+  guaranteed every repo had the files and nothing about the repo knowledge in them.
+
+  `templates/repo/agent-instructions.md` now ships a real `## This repo` skeleton —
+  build and run, test, architecture in three sentences, gotchas — as **headings
+  rather than a comment**, because an empty section is visible and an agent can say
+  nobody wrote this down, whereas the same words in a comment are invisible in every
+  rendered view.
+
+  `/repo-context` fills it in from the repo itself — manifests, the CI workflow,
+  compose files, env templates — and **cites where each command is defined** rather
+  than asserting one it never saw, because a confidently wrong build command is
+  worse than a blank section. As a byproduct it emits the `test-suites` and
+  `test-gates` rows above: it has just read the test config and the workflow, which
+  is exactly what the canon needs, so the rows are produced then instead of becoming
+  a second chore nobody does. If the workflow's branch filter disagrees with what
+  git calls the branch, it reports that as a finding rather than quietly writing the
+  working one down.
+
+- **`cognitive-coverage` skill** — a graded quiz on what your agent just built,
+  recorded with a date.
+
+  Code review asks *is this correct*; tests ask *does it work*. Neither asks whether
+  a **person** can explain it without reading it again. Agent-built code fails that
+  quietly, precisely because it passes review.
+
+  Six to ten questions across six bands — shape, state, failure, boundary, decision,
+  change — asked one at a time and graded against the implementation. At least one
+  must be about something *surprising* in the code, because that is where
+  understanding lives and it is what nobody retains from watching an agent work.
+
+  Records to `Reference/Cognitive Coverage/<feature>.md`, newest first, **appending
+  rather than overwriting**, with the questions asked so a re-test can be harder
+  instead of identical. Ships with a `Cognitive Coverage` note template (templates
+  8 → 9) and a router row.
+
+  **Most of the design is refusing to be nice.** A quiz everyone passes is worse than
+  no quiz: it converts an unknown gap into a false belief and burns the one moment
+  somebody was willing to be tested. So an answer that would equally fit a different
+  implementation is *partial* at best, "I don't know" is a *gap* and never a partial,
+  softball questions answerable from a function name are called out as a failure
+  mode, and the bands are never averaged into one number — a person solid on shape
+  and blank on failure modes has a specific problem that a percentage hides.
+
+  It stores its result, against the kit's derived-never-stored rule, and says why:
+  this cannot be recomputed, because it records what a specific person could explain
+  on a specific date. Same class of fact as `verified:`.
+
+  Framed as a coverage report for a system rather than a performance review — stated
+  in the skill itself, because if it reads as a scorecard on a colleague then nobody
+  asks for it twice and the people who need it stop first.
 - **`--export` and `--view`: the canon as one document, for both audiences.**
 
   The canon was written for machines and readable by neither. An agent that wanted it
