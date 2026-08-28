@@ -684,7 +684,7 @@ missing_cc=""
 for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
   LC_ALL=C grep -q "Cognitive Coverage" "$f" 2>/dev/null || missing_cc="$missing_cc $(basename "$f")"
 done
-is "BOTH rules files mention it" "${missing_cc:-none}" "none"
+is "BOTH rules files mention cognitive coverage" "${missing_cc:-none}" "none"
 
 # It stores a result, against the kit's derived-never-stored rule, so it must say why.
 has "justifies storing the result" "$(cat "$CC")" "cannot be recomputed"
@@ -779,6 +779,16 @@ has "router advertises the folder" \
     "$(cat "$KIT/templates/vault/Vision/Agent Router.md")" "Reference/Writing/"
 has "How We Work carries the doctrine" \
     "$(cat "$KIT/templates/vault/Vision/How We Work.md")" "How our documents read"
+
+# The vault router is not the only place agents look. An agent working inside a CODE
+# repo loads the path-scoped rules, never the vault's router — so a feature wired only
+# into the vault is invisible exactly where most work happens. Every other canon
+# feature has a bullet in both files; this one shipped without either.
+missing_hv=""
+for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
+  LC_ALL=C grep -q "Reference/Writing" "$f" 2>/dev/null || missing_hv="$missing_hv $(basename "$f")"
+done
+is "BOTH rules files mention house voice" "${missing_hv:-none}" "none"
 
 # House Voice is an index note and index notes are read in full.
 HVL="$(wc -l < "$V/Reference/Writing/House Voice.md" | tr -d ' ')"
