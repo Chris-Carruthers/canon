@@ -872,17 +872,32 @@ if [ "$TCL" -lt 200 ]; then ok "test canon template under 200 lines ($TCL)"; els
 
 # The frozen key sets in the tool must match the keys the template documents. A
 # key documented but unknown to the validator is the exact shape of the scar.
+#
+# Done entirely in python3 rather than sed/grep/tr: the first version of this
+# passed on macOS and failed on ubuntu, because BSD and GNU disagree about
+# bracket expressions in `tr`. A portability bug in a test is worse than one in
+# the code — it makes the suite itself the thing you cannot trust.
 TA="$KIT/bin/canon-test-audit"
-tpl_keys() { LC_ALL=C sed -n "/^\`\`\`$1\$/,/^\`\`\`\$/p" "$TCN" \
-  | LC_ALL=C grep -oE '^[- ] *[a-z_]+:' | tr -d '[- :]' | sort -u | tr '\n' ' '; }
-tool_keys() { python3 -c "
-import re,sys
-s=open('$TA').read()
-m=re.search(r'^$2 = \{(.*?)\}', s, re.S|re.M)
-print(' '.join(sorted(set(re.findall(r'\"([a-z_]+)\"', m.group(1))))) + ' ')
-"; }
-is "test-suites keys match the tool" "$(tpl_keys test-suites)" "$(tool_keys test-suites SUITE_KEYS)"
-is "test-gates keys match the tool"  "$(tpl_keys test-gates)"  "$(tool_keys test-gates GATE_KEYS)"
+keys_match() { python3 - "$TCN" "$TA" "$1" "$2" <<'KEYPY'
+import re, sys
+tpl_path, tool_path, fence, const = sys.argv[1:5]
+body = re.search(r"```" + fence + r"\n(.*?)```", open(tpl_path).read(), re.S)
+if not body:
+    print("NO SUCH FENCE IN TEMPLATE: " + fence); sys.exit(0)
+documented = sorted(set(re.findall(r"^\s*(?:- )?([a-z_]+):", body.group(1), re.M)))
+frozen_src = re.search(r"^" + const + r" = \{(.*?)\}", open(tool_path).read(), re.S | re.M)
+if not frozen_src:
+    print("NO SUCH KEY SET IN TOOL: " + const); sys.exit(0)
+frozen = sorted(set(re.findall(r'"([a-z_]+)"', frozen_src.group(1))))
+if documented == frozen:
+    print("MATCH")
+else:
+    print("documented-only=%s tool-only=%s"
+          % (sorted(set(documented) - set(frozen)), sorted(set(frozen) - set(documented))))
+KEYPY
+}
+is "test-suites keys match the tool" "$(keys_match test-suites SUITE_KEYS)" "MATCH"
+is "test-gates keys match the tool"  "$(keys_match test-gates GATE_KEYS)"  "MATCH"
 
 # THE ONE THAT MATTERS: the documented example is annotated on every line, and a
 # reader copies it verbatim. If the validator cannot parse its own documentation
