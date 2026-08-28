@@ -9,6 +9,7 @@ updated: YYYY-MM-DD
 ---
 
 <!--
+Voice: skills/house-voice/references/product-spec.md — your own map wins: Reference/Writing/House Voice.md
 File as: Specs/<slug>.product-spec.md    Companion ops doc: Handoffs/<slug>.handoff.md
 
 WHY THIS SHAPE. The spec is intent — what and why — and it stays the single

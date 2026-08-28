@@ -12,6 +12,7 @@ tokens: [--token-name, --token-name]
 ---
 
 <!--
+Voice: skills/house-voice/references/design-component.md — your own map wins: Reference/Writing/House Voice.md
 File as: Reference/Design/Component — <Display Name>.md
 
 WHEN TO WRITE ONE OF THESE — and mostly, do not.

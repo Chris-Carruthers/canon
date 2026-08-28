@@ -6,6 +6,10 @@ repo: path/to/repo
 generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 ---
 
+<!--
+Voice: skills/house-voice/references/session-log.md — your own map wins: Reference/Writing/House Voice.md
+-->
+
 # Session — YYYY-MM-DD — <short title>
 
 ## Goal
