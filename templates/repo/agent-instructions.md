@@ -18,7 +18,9 @@ into context automatically; if it didn't, resolve the path and read
 - the newest `Sessions/` note linked from that project — what happened last
 - `Reference/Design/` — **before building any UI.** The design canon: which token
   names exist, which components already exist (and which deliberately do not), and
-  where each resolves to a Figma node and an implementation.
+  where each resolves to a Figma node and an implementation. If you are about to
+  run a design tool, read the `design-tools` block first and target the vocabulary
+  the row names — a generator left to pick its own invents a new one.
 
 Reach vault content **on demand** with glob and grep against the vault path.
 Do not try to load the vault; it is far larger than a context window.

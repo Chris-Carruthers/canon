@@ -61,10 +61,15 @@ is a ratchet — the coverage that already exists, rounded down — and only ris
 attestation, because branch protection is not visible from a checkout. No
 percentage goes in the note.
 
-The design canon lives in `Reference/Design/`: two frozen fenced blocks
-(`design-tokens`, `design-components`) whose contract is in the Design System
-template. Omit a key you do not have rather than writing `TODO` — absence is what
-the tooling reads.
+The design canon lives in `Reference/Design/`: three frozen fenced blocks
+(`design-tokens`, `design-components`, `design-tools`) whose contract is in the
+Design System template. Omit a key you do not have rather than writing `TODO` —
+absence is what the tooling reads.
+
+Before running a design tool, read the `design-tools` block and target the
+vocabulary its row names; a generator left to pick its own invents one. What it
+emits comes back as names in the vault, values in the repo — never as pasted
+markup.
 
 Freely writable: `Sessions/`, `Projects/`, `Clients/`, `Reference/`, `Outputs/`,
 `Sources/`, `_Inbox/`.

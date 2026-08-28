@@ -24,6 +24,17 @@ and `python3` — nothing else, and that constraint is intentional.
    `mapfile`, no `${var,,}`, no globstar. CI has a macOS leg to catch this.
 5. **No new dependencies.** If you need a package manager, it belongs in a
    different project.
+6. **Examples use placeholder names, never your own.** This kit is generic and the
+   vault it manages is not. Sample output, JSON snippets and template values use
+   neutral names — `web-app`, `design-system`, `web-shadcn-hsl` — never a real repo,
+   token vocabulary, product or person from the vault you happen to be testing
+   against. Every example here has been that exact mistake at least once: the
+   `canon-design-audit` sample in the README was a verbatim paste of one private
+   vault's vocabulary slugs and violation counts. It reads as documentation and
+   ships as disclosure.
+7. **No claims about repos the reader cannot see.** "The most common violation in
+   every repo we have pointed this at" is unfalsifiable to anyone outside that team.
+   Say what the tool measures and tell them to run it.
 
 ## Design principles, so review isn't a surprise
 

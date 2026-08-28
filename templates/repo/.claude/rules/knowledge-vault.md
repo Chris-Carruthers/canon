@@ -55,14 +55,20 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
 - **Link generously** with `[[wikilinks]]`. A link to a note that does not exist
   yet is a feature — it marks something worth writing.
 - **The design canon lives in `Reference/Design/`.** Its machine-readable half is
-  two fenced blocks with frozen key sets — `design-tokens` and
-  `design-components` — whose contract is documented in the Design System
-  template. A component resolves in three rungs: an exported image under
-  `Attachments/Design/`, a Figma `{ file, node }`, then `impl: repo/path`. **Omit
-  a key you do not have** rather than writing `TODO`; absence is what the tooling
-  reads, and coverage is derived from it. Write a per-component note only when a
-  reader would ask *why* — a decision, a drift story, an a11y contract. Otherwise
-  add a row.
+  three fenced blocks with frozen key sets — `design-tokens`,
+  `design-components` and `design-tools` — whose contract is documented in the
+  Design System template. A component resolves in three rungs: an exported image
+  under `Attachments/Design/`, a Figma `{ file, node }`, then `impl: repo/path`.
+  **Omit a key you do not have** rather than writing `TODO`; absence is what the
+  tooling reads, and coverage is derived from it. Write a per-component note only
+  when a reader would ask *why* — a decision, a drift story, an a11y contract.
+  Otherwise add a row.
+- **Before running a design tool, read the `design-tools` block** and target the
+  vocabulary its row names. Whatever the tool emits comes back as *names in the
+  vault, values in the repo*: names become a `design-tokens` row with
+  `status: proposed`, values land in the repo's tokens file. Generated markup is a
+  structural draft — do not paste it in as-is, which is how a codebase acquires
+  thousands of hardcoded colour utilities.
 - **The testing canon lives in `Reference/Testing/`.** Its machine-readable half is
   two fenced blocks with frozen key sets — `test-suites` and `test-gates` — whose
   contract is documented in the Test Canon template. **A floor is a ratchet, not a

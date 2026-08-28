@@ -16,6 +16,11 @@
 # from one template so they cannot drift. Opt out with --no-gemini, --no-copilot,
 # --no-windsurf, --no-cline, or --claude-only.
 #
+# --design also writes a DESIGN.md: the pointer file a design tool reads before it
+# touches any UI, so it targets your token vocabulary instead of inventing one.
+# Opt-in, because a repo with no UI does not want one. Created if absent, never
+# overwritten, and left in place by --uninstall — once you fill it in it is yours.
+#
 # Only Claude Code gets the automatic hooks; the other runtimes have nowhere to
 # attach them. They read the vault, they do not maintain it. If you want the
 # hooks without install.sh, canon also ships as a Claude Code plugin — see the
@@ -42,7 +47,7 @@ MARKER="<!-- canon:knowledge-vault -->"
 TARGET=""
 VAULT=""
 DRY=0
-UNINSTALL=0
+UNINSTALL=0; WANT_DESIGN=0
 # On by default. A stray instruction file costs nothing and is removed cleanly by
 # --uninstall, whereas a missing one is a teammate quietly getting no context
 # because they happen to use a different tool.
@@ -58,6 +63,7 @@ while [ $# -gt 0 ]; do
     --no-windsurf) WANT_WINDSURF=0; shift ;;
     --no-cline) WANT_CLINE=0; shift ;;
     --claude-only) WANT_GEMINI=0; WANT_COPILOT=0; WANT_WINDSURF=0; WANT_CLINE=0; shift ;;
+    --design) WANT_DESIGN=1; shift ;;
     -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
     *) TARGET="$1"; shift ;;
   esac
@@ -190,6 +196,28 @@ done
 # --- path-scoped rules -------------------------------------------------------
 run cp "$TPL/.claude/rules/knowledge-vault.md" "$TARGET/.claude/rules/knowledge-vault.md"
 say "rules: .claude/rules/knowledge-vault.md"
+
+# --- DESIGN.md, opt-in ------------------------------------------------------
+# A pointer file design tools read before they touch any UI. Without one they find
+# no committed design language and generate their own, which is how a codebase
+# acquires a second, plausible, entirely parallel set of tokens.
+#
+# CREATE-IF-ABSENT, never overwritten: unlike the rules files this is the user's
+# content once they fill in the vocabulary slug, and clobbering it would throw away
+# the only thing that makes it useful. Not removed by --uninstall for the same
+# reason.
+#
+# Opt-in rather than on-by-default, which inverts this installer's usual bias. A
+# stray CLAUDE.md costs nothing; a stray DESIGN.md in a repo with no UI points a
+# design tool at a vocabulary that has nothing to do with it.
+if [ "$WANT_DESIGN" = "1" ]; then
+  if [ -e "$TARGET/DESIGN.md" ]; then
+    say "DESIGN.md: already present, left alone"
+  else
+    run cp "$TPL/DESIGN.md" "$TARGET/DESIGN.md"
+    say "DESIGN.md: written — fill in the vocabulary slug and tokens path"
+  fi
+fi
 
 # --- Cursor rules ------------------------------------------------------------
 run mkdir -p "$TARGET/.cursor/rules"

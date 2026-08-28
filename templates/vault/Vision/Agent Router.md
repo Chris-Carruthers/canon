@@ -19,7 +19,7 @@ map, not a manual.
 | What a workstream is / where it stands | `Projects/<name>.md` |
 | A client / customer / domain area | `Clients/<name>.md` |
 | Durable facts, schemas, APIs, pricing | `Reference/` |
-| Design system: tokens, components, design assets | `Reference/Design/` |
+| Design system: tokens, components, design assets, approved design tools | `Reference/Design/` |
 | Who can explain a feature, and when they were last checked | `Reference/Cognitive Coverage/` |
 | What is tested, the floor, and whether the gate can block | `Reference/Testing/` |
 | How a document of this type should read, and which to write | `Reference/Writing/` |
