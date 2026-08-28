@@ -51,6 +51,12 @@ yourself** — that field means a human confirmed the content and is theirs to a
   place. Check `.canon-owners` in the vault for who owns what.
 - Do not commit or push the vault on someone's behalf unless asked.
 
+Before writing a vault document, check how that type should read.
+`Reference/Writing/House Voice.md` maps each document type to a writer worth
+imitating and to the register it must not land in. `Choosing a Document.md` says
+which document to write at which stage — pick the cheapest rung that works. The
+vault note overrides canon's shipped defaults.
+
 `Reference/Cognitive Coverage/` records whether a person can explain a feature, as
 dated assessments, newest first. Never overwrite an entry.
 
