@@ -8,6 +8,80 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **A testing canon, and `canon-test-audit`** — what is tested, the floor it may not
+  fall below, and whether the gate that checks it can actually block a merge.
+
+  `Reference/Testing/` holds two frozen fenced blocks, `test-suites` and
+  `test-gates`, following the design canon's split: **thresholds and pointers, never
+  measurements.** The percentage lives in the coverage report your suite already
+  writes; a number typed into a note is wrong the next day and still reads as
+  authoritative. Ships with a `Test Canon` note template (templates 9 → 10), a
+  router row, `How We Work` doctrine, and a rule bullet in **both** the Claude and
+  Cursor rules files.
+
+  Two rules carry the value, and both were learned expensively. **A floor is a
+  ratchet, not a target** — set it to the coverage you already have, rounded down;
+  one set to where you wish you were fails on day one, gets muted within a week, and
+  then measures nothing while still looking like a control. **A gate nobody made
+  required is a decoration** — a workflow that runs, reports and cannot block a
+  merge is advice, and that difference is invisible from a checkout.
+
+  `canon-test-audit` reads the contract from the vault and the facts from your repos
+  and derives everything on every run. The check worth the whole tool is
+  **`TEST-GATE-BRANCH-MISMATCH`**: forge branch filters are case-sensitive, so a
+  workflow filtered on `dev` against a branch named `Dev` runs on nothing — no run,
+  no failure, no signal, and a PR list that looks clean. It is a string comparison,
+  and it is the difference between a gate and a decoration.
+
+  Also `TEST-FLOOR-BREACH`, `TEST-REPORT-MISSING` (an unverifiable floor reads as a
+  passing one), `TEST-REPORT-STALE`, `TEST-GATE-WORKFLOW-MISSING`,
+  `TEST-GATE-JOB-MISSING`, `TEST-BLOCK-MALFORMED`, and as GAPs —
+  `TEST-GATE-ADVISORY`, `TEST-SUITE-UNDECLARED`, `TEST-FLOOR-ABSENT`,
+  `TEST-REPORT-UNDECLARED`. `--strict` compares against a `.canon-test-baseline`
+  rather than zero, because on a repo with a long tail of untested code the only
+  useful signal is *did it get worse*. `--ratchet` prints the floor each suite could claim today and
+  **deliberately refuses to suggest a lower one**, since lowering a floor is how a
+  ratchet quietly becomes a target.
+
+  **Four deliberate non-goals**, each of them the design. It never runs your tests —
+  executing an arbitrary repo's suite is slow, needs its dependencies, and is a
+  code-execution surface pointed at whatever the canon names; it reads the report the
+  suite already wrote and reports its age. It never computes coverage — it parses
+  cobertura, lcov or an istanbul json-summary, and an unrecognised format is a clean
+  error, because a guessed denominator is a confident wrong number. It cannot see
+  branch protection, which is server-side, so `required:` is a **human attestation**
+  recorded with `canon-verify` and `TEST-GATE-ADVISORY` can never fail a build. And
+  it does not judge whether coverage is *meaningful* — a test that merely imports a
+  module takes it from 0% to 100%, which is a documented caveat for the human
+  setting the floor rather than a faked check.
+
+  Read-only in every repo it scans, asserted by a test. In no pre-commit hook: it
+  scans code repos, not the vault. `TEST-REPORT-STALE` is an explicit
+  `--max-report-age` window rather than a comparison against HEAD's commit time —
+  commit time is when somebody committed, not when the code changed, so the
+  obvious-looking version fires on "ran the suite, then committed", and a rule that
+  fires on correct behaviour is a rule people switch off.
+
+- **`repo-context` skill, and the other half of `CLAUDE.md`** — the repo-specific
+  section of the generated instruction files was an HTML comment, so canon
+  guaranteed every repo had the files and nothing about the repo knowledge in them.
+
+  `templates/repo/agent-instructions.md` now ships a real `## This repo` skeleton —
+  build and run, test, architecture in three sentences, gotchas — as **headings
+  rather than a comment**, because an empty section is visible and an agent can say
+  nobody wrote this down, whereas the same words in a comment are invisible in every
+  rendered view.
+
+  `/repo-context` fills it in from the repo itself — manifests, the CI workflow,
+  compose files, env templates — and **cites where each command is defined** rather
+  than asserting one it never saw, because a confidently wrong build command is
+  worse than a blank section. As a byproduct it emits the `test-suites` and
+  `test-gates` rows above: it has just read the test config and the workflow, which
+  is exactly what the canon needs, so the rows are produced then instead of becoming
+  a second chore nobody does. If the workflow's branch filter disagrees with what
+  git calls the branch, it reports that as a finding rather than quietly writing the
+  working one down.
+
 - **`cognitive-coverage` skill** — a graded quiz on what your agent just built,
   recorded with a date.
 

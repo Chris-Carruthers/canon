@@ -104,6 +104,42 @@ Unlike the spec blocks above, these two **do** ship with a validator:
 It also scans the code repos and reports what has drifted. It measures; it does not
 enforce. Enforcement is CODEOWNERS on the token files plus branch protection.
 
+## The testing canon
+
+`Reference/Testing/` is where "is this tested?" gets a written answer. Like the
+design canon it holds **names, pointers and thresholds, never measurements** — the
+percentage lives in the coverage report your suite already writes, and a number
+typed into a note is wrong the next day while still reading as authoritative.
+
+Two rules carry most of the value, and both were learned the expensive way:
+
+- **A floor is a ratchet, not a target.** Set each floor to the coverage the branch
+  already has, rounded down. It only ever goes up, and raising it is a normal part
+  of a PR that adds tests. A floor set to where you *wish* you were fails on day
+  one, gets muted in a week, and then measures nothing while still looking like a
+  control.
+- **A gate nobody made required is a decoration.** A workflow that runs, reports,
+  and cannot block a merge is advice. That distinction is invisible from the repo —
+  branch protection is server-side — so it is recorded as a human attestation and
+  never inferred. Name the person who *has the rights* to make a check required,
+  because it is usually not the person who wants it done.
+
+Two failure modes worth naming, because neither shows up as a red build:
+
+- **Branch filters are case-sensitive.** A workflow filtered on `dev` against a
+  branch named `Dev` runs on nothing: no run, no failure, no signal, and a clean
+  PR list. This is the check `canon-test-audit` exists for.
+- **A percentage can be a lie in a predictable direction.** A test that merely
+  imports a module takes it from 0% to 100%. Put effort into the seams that have
+  actually caused incidents — in practice wiring rather than logic — and treat a
+  jump in the number as a question, not an achievement.
+
+Like the design canon, this one ships with a validator: `canon-test-audit` parses
+the blocks, reads the coverage report your suite wrote, and reports what has
+drifted. It never runs your tests and it never computes coverage. It measures; it
+does not enforce. Enforcement is a required status check, in the forge, set by
+somebody with admin.
+
 ## Size budgets
 
 Index notes ≤200 lines / 25 KB · detail notes <500 lines · references one level

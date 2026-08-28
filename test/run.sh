@@ -68,7 +68,7 @@ section "vault scaffold"
 SB="$(mktemp -d)"; V="$SB/vault"; R="$SB/repo"
 "$KIT/bin/canon-init-vault" "$V" >/dev/null 2>&1
 is "creates the router"        "$([ -f "$V/Vision/Agent Router.md" ] && echo y)" "y"
-is "creates 9 note templates" "$(find "$V/Templates" -name '*.md' | wc -l | tr -d ' ')" "9"
+is "creates 10 note templates" "$(find "$V/Templates" -name '*.md' | wc -l | tr -d ' ')" "10"
 is "gitkeeps every folder"    "$(find "$V" -name .gitkeep | wc -l | tr -d ' ')" "13"
 is "ships .canon-owners"      "$([ -f "$V/.canon-owners" ] && echo y)" "y"
 is "ships a self-bootstrap"   "$([ -x "$V/.canon/bootstrap.sh" ] && echo y)" "y"
@@ -427,7 +427,7 @@ cd "$V4" || exit 1; git init -q; git config user.email chris@example.com; git co
 is "vendors canon-trust + canon-verify" \
    "$([ -x "$V4/.canon/canon-trust" ] && [ -x "$V4/.canon/canon-verify" ] && echo y)" "y"
 is "templates carry generated:" \
-   "$(grep -l 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "7"
+   "$(grep -l 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "8"
 
 printf -- '---\ntype: decision\ngenerated: { by: some-agent/1, at: 2026-07-30T10:00:00Z }\n---\n# x\n' > "$V4/Decisions/a.md"
 printf -- '---\ntype: reference\nverified: { by: process:ci, at: 2026-07-02T02:00:00Z }\nstale_after: 2020-01-01\n---\n# y\n' > "$V4/Reference/b.md"
@@ -848,6 +848,219 @@ AJ="$("$DA" --vault "$V8" --json "$SB/nonexistent-elsewhere" 2>/dev/null)"
 is "unscanned repo pointers are not called dead" "$(Q=count R=DS-POINTER-DEAD pick)" "1"
 
 "$DA" >/dev/null 2>&1; is "refuses to run with no repo" "$?" "2"
+
+# ---------------------------------------------------------------------------
+section "testing canon"
+# Same tripwire as the design canon, for the same reason: the machine-readable
+# half ships with a validator, so the template and the tool must agree on the
+# fence names AND the key sets. The kit has been bitten twice — once by a Product
+# Spec template whose fences never matched its validator, and once by an
+# annotated block its own validator could not parse.
+TCN="$V8/Templates/Test Canon.md"
+is "ships a Test Canon template"    "$([ -f "$TCN" ] && echo y)" "y"
+has "declares the test-suites fence" "$(cat "$TCN")" '```test-suites'
+has "declares the test-gates fence"  "$(cat "$TCN")" '```test-gates'
+has "marks the contract frozen"      "$(cat "$TCN")" "FROZEN"
+# The two rules that carry the value must be IN the template, not only in the
+# README. The template is what somebody copies.
+has "template states the ratchet rule"    "$(cat "$TCN")" "RATCHET, NOT A TARGET"
+has "template states the required rule"   "$(cat "$TCN")" "HUMAN ATTESTATION"
+has "template warns on case-sensitivity"  "$(cat "$TCN")" "CASE-SENSITIVE"
+has "template keeps percentages out"      "$(cat "$TCN")" "No percentage is written in this note"
+TCL="$(wc -l < "$TCN" | tr -d ' ')"
+if [ "$TCL" -lt 200 ]; then ok "test canon template under 200 lines ($TCL)"; else bad "test canon template under 200 lines" "$TCL"; fi
+
+# The frozen key sets in the tool must match the keys the template documents. A
+# key documented but unknown to the validator is the exact shape of the scar.
+#
+# Done entirely in python3 rather than sed/grep/tr: the first version of this
+# passed on macOS and failed on ubuntu, because BSD and GNU disagree about
+# bracket expressions in `tr`. A portability bug in a test is worse than one in
+# the code — it makes the suite itself the thing you cannot trust.
+TA="$KIT/bin/canon-test-audit"
+keys_match() { python3 - "$TCN" "$TA" "$1" "$2" <<'KEYPY'
+import re, sys
+tpl_path, tool_path, fence, const = sys.argv[1:5]
+body = re.search(r"```" + fence + r"\n(.*?)```", open(tpl_path).read(), re.S)
+if not body:
+    print("NO SUCH FENCE IN TEMPLATE: " + fence); sys.exit(0)
+documented = sorted(set(re.findall(r"^\s*(?:- )?([a-z_]+):", body.group(1), re.M)))
+frozen_src = re.search(r"^" + const + r" = \{(.*?)\}", open(tool_path).read(), re.S | re.M)
+if not frozen_src:
+    print("NO SUCH KEY SET IN TOOL: " + const); sys.exit(0)
+frozen = sorted(set(re.findall(r'"([a-z_]+)"', frozen_src.group(1))))
+if documented == frozen:
+    print("MATCH")
+else:
+    print("documented-only=%s tool-only=%s"
+          % (sorted(set(documented) - set(frozen)), sorted(set(frozen) - set(documented))))
+KEYPY
+}
+is "test-suites keys match the tool" "$(keys_match test-suites SUITE_KEYS)" "MATCH"
+is "test-gates keys match the tool"  "$(keys_match test-gates GATE_KEYS)"  "MATCH"
+
+# THE ONE THAT MATTERS: the documented example is annotated on every line, and a
+# reader copies it verbatim. If the validator cannot parse its own documentation
+# it reports errors for correct input and disables the rule it is documenting.
+VT="$SB/vault-tc"; mkdir -p "$VT/Reference/Testing"
+cp "$TCN" "$VT/Reference/Testing/From Template.md"
+mkdir -p "$SB/tc-empty"
+TT="$("$TA" --vault "$VT" --quiet "$SB/tc-empty" 2>&1)"
+is "the template's own example validates" "$(printf '%s' "$TT" | LC_ALL=C grep -c 'TEST-BLOCK-MALFORMED')" "0"
+
+# Router must advertise it — a folder no router mentions is a folder no agent visits.
+has "router routes Reference/Testing" "$(cat "$V8/Vision/Agent Router.md")" "Reference/Testing/"
+has "How We Work explains the ratchet" "$(cat "$V8/Vision/How We Work.md")" "ratchet, not a target"
+missing_tc=""
+for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
+  LC_ALL=C grep -q "Reference/Testing" "$f" 2>/dev/null || missing_tc="$missing_tc $(basename "$f")"
+done
+is "BOTH rules files carry the testing canon" "${missing_tc:-none}" "none"
+
+# canon-init-vault's vendored-tool list is hand-maintained. A registry entry that
+# nothing asserts is how a tool ships and never arrives.
+missing_vendored=""
+for t in "$KIT"/bin/canon-*-audit; do
+  n="$(basename "$t")"
+  LC_ALL=C grep -q "$n" "$KIT/bin/canon-init-vault" || missing_vendored="$missing_vendored $n"
+  [ -x "$V8/.canon/$n" ] || missing_vendored="$missing_vendored $n(not-in-vault)"
+done
+is "every audit tool is vendored into the vault" "${missing_vendored:-none}" "none"
+
+# ---------------------------------------------------------------------------
+section "test audit"
+# The tool's whole value rests on not crying wolf, so most of these assert what
+# it must NOT report. Fixtures are built here rather than reused, because the
+# earlier sections have deliberately mutated $V8.
+TR="$SB/tc"; mkdir -p "$TR/vault/Reference/Testing"
+cat > "$TR/vault/Reference/Testing/Canon.md" <<'TCEOF'
+```test-suites
+- suite: api-python
+  repo: api
+  command: pytest
+  report: coverage.xml
+  format: cobertura
+  metric: lines
+  floor: 62
+  status: enforced
+- suite: web-frontend
+  repo: web-app
+  report: coverage/coverage-summary.json
+  format: json-summary
+  metric: lines
+  floor: 18
+  status: advisory
+- suite: mobile
+  repo: mobile-app
+  status: absent
+```
+
+```test-gates
+- gate: api-ci
+  repo: api
+  workflow: .github/workflows/ci.yml
+  job: test
+  branches: [Dev]
+  required: false
+- gate: web-ci
+  repo: web-app
+  workflow: .github/workflows/ci.yml
+  job: test
+  branches: [dev]
+  required: true
+  verified: { by: human:cc, at: 2026-01-01T00:00:00Z }
+```
+TCEOF
+# api: the workflow filters `dev`; the canon declares `Dev`. This is the scar.
+mkdir -p "$TR/api/.github/workflows"
+printf 'name: CI\non:\n  pull_request:\n    branches:\n      - dev\njobs:\n  test:\n    runs-on: ubuntu-latest\n' \
+  > "$TR/api/.github/workflows/ci.yml"
+printf '<?xml version="1.0" ?>\n<coverage line-rate="0.624" lines-valid="1000" lines-covered="624"/>\n' \
+  > "$TR/api/coverage.xml"
+# web-app: filter matches, and 6.9 is under the floor of 7.
+mkdir -p "$TR/web-app/.github/workflows" "$TR/web-app/coverage"
+printf 'name: CI\non:\n  pull_request:\n    branches: [dev, "release/**"]\njobs:\n  test:\n    runs-on: ubuntu-latest\n' \
+  > "$TR/web-app/.github/workflows/ci.yml"
+printf '{"total":{"lines":{"pct":17.6},"branches":{"pct":9.4}}}\n' \
+  > "$TR/web-app/coverage/coverage-summary.json"
+# svc: tested, and the canon says nothing about it at all.
+mkdir -p "$TR/svc/tests"; : > "$TR/svc/pytest.ini"
+
+TJ="$("$TA" --vault "$TR/vault" --json "$TR/api" "$TR/web-app" "$TR/svc" 2>/dev/null)"
+tpick() { printf '%s' "$TJ" | python3 -c "
+import json,os,sys
+d=json.load(sys.stdin); f=d['findings']; q=os.environ['Q']
+if q=='count': print(d['counts'].get(os.environ['R'],0))
+elif q=='details': print(' | '.join(x['detail'] for x in f if x['rule']==os.environ['R']))
+elif q=='sev': print(d['severity'].get(os.environ['R'],'-'))
+elif q=='cov': print(d['coverage'][os.environ['R']])
+elif q=='pct': print('%.1f' % d['measured'][os.environ['R']]['pct'])
+" 2>/dev/null; }
+
+is "catches the case-only branch mismatch" "$(Q=count R=TEST-GATE-BRANCH-MISMATCH tpick)" "1"
+has "and names case-sensitivity as the cause" "$(Q=details R=TEST-GATE-BRANCH-MISMATCH tpick)" "CASE-SENSITIVE"
+is "the mismatch is a VIOLATION" "$(Q=sev R=TEST-GATE-BRANCH-MISMATCH tpick)" "VIOLATION"
+is "catches a floor breach" "$(Q=count R=TEST-FLOOR-BREACH tpick)" "1"
+is "parses cobertura" "$(Q=pct R=api-python tpick)" "62.4"
+is "parses json-summary" "$(Q=pct R=web-frontend tpick)" "17.6"
+is "notices an undeclared tested repo" "$(Q=count R=TEST-SUITE-UNDECLARED tpick)" "1"
+is "an undeclared repo is only a GAP" "$(Q=sev R=TEST-SUITE-UNDECLARED tpick)" "GAP"
+# The matching gate is attested required by a human, so it must be SILENT. One
+# advisory finding, not two.
+is "an attested required gate is not flagged" "$(Q=count R=TEST-GATE-ADVISORY tpick)" "1"
+is "advisory is never a VIOLATION" "$(Q=sev R=TEST-GATE-ADVISORY tpick)" "GAP"
+# status: absent is a decision, not a gap. It must not be measured or reported.
+is "a deliberately absent suite is counted, not flagged" "$(Q=cov R=absent tpick)" "1"
+is "and is left out of the live denominator" "$(Q=cov R=suites tpick)" "2"
+# Recency of the report is an explicit window, never inferred from commit time —
+# "ran the suite, then committed" must not read as stale.
+is "a fresh report is not called stale" "$(Q=count R=TEST-REPORT-STALE tpick)" "0"
+touch -t 197001020000 "$TR/api/coverage.xml"
+is "an old report IS called stale" \
+  "$("$TA" --vault "$TR/vault" --quiet "$TR/api" 2>/dev/null | LC_ALL=C grep -c 'TEST-REPORT-STALE')" "1"
+is "and the window is tunable" \
+  "$("$TA" --vault "$TR/vault" --max-report-age 99999 --quiet "$TR/api" 2>/dev/null | LC_ALL=C grep -c 'TEST-REPORT-STALE')" "0"
+
+# A ratchet only ratchets in one direction. Suggesting a lower floor is how it
+# quietly becomes a target, so the tool must refuse to print one.
+RAT="$("$TA" --vault "$TR/vault" --ratchet "$TR/api" "$TR/web-app" 2>/dev/null)"
+has "ratchet reports the breach instead of a lower floor" "$RAT" "BREACH"
+is "ratchet never suggests a floor below the declared one" \
+  "$(printf '%s' "$RAT" | LC_ALL=C grep -c 'floor: 1[0-7]$')" "0"
+is "ratchet writes nothing to the vault" \
+  "$(find "$TR/vault/Outputs" -type f 2>/dev/null | wc -l | tr -d ' ')" "0"
+
+# GAPs alone can never fail a build; that is the whole severity split.
+mkdir -p "$TR/gapsonly/vault/Reference/Testing" "$TR/gapsonly/svc/tests"
+: > "$TR/gapsonly/svc/pytest.ini"
+"$TA" --vault "$TR/gapsonly/vault" --strict "$TR/gapsonly/svc" >/dev/null 2>&1
+is "GAPs alone exit 0 under --strict" "$?" "0"
+"$TA" --vault "$TR/vault" --strict "$TR/api" "$TR/web-app" >/dev/null 2>&1
+is "a VIOLATION over baseline exits 1 under --strict" "$?" "1"
+"$TA" --vault "$TR/vault" --baseline-write "$TR/api" "$TR/web-app" 2>/dev/null > "$TR/api/.canon-test-baseline"
+"$TA" --vault "$TR/vault" --strict "$TR/api" "$TR/web-app" >/dev/null 2>&1
+is "the same violations under a written baseline exit 0" "$?" "0"
+
+# Read-only in every repo it scans. Asserted against git, so it means "changed
+# nothing" rather than "the repo happens to be clean".
+git_q -C "$TR/api" init --quiet 2>/dev/null
+git_q -C "$TR/api" add coverage.xml .canon-test-baseline >/dev/null 2>&1
+git_q -C "$TR/api" commit -qm fixture >/dev/null 2>&1
+TBEFORE="$(git -C "$TR/api" status --porcelain)"
+"$TA" --vault "$TR/vault" --report "$TR/api" >/dev/null 2>&1
+is "never writes in the scanned repo" "$(git -C "$TR/api" status --porcelain)" "$TBEFORE"
+is "writes exactly one report, into the vault" \
+  "$(find "$TR/vault/Outputs" -name '*Test Canon Audit.md' | wc -l | tr -d ' ')" "1"
+has "the report carries a staleness date" \
+  "$(cat "$TR/vault/Outputs/"*'Test Canon Audit.md')" "stale_after:"
+is "the report stores no score" \
+  "$(LC_ALL=C grep -cE '^(coverage_score|grade|score):' "$TR/vault/Outputs/"*'Test Canon Audit.md' | tr -d ' ')" "0"
+
+# An unscanned repo is unknown, not broken — the easiest false positive here.
+TJ="$("$TA" --vault "$TR/vault" --json "$TR/api" 2>/dev/null)"
+is "a row for an unscanned repo is not called broken" "$(Q=count R=TEST-REPORT-MISSING tpick)" "0"
+
+"$TA" >/dev/null 2>&1; is "refuses to run with no repo" "$?" "2"
 
 # ---------------------------------------------------------------------------
 section "concurrent writers"

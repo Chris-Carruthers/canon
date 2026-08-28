@@ -63,6 +63,15 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
   reads, and coverage is derived from it. Write a per-component note only when a
   reader would ask *why* — a decision, a drift story, an a11y contract. Otherwise
   add a row.
+- **The testing canon lives in `Reference/Testing/`.** Its machine-readable half is
+  two fenced blocks with frozen key sets — `test-suites` and `test-gates` — whose
+  contract is documented in the Test Canon template. **A floor is a ratchet, not a
+  target**: it is the coverage that already exists, rounded down, and it only rises.
+  `branches:` is **case-sensitive and verbatim** — a workflow filtered on `dev`
+  against a branch named `Dev` runs on nothing and still looks green. Never infer
+  `required:`; whether a check can block a merge is server-side state that no
+  checkout can see, so it is a human attestation. Percentages live in the coverage
+  report and in dated `Outputs/` audits, never in the note.
 - **`Reference/Cognitive Coverage/` records whether a person can explain a feature**,
   as dated assessments, newest first. Never overwrite an entry — the history is the
   point. One person per entry, and record the questions asked so a re-test can be

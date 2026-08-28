@@ -54,6 +54,13 @@ yourself** — that field means a human confirmed the content and is theirs to a
 `Reference/Cognitive Coverage/` records whether a person can explain a feature, as
 dated assessments, newest first. Never overwrite an entry.
 
+The testing canon lives in `Reference/Testing/`: two frozen fenced blocks
+(`test-suites`, `test-gates`) whose contract is in the Test Canon template. A floor
+is a ratchet — the coverage that already exists, rounded down — and only rises.
+`branches:` is case-sensitive and verbatim. Never infer `required:`; it is a human
+attestation, because branch protection is not visible from a checkout. No
+percentage goes in the note.
+
 The design canon lives in `Reference/Design/`: two frozen fenced blocks
 (`design-tokens`, `design-components`) whose contract is in the Design System
 template. Omit a key you do not have rather than writing `TODO` — absence is what
