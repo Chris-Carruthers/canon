@@ -43,6 +43,31 @@ for f in "$KIT"/bin/canon-* "$KIT"/install.sh; do
 done
 is "every script reports VERSION ($VER)" "${mismatch:-none}" "none"
 
+# --help was tested nowhere, and five of the twelve bins mishandled it: they took
+# the flag as a positional argument. canon-init-vault got as far as `mkdir --help`
+# and surfaced "mkdir: illegal option -- -", which reads as a crash rather than a
+# usage error. Asserted on the three things a reader actually needs.
+badhelp=""
+for f in "$KIT"/bin/canon-* "$KIT"/install.sh; do
+  b="$(basename "$f")"
+  out="$("$f" --help 2>&1)" || { badhelp="$badhelp $b:exit"; continue; }
+  case "$out" in
+    "")     badhelp="$badhelp $b:empty" ;;
+    "#"*)   badhelp="$badhelp $b:leaks-comment-marker" ;;
+    "$b"*)  : ;;
+    *)      badhelp="$badhelp $b:does-not-name-itself" ;;
+  esac
+done
+is "every script has usable --help" "${badhelp:-none}" "none"
+
+# -h must be the same thing. A short flag that silently does something else is
+# worse than one that does not exist.
+shorthelp=""
+for f in "$KIT"/bin/canon-* "$KIT"/install.sh; do
+  [ "$("$f" -h 2>&1)" = "$("$f" --help 2>&1)" ] || shorthelp="$shorthelp $(basename "$f")"
+done
+is "-h matches --help" "${shorthelp:-none}" "none"
+
 # bash 3.2 compatibility — stock macOS ships 3.2.57
 if grep -qnE 'declare -A|mapfile|readarray|\$\{[a-zA-Z_]+,,\}|globstar' \
      "$KIT"/bin/canon-* "$KIT"/install.sh 2>/dev/null; then
@@ -426,8 +451,12 @@ cd "$V4" || exit 1; git init -q; git config user.email chris@example.com; git co
 
 is "vendors canon-trust + canon-verify" \
    "$([ -x "$V4/.canon/canon-trust" ] && [ -x "$V4/.canon/canon-verify" ] && echo y)" "y"
-is "templates carry generated:" \
-   "$(grep -l 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "8"
+# Counted against the templates present, not against a literal. The old form was
+# pinned to 8 of 10 — it recorded the gap rather than catching it, and the two
+# without provenance frontmatter (Handoff, Product Spec) stayed that way through
+# every run.
+is "EVERY template carries generated:" \
+   "$(grep -L 'generated:' "$V4"/Templates/*.md | wc -l | tr -d ' ')" "0"
 
 printf -- '---\ntype: decision\ngenerated: { by: some-agent/1, at: 2026-07-30T10:00:00Z }\n---\n# x\n' > "$V4/Decisions/a.md"
 printf -- '---\ntype: reference\nverified: { by: process:ci, at: 2026-07-02T02:00:00Z }\nstale_after: 2020-01-01\n---\n# y\n' > "$V4/Reference/b.md"
@@ -764,6 +793,53 @@ for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vau
   LC_ALL=C grep -q "Reference/Writing" "$f" 2>/dev/null || missing_hv="$missing_hv $(basename "$f")"
 done
 is "BOTH rules files mention house voice" "${missing_hv:-none}" "none"
+
+# ---------------------------------------------------------------------------
+section "feature wiring"
+# THE ASSERTION THAT SHOULD HAVE EXISTED FIRST. A feature has to reach six
+# surfaces, and every one of them shipped reaching a different subset:
+# cognitive coverage never reached agent-instructions.md, house voice reached
+# neither rules file, template packs reached nothing an agent reads. Nothing
+# failed, because each surface was only ever checked one at a time.
+#
+# agent-instructions.md is the one that matters most: install.sh writes it into
+# ALL SEVEN runtime files, so anything absent there is invisible to Gemini,
+# Copilot, Windsurf, Cline and AGENTS.md — every runtime except Claude and Cursor.
+ROUTER_T="$KIT/templates/vault/Vision/Agent Router.md"
+HWW_T="$KIT/templates/vault/Vision/How We Work.md"
+CRUL="$KIT/templates/repo/.claude/rules/knowledge-vault.md"
+XRUL="$KIT/templates/repo/.cursor/rules/knowledge-vault.mdc"
+AINS="$KIT/templates/repo/agent-instructions.md"
+
+unwired=""
+for feature in "Reference/Design/" "Reference/Testing/" "Reference/Writing/" "Reference/Cognitive Coverage/"; do
+  for surface in "$ROUTER_T" "$CRUL" "$XRUL" "$AINS"; do
+    LC_ALL=C grep -qF "$feature" "$surface" \
+      || unwired="$unwired ${feature%/}->$(basename "$surface")"
+  done
+done
+is "every vault surface is wired into every agent-facing file" "${unwired:-none}" "none"
+
+# How We Work is the human reference; a feature missing there is one nobody can
+# read the reasoning for.
+undocumented=""
+for feature in "Reference/Design/" "Reference/Testing/" "Reference/Writing/" "Reference/Cognitive Coverage/"; do
+  LC_ALL=C grep -qF "$feature" "$HWW_T" || undocumented="$undocumented ${feature%/}"
+done
+is "and explained in How We Work" "${undocumented:-none}" "none"
+
+# A template that files into a folder nothing creates sends notes nowhere. The
+# Design Critique template shipped pointing at `Reviews/`, which canon-init-vault
+# does not scaffold, no .gitkeep covers, and which appears in no other file — so a
+# teammate cloning the vault would not even have the directory.
+SCAFFOLDED="Vision Projects Clients Decisions Reference Sessions Specs Handoffs Outputs Sources Templates Attachments _Inbox"
+badpath=""
+for t in "$KIT"/templates/vault/Templates/*.md "$KIT"/templates/packs/*/Templates/*.md; do
+  dest="$(LC_ALL=C sed -n 's|^File as: \([A-Za-z_][A-Za-z0-9_]*\)/.*|\1|p' "$t" | head -1)"
+  [ -n "$dest" ] || { badpath="$badpath $(basename "$t"):no-File-as"; continue; }
+  case " $SCAFFOLDED " in *" $dest "*) : ;; *) badpath="$badpath $(basename "$t"):$dest" ;; esac
+done
+is "every template files into a folder canon creates" "${badpath:-none}" "none"
 
 # House Voice is an index note and index notes are read in full.
 HVL="$(wc -l < "$V/Reference/Writing/House Voice.md" | tr -d ' ')"

@@ -8,6 +8,61 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **Feature wiring is asserted, not assumed.** A feature has to reach six surfaces —
+  the router, `How We Work`, both repo rules files, `agent-instructions.md` and the
+  README — and every one of them had shipped reaching a different subset. Cognitive
+  coverage never reached `agent-instructions.md` or `How We Work`; house voice
+  reached neither rules file; template packs reached nothing an agent reads, so no
+  agent knew optional templates existed. Nothing failed, because each surface was
+  only ever checked one at a time.
+
+  `agent-instructions.md` is the one that matters most: `install.sh` writes it into
+  **all seven** runtime files, so anything absent there is invisible to Gemini,
+  Copilot, Windsurf, Cline and `AGENTS.md`. Three new assertions close the matrix,
+  one per surface class.
+
+  Fixed alongside: `Reference/Writing/`, `Reference/Testing/` and
+  `Reference/Cognitive Coverage/` added to the reading list every runtime gets;
+  template packs described in both rules files; a `Cognitive coverage` section in
+  `How We Work`, which had none.
+
+- **A template filed into a folder canon never creates.** `Design Critique` pointed
+  at `Reviews/` — absent from `canon-init-vault`'s directory list, covered by no
+  `.gitkeep`, and named nowhere else in the kit, so a teammate cloning the vault
+  would not have had the directory at all. Now `Reference/Design/Critiques/`, and a
+  new assertion checks every template's `File as:` destination against the folders
+  that actually get scaffolded.
+
+- **Every note template now carries `generated:` and says where it is filed.**
+  `Handoff` and `Product Spec` were the two without provenance frontmatter, and the
+  assertion covering it was pinned to `8` — it recorded the gap rather than catching
+  it, so both stayed that way through every run. It now counts templates *without*
+  the key and requires zero. Five templates never said where the note goes: Client,
+  Decision, Handoff, Project and Session Log. Handoff mattered most, because the
+  spec cites it by path.
+
+- **`plugin.json` advertised two of three skills.** `repo-context` was missing.
+
+- **The README's nav omitted the design canon** while listing every newer feature —
+  each release added its own entry and the biggest one was never retrofitted.
+
+- **`--help` works on every script, and is asserted.** Five of the twelve bins took
+  the flag as a positional argument: `canon-init-vault --help` got as far as
+  `mkdir --help` and printed `mkdir: illegal option -- -`, which reads as a crash
+  rather than a usage error; `canon-scan` and `canon-install-vault-hooks` failed
+  with "not a directory" / "not a git repo"; `canon-guard` printed nothing and
+  exited 0; `canon-path` ignored the flag and printed the vault path.
+
+  All thirteen entry points now share one idiom, extending the `--version` case
+  that was already uniform. Help renders the file's own header comment with the
+  `#` markers stripped, so it terminates wherever the header does instead of at a
+  hardcoded line number — the seven scripts that did have `-h` used
+  `sed -n '2,NNp'`, which silently truncates the moment somebody adds a paragraph.
+
+  CI asserts what a reader actually needs: exit 0, non-empty, no leaked comment
+  marker, first line names the script, and `-h` is byte-identical to `--help`.
+  Nothing tested `--help` before; only `--version` was covered.
+
 - **Template packs, and `canon-pack`** — optional note templates, asked for rather than
   installed.
 

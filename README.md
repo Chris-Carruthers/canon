@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-362%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-367%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -39,6 +39,7 @@ reading the vault with two apps and no commands.
 - [What you get](#what-you-get) · [Install as a Claude Code plugin](#install-it-as-a-claude-code-plugin) · [Quickstart](#quickstart) · [How it finds the vault](#how-it-finds-the-vault)
 - [Claude Desktop and Cowork](#claude-desktop-and-cowork) — connected folder, or the `.mcpb` bundle
 - [Works with agents that are not Claude](#works-with-agents-that-are-not-claude) — seven runtimes from one template
+- [The design canon](#the-design-canon-names-and-pointers-never-values) — names and pointers, never values
 - [The testing canon](#the-testing-canon-a-ratchet-and-a-gate-that-actually-runs) — a floor that only rises
 - [Cognitive coverage](#cognitive-coverage-can-you-explain-what-your-agent-built) — the quiz nobody else runs
 - [House voice](#house-voice-who-each-document-should-read-like) — who each document should read like, and who it must not
