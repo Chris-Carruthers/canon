@@ -8,6 +8,22 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **The MCP server's header promised a default it did not have.** It said large
+  vendored subtrees are *"skipped by default"* and named the 79 MB documentation
+  mirror it would otherwise drown in. The actual defaults are `.git`, `.canon` and
+  `node_modules`; the exclusion is opt-in via `CANON_MCP_EXCLUDE`. The package
+  README stated this correctly, so the wrong copy was the one a maintainer reads,
+  and the failure it promised to prevent is the exact one a real vault hits.
+
+- **Six version declarations CI never checked, two already wrong.** The check
+  covered `bin/canon-*` and `install.sh` only. `connectors/slack/package.json` and
+  `connectors/discord/package.json` were still on `0.1.0`, and
+  `connectors/mcp/src/server.mjs` hardcoded `version: "0.1.0"` as the identity it
+  advertises **over the protocol** — so an MCP client saw a version that nothing
+  else in the repo agreed with. All now derive from `VERSION`, and the CI step
+  covers `plugin.json`, the `.mcpb` manifest, all three connector packages, and the
+  string inside the server.
+
 - **Feature wiring is asserted, not assumed.** A feature has to reach six surfaces —
   the router, `How We Work`, both repo rules files, `agent-instructions.md` and the
   README — and every one of them had shipped reaching a different subset. Cognitive
