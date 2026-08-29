@@ -51,6 +51,16 @@ AHEAD=0
 git -C "$VAULT" rev-parse --verify --quiet "origin/$BRANCH" >/dev/null 2>&1 \
   && AHEAD="$(git -C "$VAULT" rev-list --count "origin/$BRANCH..HEAD" 2>/dev/null || echo 0)"
 
+# Is there a team to be out of step WITH? A vault with no remote is not behind,
+# it is solo — and "never pulled from the team" is then both false and, worse,
+# unfixable: canon-sync has nothing to pull from. canon-init-vault creates a repo
+# with no remote, so that is the state of EVERY vault on its first run, and
+# permanently for anyone working alone. The hook that prints this tells the agent
+# to raise it every session, so the first experience of canon was a standing
+# complaint about a team that does not exist yet.
+HAS_REMOTE=0
+[ -n "$(git -C "$VAULT" remote 2>/dev/null)" ] && HAS_REMOTE=1
+
 DAYS=""
 FH="$VAULT/.git/FETCH_HEAD"
 if [ -f "$FH" ]; then
@@ -77,8 +87,10 @@ case "$BRANCH" in canon/*) ONBRANCH=1 ;; esac
 # "in step" — while the notes are sitting in an unmerged pull request that nobody
 # else's vault contains. Same failure as an unpushed commit, one step further out.
 [ "$ONBRANCH" = "1" ] && add "on review branch $BRANCH, not merged into the shared vault"
-[ -n "$DAYS" ] && [ "$DAYS" -ge "$STALE_DAYS" ] && add "last checked for teammates' updates ${DAYS}d ago"
-[ -z "$DAYS" ] && add "never pulled from the team"
+if [ "$HAS_REMOTE" = "1" ]; then
+  [ -n "$DAYS" ] && [ "$DAYS" -ge "$STALE_DAYS" ] && add "last checked for teammates' updates ${DAYS}d ago"
+  [ -z "$DAYS" ] && add "never pulled from the team"
+fi
 
 [ -z "$REASONS" ] && exit 0
 [ "$QUIET" = "1" ] && exit 1
@@ -86,6 +98,11 @@ case "$BRANCH" in canon/*) ONBRANCH=1 ;; esac
 printf 'Knowledge vault: %s\n' "$REASONS"
 if [ "$ONBRANCH" = "1" ]; then
   printf '  Get it reviewed:  open the pull request for %s\n' "$BRANCH"
+elif [ "$HAS_REMOTE" = "0" ]; then
+  # Local-only: committing is the whole of "safe" here. Do not advertise --push;
+  # there is nowhere to push, and naming a command that cannot work reads as a
+  # broken tool rather than as a vault that simply has no remote yet.
+  printf '  Save it locally:  canon-sync   (no remote yet — add one to share with a team)\n'
 elif [ "$DIRTY" -gt 0 ] || [ "$AHEAD" -gt 0 ]; then
   printf '  Share your work:  canon-sync --push\n'
 else

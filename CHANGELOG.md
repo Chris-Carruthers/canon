@@ -8,6 +8,29 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **A vault with no remote was reported as out of step with a team that does not
+  exist.** `canon-init-vault` creates a repo and configures no remote, so
+  `canon-status` found no `.git/FETCH_HEAD` and said *"never pulled from the team ·
+  Get up to date: canon-sync"* — on **every vault's first run**, and permanently for
+  anyone working alone. The `SessionStart` hook instructs the agent to raise this in
+  its first reply, so canon's opening move was a standing complaint the user could
+  not act on: with no remote, `canon-sync` has nothing to pull.
+
+  Team signals are now conditional on a remote existing. A solo vault with
+  uncommitted work says *"Save it locally: canon-sync (no remote yet — add one to
+  share with a team)"* rather than offering `--push` into nowhere, and a clean one
+  is silent. Add a remote and every previous signal returns unchanged.
+
+  The test that covered this **required** the wrong message — `has "flags a vault
+  never pulled"` against a vault with no remote — so the suite encoded the defect
+  instead of catching it. Replaced with assertions for both states.
+
+  The `Stop` hook echoes `canon-status`, so it inherited the same wrong framing in
+  prose it hardcodes: *"out of step with the team"* and *"the note is not shared
+  until it is pushed"*. Both are now conditional on a remote existing — a solo
+  vault is told its work is unsaved and one lost laptop from gone, which is the
+  true and actionable version.
+
 - **The MCP server's header promised a default it did not have.** It said large
   vendored subtrees are *"skipped by default"* and named the 79 MB documentation
   mirror it would otherwise drown in. The actual defaults are `.git`, `.canon` and
