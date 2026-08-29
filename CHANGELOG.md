@@ -12,6 +12,14 @@ _Nothing yet._
 
 ### Added
 
+- **CI runs on every branch, not only `main` and pull requests.** Feature branches
+  were covered solely by the `pull_request` event. When GitHub missed the
+  `synchronize` for a push, the PR kept showing the **previous** commit's four green
+  checks while the code that would actually merge had never been tested — and the
+  commit then merged untested. A false green is worse than a missing one, because
+  nobody investigates it. Costs a duplicate run on PR branches; the suite is under a
+  minute.
+
 - **Releases exist now, and a stale install says so.** There were **no git tags and
   no GitHub releases**, and `VERSION` had not moved in 68 commits — everything since
   `413d433` accumulated under `[Unreleased]` at 0.2.0. So nobody could be behind,
