@@ -9,7 +9,7 @@ generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 
 <!--
 Voice: skills/house-voice/references/design-critique.md — your own map wins: Reference/Writing/House Voice.md
-File as: Reviews/YYYY-MM-DD — <Subject> critique.md
+File as: Reference/Design/Critiques/YYYY-MM-DD — <Subject>.md
 
 WHY WRITE IT DOWN: verbal critique evaporates, and the same objection then gets
 raised in three separate reviews by three people who each think it is new.

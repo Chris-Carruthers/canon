@@ -151,6 +151,30 @@ drifted. It never runs your tests and it never computes coverage. It measures; i
 does not enforce. Enforcement is a required status check, in the forge, set by
 somebody with admin.
 
+## Cognitive coverage
+
+`Reference/Cognitive Coverage/` answers a question neither review nor tests ask:
+**can a person explain what was built, without reading it again?** Agent-built
+code fails that quietly, because it passes review — it *is* correct. The gap
+surfaces later, when somebody has to change it and realises they are reading it
+for the first time.
+
+Entries are dated assessments, newest first, and they are **appended, never
+overwritten** — the history is the value, because it shows whether understanding
+improved after somebody went and read the code or quietly decayed. Results are
+reported per band rather than as one score: solid on shape and blank on failure
+modes is a specific, actionable problem that an average hides.
+
+Two rules keep it worth running. **A quiz everybody passes is worse than none** —
+it converts an unknown gap into a false belief and spends the one moment somebody
+was willing to be tested. And it is **a coverage report for a system, not a review
+of a person**; if it reads as a scorecard on a colleague, nobody asks for it twice
+and the people who need it stop first.
+
+This is the one thing in the vault that is stored rather than derived, and it has
+to be: it records what a specific person could explain on a specific date, which
+nothing can recompute.
+
 ## How our documents read
 
 The templates say what sections a document has. They do not say how it

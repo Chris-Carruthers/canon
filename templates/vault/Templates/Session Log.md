@@ -8,6 +8,7 @@ generated: { by: <actor>, at: YYYY-MM-DDTHH:MM:SSZ }
 
 <!--
 Voice: skills/house-voice/references/session-log.md — your own map wins: Reference/Writing/House Voice.md
+File as: Sessions/YYYY-MM-DD — <short title> (<initials>).md
 -->
 
 # Session — YYYY-MM-DD — <short title>
