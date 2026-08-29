@@ -78,6 +78,13 @@ Freely writable without asking: `Sessions/`, `Projects/`, `Clients/`,
   `required:`; whether a check can block a merge is server-side state that no
   checkout can see, so it is a human attestation. Percentages live in the coverage
   report and in dated `Outputs/` audits, never in the note.
+- **Before writing a vault document, check how that type should read.**
+  `Reference/Writing/House Voice.md` maps each document type to a writer worth
+  imitating and, more usefully, to the register it must **not** land in — a Decision
+  note that reads like meeting minutes records what was discussed rather than what
+  was chosen. `Reference/Writing/Choosing a Document.md` says which document to write
+  at which stage; pick the cheapest rung that still works. canon's defaults are in
+  the `house-voice` skill, and the vault note overrides them.
 - **`Reference/Cognitive Coverage/` records whether a person can explain a feature**,
   as dated assessments, newest first. Never overwrite an entry — the history is the
   point. One person per entry, and record the questions asked so a re-test can be
