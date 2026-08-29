@@ -68,6 +68,50 @@ for f in "$KIT"/bin/canon-* "$KIT"/install.sh; do
 done
 is "-h matches --help" "${shorthelp:-none}" "none"
 
+# ---------------------------------------------------------------------------
+section "install staleness"
+# Hooks and .canon/ tools are COPIES. Upgrading the kit does nothing to a repo
+# wired weeks ago or a vault scaffolded last month, and nothing about the files
+# says how old they are — so being behind was undetectable, not just unreported.
+SBS="$(mktemp -d)"; VS="$SBS/vaultS"; RS="$SBS/repoS"   # $SB is not created until later
+"$KIT/bin/canon-init-vault" "$VS" >/dev/null 2>&1
+mkdir -p "$RS"; git -C "$RS" init -q
+"$KIT/install.sh" "$RS" --vault "$VS" >/dev/null 2>&1
+
+is "scaffold stamps the vault" "$(cat "$VS/.canon/.canon-version" 2>/dev/null)" "$VER"
+is "install stamps the repo"   "$(cat "$RS/.claude/hooks/.canon-version" 2>/dev/null)" "$VER"
+
+# An in-step install must say NOTHING. A staleness banner that always shows is a
+# banner people stop reading, which is how the solo-vault nag went unnoticed.
+export XDG_CACHE_HOME="$SBS/nocache"
+(cd "$VS" && git status --porcelain | awk '{print $2}' | while read -r f; do git add "$f"; done)
+git -C "$VS" -c user.email=t@t -c user.name=T commit -qm base >/dev/null 2>&1
+is "in-step install is silent" "$(CANON_REPO="$RS" "$KIT/bin/canon-status" "$VS" 2>/dev/null || true)" ""
+
+printf '0.0.1\n' > "$VS/.canon/.canon-version"
+has "flags a stale vault"  "$(CANON_REPO="$RS" "$KIT/bin/canon-status" "$VS" 2>/dev/null)" "canon-init-vault"
+printf '%s\n' "$VER" > "$VS/.canon/.canon-version"
+printf '0.0.1\n' > "$RS/.claude/hooks/.canon-version"
+has "flags stale repo hooks" "$(CANON_REPO="$RS" "$KIT/bin/canon-status" "$VS" 2>/dev/null)" "install.sh"
+printf '%s\n' "$VER" > "$RS/.claude/hooks/.canon-version"
+
+# The release check reads a cache canon-sync writes. canon-status must never make
+# the network call itself — it runs in a SessionStart hook, and a hook that hangs
+# on a bad connection is worse than a stale version number.
+mkdir -p "$SBS/nocache/canon"; printf '99.0.0\n' > "$SBS/nocache/canon/latest-release"
+has "reports a newer release"  "$("$KIT/bin/canon-status" "$VS" 2>/dev/null)" "99.0.0"
+rm -f "$SBS/nocache/canon/latest-release"
+is  "and is silent without it" "$("$KIT/bin/canon-status" "$VS" 2>/dev/null || true)" ""
+
+# Both hooks must tell canon-status which repo invoked it, or the repo-hook check
+# can never fire — that is the copy most likely to be stale.
+noexport=""
+for h in session-start.sh session-end-check.sh; do
+  LC_ALL=C grep -q 'CANON_REPO' "$KIT/templates/repo/.claude/hooks/$h" || noexport="$noexport $h"
+done
+is "both hooks pass CANON_REPO" "${noexport:-none}" "none"
+unset XDG_CACHE_HOME
+
 # bash 3.2 compatibility — stock macOS ships 3.2.57
 if grep -qnE 'declare -A|mapfile|readarray|\$\{[a-zA-Z_]+,,\}|globstar' \
      "$KIT"/bin/canon-* "$KIT"/install.sh 2>/dev/null; then

@@ -6,7 +6,38 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.3.0] — 2026-08-29
+
 ### Added
+
+- **Releases exist now, and a stale install says so.** There were **no git tags and
+  no GitHub releases**, and `VERSION` had not moved in 68 commits — everything since
+  `413d433` accumulated under `[Unreleased]` at 0.2.0. So nobody could be behind,
+  because there was nothing to be behind of, and nothing anywhere checked.
+
+  Worse, **three copies drift independently**: the kit, the vault's vendored
+  `.canon/` tools, and each repo's `.claude/hooks/`. Upgrading the kit does nothing
+  to a repo wired weeks ago — it keeps running the old hooks, silently, forever, and
+  nothing in the files says how old they are.
+
+  `canon-init-vault` and `install.sh` now stamp `.canon-version` where they write.
+  `canon-status` compares those against what is actually running and names the
+  command that fixes it — `re-run canon-init-vault`, `re-run install.sh`. Both hooks
+  export `CANON_REPO` so the repo copy can be checked at all; without it that check
+  could never fire, and the repo copy is the one most likely to be stale.
+
+  **The release check does not live in `canon-status`.** That command runs in a
+  `SessionStart` hook and promises no network call — a hook that hangs on a bad
+  connection is worse than a stale version number. `canon-sync` already makes a
+  network call, so it asks GitHub once a day and writes the answer to
+  `${XDG_CACHE_HOME:-~/.cache}/canon/latest-release`; `canon-status` only reads it.
+  Best-effort throughout: no curl, no network, no releases, a rate limit — all leave
+  the cache alone and say nothing. Opt out with `CANON_CHECK_UPDATES=0`.
+
+  An in-step install is **silent**. A banner that always shows is one people stop
+  reading, which is exactly how the solo-vault nag survived this long.
 
 - **A vault with no remote was reported as out of step with a team that does not
   exist.** `canon-init-vault` creates a repo and configures no remote, so

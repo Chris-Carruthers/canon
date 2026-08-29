@@ -26,7 +26,7 @@
 
 set -uo pipefail
 
-CANON_VERSION="0.2.0"
+CANON_VERSION="0.3.0"
 case "${1:-}" in
   --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;;
   -h|--help)    sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//'; exit 0 ;;

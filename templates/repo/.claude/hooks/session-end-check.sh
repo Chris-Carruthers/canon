@@ -133,6 +133,7 @@ fi
 # Safe to run unconditionally because canon-status is SILENT when in step, so this
 # speaks only when there is genuinely unshared work. No new noise on a read-only
 # session with a clean vault.
+export CANON_REPO="$REPO"   # so it can spot stale hooks in this repo
 SH="$REPO/.claude/hooks/canon-status"
 [ -x "$SH" ] || [ -z "${CLAUDE_PLUGIN_ROOT:-}" ] || SH="${CLAUDE_PLUGIN_ROOT}/bin/canon-status"
 [ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"

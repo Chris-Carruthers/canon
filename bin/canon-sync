@@ -50,7 +50,7 @@
 
 set -uo pipefail
 
-CANON_VERSION="0.2.0"
+CANON_VERSION="0.3.0"
 case "${1:-}" in
   --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;;
   -h|--help)    sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//'; exit 0 ;;
@@ -181,6 +181,38 @@ if [ "$DO_PULL" = "1" ] && [ "$HAS_REMOTE" = 1 ]; then
     echo "  pull failed or left a conflict — resolve it in the vault, then re-run" >&2
     git status --short | head -20 >&2
     exit 1
+  fi
+fi
+
+# --- is a newer canon out? ---------------------------------------------------
+# WHY HERE AND NOT IN canon-status. canon-status is called by the SessionStart
+# hook on every session and promises to make no network call — a promise worth
+# keeping, because a hook that hangs on a bad connection is worse than a stale
+# version number. This command already talks to the network, so it asks once and
+# writes the answer to a cache; canon-status only ever reads that file.
+#
+# Best-effort by design: no curl, no network, no releases yet, rate-limited — all
+# of them leave the cache untouched and say nothing. A version check must never be
+# the reason a sync fails.
+if [ "$DO_PULL" = "1" ] && [ "${CANON_CHECK_UPDATES:-1}" = "1" ]; then
+  CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/canon"
+  CACHE="$CACHE_DIR/latest-release"
+  FRESH=0
+  # Once a day is plenty for a release feed, and it keeps a chatty sync quiet.
+  if [ -f "$CACHE" ]; then
+    AGE="$(python3 -c '
+import os, sys, time
+try: print(int(time.time() - os.path.getmtime(sys.argv[1])))
+except Exception: print(0)' "$CACHE" 2>/dev/null || echo 0)"
+    [ "${AGE:-0}" -lt 86400 ] && FRESH=1
+  fi
+  if [ "$FRESH" = "0" ] && command -v curl >/dev/null 2>&1; then
+    mkdir -p "$CACHE_DIR" 2>/dev/null || true
+    TAG="$(curl -fsS --max-time 4 \
+             -H 'Accept: application/vnd.github+json' \
+             "https://api.github.com/repos/${CANON_REPO_SLUG:-Chris-Carruthers/canon}/releases/latest" \
+           2>/dev/null | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -1)"
+    [ -n "$TAG" ] && printf '%s\n' "$TAG" > "$CACHE" 2>/dev/null || true
   fi
 fi
 

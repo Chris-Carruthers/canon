@@ -95,6 +95,10 @@ BODY="$(head -c "$CAP" "$ROUTER" 2>/dev/null || true)"
 # Is the vault in step with the team? Purely local checks — no network call, so this
 # cannot slow down or hang a session start. Silent when everything is current.
 STATUS=""
+# canon-status is handed a VAULT, so it cannot work out which repo invoked it —
+# and the repo's hooks are the copy most likely to be stale, because upgrading
+# the kit never touches a repo wired weeks ago. Tell it.
+export CANON_REPO="${CLAUDE_PROJECT_DIR:-$PWD}"
 SH="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/canon-status"
 [ -x "$SH" ] || [ -z "${CLAUDE_PLUGIN_ROOT:-}" ] || SH="${CLAUDE_PLUGIN_ROOT}/bin/canon-status"
 [ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"

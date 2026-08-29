@@ -21,7 +21,7 @@
 
 set -uo pipefail
 
-CANON_VERSION="0.2.0"
+CANON_VERSION="0.3.0"
 case "${1:-}" in
   --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;;
   -h|--help)    sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//'; exit 0 ;;
@@ -78,6 +78,36 @@ fi
 REASONS=""
 add() { REASONS="${REASONS}${REASONS:+ · }$1"; }
 
+# ── is the INSTALL stale? ────────────────────────────────────────────────────
+# Separate question from "is the vault in step with the team", and invisible
+# without asking. Hooks and .canon/ tools are COPIES: upgrading the kit does
+# nothing to a repo wired weeks ago or a vault scaffolded last month, and nothing
+# about the files says how old they are. Two checks, both cheap:
+#
+#   drift    what wrote the vault / this repo, versus what is running now. Pure
+#            local file reads, no network.
+#   release  whether a newer version was published. That needs the network, which
+#            this command promises never to touch — so it does NOT look. canon-sync
+#            already makes a network call and writes the answer to a cache file;
+#            this only reads it. Offline stays offline.
+STALE=""
+stale() { STALE="${STALE}${STALE:+ · }$1"; }
+
+vfile() { [ -f "$1" ] && tr -d ' \t\r\n' < "$1" || true; }
+VAULT_V="$(vfile "$VAULT/.canon/.canon-version")"
+REPO_V=""
+[ -n "${CANON_REPO:-}" ] && REPO_V="$(vfile "$CANON_REPO/.claude/hooks/.canon-version")"
+
+[ -n "$VAULT_V" ] && [ "$VAULT_V" != "$CANON_VERSION" ] \
+  && stale "vault tools are $VAULT_V, this is $CANON_VERSION — re-run canon-init-vault"
+[ -n "$REPO_V" ] && [ "$REPO_V" != "$CANON_VERSION" ] \
+  && stale "this repo's hooks are $REPO_V, this is $CANON_VERSION — re-run install.sh"
+
+# Written by canon-sync, which is the one command already making a network call.
+LATEST="$(vfile "${XDG_CACHE_HOME:-$HOME/.cache}/canon/latest-release")"
+[ -n "$LATEST" ] && [ "$LATEST" != "$CANON_VERSION" ] \
+  && stale "canon $LATEST has been released, you are on $CANON_VERSION"
+
 ONBRANCH=0
 case "$BRANCH" in canon/*) ONBRANCH=1 ;; esac
 
@@ -92,8 +122,14 @@ if [ "$HAS_REMOTE" = "1" ]; then
   [ -z "$DAYS" ] && add "never pulled from the team"
 fi
 
-[ -z "$REASONS" ] && exit 0
+[ -z "$REASONS" ] && [ -z "$STALE" ] && exit 0
 [ "$QUIET" = "1" ] && exit 1
+
+# The install line goes FIRST when the vault itself is in step: an out-of-date
+# install is the more surprising fact, and burying it under sync advice is how it
+# stays unnoticed for months.
+[ -n "$STALE" ] && printf 'canon install: %s\n' "$STALE"
+[ -z "$REASONS" ] && exit 1
 
 printf 'Knowledge vault: %s\n' "$REASONS"
 if [ "$ONBRANCH" = "1" ]; then
