@@ -36,7 +36,7 @@
 
 set -euo pipefail
 
-CANON_VERSION="0.2.0"
+CANON_VERSION="0.3.0"
 case "${1:-}" in
   --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;;
   -h|--help)    sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//'; exit 0 ;;
@@ -195,6 +195,17 @@ for tool in canon-path canon-status; do
   run chmod +x "$TARGET/.claude/hooks/$tool"
   say "tool: .claude/hooks/$tool"
 done
+
+# Record which kit wrote these. Hooks and vendored tools are COPIES: upgrading the
+# kit does nothing to a repo wired weeks ago, and nothing about the files says how
+# old they are. Without this stamp the drift is undetectable — the repo keeps
+# running the version it was installed with, silently, forever.
+if [ "$DRY" = "1" ]; then
+  say "[dry-run] stamp .claude/hooks/.canon-version -> $CANON_VERSION"
+else
+  printf '%s\n' "$CANON_VERSION" > "$TARGET/.claude/hooks/.canon-version"
+  say "stamped .claude/hooks/.canon-version ($CANON_VERSION)"
+fi
 
 # --- path-scoped rules -------------------------------------------------------
 run cp "$TPL/.claude/rules/knowledge-vault.md" "$TARGET/.claude/rules/knowledge-vault.md"

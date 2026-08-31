@@ -156,7 +156,7 @@ const TOOLS = [
 ];
 
 const server = new Server(
-  { name: "canon", version: "0.2.0" },   // keep in step with package.json; CI asserts it
+  { name: "canon", version: "0.3.0" },   // keep in step with package.json; CI asserts it
   { capabilities: { tools: {} } },
 );
 

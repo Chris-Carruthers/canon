@@ -1,8 +1,8 @@
 {
   "manifest_version": "0.3",
   "name": "canon",
-  "display_name": "canon — team knowledge vault",
-  "version": "0.2.0",
+  "display_name": "canon \u2014 team knowledge vault",
+  "version": "0.3.0",
   "description": "Read your team's shared knowledge vault from Claude Desktop and Cowork. Read-only: it returns notes, Claude reasons.",
   "long_description": "canon turns a folder of markdown notes into shared context every agent on your team can read. This bundle exposes that vault to Claude Desktop and to local Cowork sessions over MCP.\n\nFour tools, all read-only, and no write tool at all: canon_router returns the vault's map, canon_search greps it, canon_list browses folders, canon_read returns a note. Every caller-supplied path is resolved through a symlink-aware check that refuses anything outside the vault you selected.\n\nPick your vault folder during install. If your team already shares a vault repository, clone it first and point this at the clone.",
   "author": {
@@ -13,13 +13,22 @@
   "documentation": "https://github.com/Chris-Carruthers/canon/blob/main/connectors/mcp/README.md",
   "support": "https://github.com/Chris-Carruthers/canon/issues",
   "license": "MIT",
-  "keywords": ["knowledge", "notes", "obsidian", "markdown", "context", "team"],
+  "keywords": [
+    "knowledge",
+    "notes",
+    "obsidian",
+    "markdown",
+    "context",
+    "team"
+  ],
   "server": {
     "type": "node",
     "entry_point": "connectors/mcp/src/server.mjs",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/connectors/mcp/src/server.mjs"],
+      "args": [
+        "${__dirname}/connectors/mcp/src/server.mjs"
+      ],
       "env": {
         "CANON_HOME": "${user_config.vault_dir}",
         "CANON_ROUTER": "${user_config.router}",
@@ -44,19 +53,37 @@
     "exclude": {
       "type": "string",
       "title": "Folders to skip",
-      "description": "Comma-separated paths the tools will not read — useful for large vendored doc trees that would swamp search results.",
+      "description": "Comma-separated paths the tools will not read \u2014 useful for large vendored doc trees that would swamp search results.",
       "default": "",
       "required": false
     }
   },
   "tools": [
-    { "name": "canon_router", "description": "The vault's map: what kind of note lives where" },
-    { "name": "canon_search", "description": "Search note contents and filenames" },
-    { "name": "canon_list", "description": "List notes in a folder" },
-    { "name": "canon_read", "description": "Read one note" }
+    {
+      "name": "canon_router",
+      "description": "The vault's map: what kind of note lives where"
+    },
+    {
+      "name": "canon_search",
+      "description": "Search note contents and filenames"
+    },
+    {
+      "name": "canon_list",
+      "description": "List notes in a folder"
+    },
+    {
+      "name": "canon_read",
+      "description": "Read one note"
+    }
   ],
   "compatibility": {
-    "platforms": ["darwin", "win32", "linux"],
-    "runtimes": { "node": ">=20.0.0" }
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
   }
 }

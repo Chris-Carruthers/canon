@@ -1,8 +1,14 @@
 name: CI
 
 on:
+  # EVERY branch, not just main. Feature branches used to be covered only by the
+  # pull_request event — and when GitHub missed the `synchronize` for a push, the
+  # PR went on displaying the previous commit's four green checks while the code
+  # that would actually merge had never been tested. A false green is worse than a
+  # missing one, because nobody investigates it. This costs a duplicate run on PR
+  # branches; the suite is under a minute, and that is a fair price for "no checks"
+  # meaning "no commit" rather than "no event".
   push:
-    branches: [main]
   pull_request:
 
 jobs:

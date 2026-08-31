@@ -133,6 +133,7 @@ fi
 # Safe to run unconditionally because canon-status is SILENT when in step, so this
 # speaks only when there is genuinely unshared work. No new noise on a read-only
 # session with a clean vault.
+export CANON_REPO="$REPO"   # so it can spot stale hooks in this repo
 SH="$REPO/.claude/hooks/canon-status"
 [ -x "$SH" ] || [ -z "${CLAUDE_PLUGIN_ROOT:-}" ] || SH="${CLAUDE_PLUGIN_ROOT}/bin/canon-status"
 [ -x "$SH" ] || SH="$(command -v canon-status 2>/dev/null || true)"
@@ -141,20 +142,31 @@ if [ -n "$SH" ] && [ -x "$SH" ]; then
   SYNC="$("$SH" "$VAULT" 2>/dev/null || true)"
 fi
 
+# "Out of step with the team" and "not shared until it is pushed" are both false
+# for a vault with no remote — it is solo, and the only thing it can be is
+# uncommitted. Saying otherwise names a team that does not exist and a command
+# that cannot work, which is how a nudge trains people to ignore nudges.
+SOLO=0
+[ -z "$(git -C "$VAULT" remote 2>/dev/null)" ] && SOLO=1
+
 # Nothing happened in the repo: the only thing still worth saying is that earlier
 # vault work has not been shared. Never demand a note for a session that changed
 # no code.
 if [ "$CHANGES" != "1" ]; then
   [ -z "$SYNC" ] && exit 0
   : > "$GUARD" 2>/dev/null || true
-  python3 - "$SYNC" <<'PY' 2>/dev/null || true
+  python3 - "$SYNC" "$SOLO" <<'PY' 2>/dev/null || true
 import json, sys
-print(json.dumps({"systemMessage":
-  "The knowledge vault is out of step with the team.\n\n"
-  + sys.argv[1]
-  + "\n\nA vault only stays shared if this happens: unpushed notes are invisible "
-    "to teammates, and unpulled ones mean this session read a stale picture. Run "
-    "the command above if the user wants to sync."}))
+solo = sys.argv[2] == "1"
+head = ("The knowledge vault has unsaved work." if solo
+        else "The knowledge vault is out of step with the team.")
+tail = ("\n\nIt is not committed, so it is one lost laptop away from gone. Run the "
+        "command above if the user wants it saved."
+        if solo else
+        "\n\nA vault only stays shared if this happens: unpushed notes are invisible "
+        "to teammates, and unpulled ones mean this session read a stale picture. Run "
+        "the command above if the user wants to sync.")
+print(json.dumps({"systemMessage": head + "\n\n" + sys.argv[1] + tail}))
 PY
   exit 0
 fi
@@ -169,13 +181,17 @@ if [ -n "$RECENT" ]; then
   # say so once. Never blocks: the work is done, this is a nudge, not a gate.
   [ -z "$SYNC" ] && exit 0
   : > "$GUARD" 2>/dev/null || true
-  python3 - "$SYNC" <<'PY' 2>/dev/null || true
+  python3 - "$SYNC" "$SOLO" <<'PY' 2>/dev/null || true
 import json, sys
-print(json.dumps({"systemMessage":
-  "A session note was written, but the vault is out of step with the team.\n\n"
-  + sys.argv[1]
-  + "\n\nThe note is not shared until it is pushed. Run the command above if the "
-    "user wants their work to reach teammates."}))
+solo = sys.argv[2] == "1"
+head = ("A session note was written, but the vault has unsaved work." if solo
+        else "A session note was written, but the vault is out of step with the team.")
+tail = ("\n\nThe note is not saved until it is committed. Run the command above if "
+        "the user wants to keep it."
+        if solo else
+        "\n\nThe note is not shared until it is pushed. Run the command above if the "
+        "user wants their work to reach teammates.")
+print(json.dumps({"systemMessage": head + "\n\n" + sys.argv[1] + tail}))
 PY
   exit 0
 fi

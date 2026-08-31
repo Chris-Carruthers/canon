@@ -68,6 +68,50 @@ for f in "$KIT"/bin/canon-* "$KIT"/install.sh; do
 done
 is "-h matches --help" "${shorthelp:-none}" "none"
 
+# ---------------------------------------------------------------------------
+section "install staleness"
+# Hooks and .canon/ tools are COPIES. Upgrading the kit does nothing to a repo
+# wired weeks ago or a vault scaffolded last month, and nothing about the files
+# says how old they are — so being behind was undetectable, not just unreported.
+SBS="$(mktemp -d)"; VS="$SBS/vaultS"; RS="$SBS/repoS"   # $SB is not created until later
+"$KIT/bin/canon-init-vault" "$VS" >/dev/null 2>&1
+mkdir -p "$RS"; git -C "$RS" init -q
+"$KIT/install.sh" "$RS" --vault "$VS" >/dev/null 2>&1
+
+is "scaffold stamps the vault" "$(cat "$VS/.canon/.canon-version" 2>/dev/null)" "$VER"
+is "install stamps the repo"   "$(cat "$RS/.claude/hooks/.canon-version" 2>/dev/null)" "$VER"
+
+# An in-step install must say NOTHING. A staleness banner that always shows is a
+# banner people stop reading, which is how the solo-vault nag went unnoticed.
+export XDG_CACHE_HOME="$SBS/nocache"
+(cd "$VS" && git status --porcelain | awk '{print $2}' | while read -r f; do git add "$f"; done)
+git -C "$VS" -c user.email=t@t -c user.name=T commit -qm base >/dev/null 2>&1
+is "in-step install is silent" "$(CANON_REPO="$RS" "$KIT/bin/canon-status" "$VS" 2>/dev/null || true)" ""
+
+printf '0.0.1\n' > "$VS/.canon/.canon-version"
+has "flags a stale vault"  "$(CANON_REPO="$RS" "$KIT/bin/canon-status" "$VS" 2>/dev/null)" "canon-init-vault"
+printf '%s\n' "$VER" > "$VS/.canon/.canon-version"
+printf '0.0.1\n' > "$RS/.claude/hooks/.canon-version"
+has "flags stale repo hooks" "$(CANON_REPO="$RS" "$KIT/bin/canon-status" "$VS" 2>/dev/null)" "install.sh"
+printf '%s\n' "$VER" > "$RS/.claude/hooks/.canon-version"
+
+# The release check reads a cache canon-sync writes. canon-status must never make
+# the network call itself — it runs in a SessionStart hook, and a hook that hangs
+# on a bad connection is worse than a stale version number.
+mkdir -p "$SBS/nocache/canon"; printf '99.0.0\n' > "$SBS/nocache/canon/latest-release"
+has "reports a newer release"  "$("$KIT/bin/canon-status" "$VS" 2>/dev/null)" "99.0.0"
+rm -f "$SBS/nocache/canon/latest-release"
+is  "and is silent without it" "$("$KIT/bin/canon-status" "$VS" 2>/dev/null || true)" ""
+
+# Both hooks must tell canon-status which repo invoked it, or the repo-hook check
+# can never fire — that is the copy most likely to be stale.
+noexport=""
+for h in session-start.sh session-end-check.sh; do
+  LC_ALL=C grep -q 'CANON_REPO' "$KIT/templates/repo/.claude/hooks/$h" || noexport="$noexport $h"
+done
+is "both hooks pass CANON_REPO" "${noexport:-none}" "none"
+unset XDG_CACHE_HOME
+
 # bash 3.2 compatibility — stock macOS ships 3.2.57
 if grep -qnE 'declare -A|mapfile|readarray|\$\{[a-zA-Z_]+,,\}|globstar' \
      "$KIT"/bin/canon-* "$KIT"/install.sh 2>/dev/null; then
@@ -206,8 +250,19 @@ printf -- '---\ntype: session\n---\n# n\n' > "$V/Sessions/note.md"
 # The note exists but is still on this laptop. Writing it and sharing it are two
 # different failures; the hook must still say something, and must not block.
 OUTN="$(stop s4)"
-has "nudges when the note is unshared" "$OUTN" "canon-sync --push"
+# This vault has no remote, so "not shared until it is pushed" would be false and
+# --push unreachable. It must still nudge — the work is unsaved either way.
+has "nudges when the note is unsaved"  "$OUTN" "unsaved work"
+has "and the solo advice is reachable" "$OUTN" "no remote yet"
+case "$OUTN" in *--push*) bad "solo nudge does not mention --push" ;; *) ok "solo nudge does not mention --push" ;; esac
 case "$OUTN" in *'"decision"'*) bad "the unshared nudge never blocks" ;; *) ok "the unshared nudge never blocks" ;; esac
+
+# With a remote, the team framing and the push command both come back.
+git_q -C "$V" remote add origin /tmp/canon-test-remote.git
+OUTP="$(stop s4b)"  # a session id nothing else uses — the guard is per session
+has "with a remote, says out of step with the team" "$OUTP" "out of step with the team"
+has "and suggests the push command"                 "$OUTP" "canon-sync --push"
+git_q -C "$V" remote remove origin
 
 # Note written AND shared — the fully-good session. Silence is the whole point.
 git_q -C "$V" add -A >/dev/null 2>&1; git_q -C "$V" commit -qm notes >/dev/null 2>&1
@@ -420,15 +475,30 @@ cd "$V5" || exit 1; git init -q; git config user.email t@t; git config user.name
 git add -A >/dev/null; git commit -qm init >/dev/null
 
 is "vendors canon-status"          "$([ -x "$V5/.canon/canon-status" ] && echo y)" "y"
-# No remote and never fetched: it should say something, not crash.
-has "flags a vault never pulled"   "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "never pulled"
+# NO REMOTE = SOLO, NOT BEHIND. canon-init-vault creates a repo with no remote,
+# so this is the state of every vault on its first run and permanently for anyone
+# working alone. Reporting "never pulled from the team" there is both false and
+# unfixable — canon-sync has nothing to pull from — and the SessionStart hook tells
+# the agent to raise it every session. The previous assertion here REQUIRED that
+# message, so the test encoded the defect rather than catching it.
+OUT0="$("$KIT/bin/canon-status" "$V5" 2>/dev/null)"
+is "clean solo vault is silent"    "${OUT0:-silent}" "silent"
 "$KIT/bin/canon-status" "$V5" >/dev/null 2>&1
-is "exits 1 when action is needed" "$?" "1"
+is "and exits 0"                   "$?" "0"
 
-# Uncommitted work must be reported.
+# Uncommitted work is still worth saying, remote or not — but the advice must be
+# reachable. Offering --push with nowhere to push reads as a broken tool.
 echo scratch > "$V5/Projects/x.md"
-has "flags uncommitted files"      "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "uncommitted"
-has "suggests the push command"    "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "canon-sync --push"
+has "flags uncommitted files"        "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "uncommitted"
+has "solo advice omits --push"       "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "no remote yet"
+lacks_push="$("$KIT/bin/canon-status" "$V5" 2>/dev/null | LC_ALL=C grep -c -- '--push')"
+is "and does not mention --push"     "$lacks_push" "0"
+
+# Give it a remote and the team signals come back.
+git -C "$V5" remote add origin /tmp/canon-test-remote.git
+has "with a remote, flags never pulled" "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "never pulled"
+has "and now suggests the push command" "$("$KIT/bin/canon-status" "$V5" 2>/dev/null)" "canon-sync --push"
+git -C "$V5" remote remove origin
 rm -f "$V5/Projects/x.md"
 
 # A clean, freshly fetched vault must be SILENT — a reminder that always fires is

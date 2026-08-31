@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-367%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-382%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -1149,6 +1149,41 @@ refuses to run instead, and says why.
 
 Full detail, and how to add your own: [docs/PACKS.md](docs/PACKS.md).
 
+## Staying current
+
+Three copies of canon exist once you are set up, and they drift independently:
+
+| Copy | Refreshed by |
+|---|---|
+| The kit | `git pull`, or the plugin marketplace |
+| The vault's `.canon/` tools | re-running `canon-init-vault` |
+| Each repo's `.claude/hooks/` | re-running `install.sh` |
+
+The third is the one that bites. You upgrade the kit, and every repo you wired
+weeks ago keeps running the hooks it was installed with — silently, because nothing
+in those files says how old they are.
+
+So `canon-init-vault` and `install.sh` stamp a `.canon-version` where they write,
+and `canon-status` — which the `SessionStart` hook already runs — compares it
+against what is actually executing:
+
+```
+canon install: this repo's hooks are 0.2.0, this is 0.3.0 — re-run install.sh
+```
+
+It names the command that fixes it, because "you are out of date" without one is
+just a complaint. **An in-step install says nothing at all** — a banner that always
+shows is a banner people stop reading.
+
+**Why the release check is not in `canon-status`.** That command runs in a session
+hook and promises to make no network call; a hook that hangs on a bad connection is
+worse than a stale version number. `canon-sync` already talks to the network, so it
+asks GitHub for the latest release at most once a day and writes the answer to
+`${XDG_CACHE_HOME:-~/.cache}/canon/latest-release`. `canon-status` only ever reads
+that file. No curl, no network, no releases published, a rate limit — every one of
+those leaves the cache untouched and says nothing, because a version check must
+never be why something else failed. Opt out with `CANON_CHECK_UPDATES=0`.
+
 ## Ownership: not everything should be everyone's
 
 `Vision/` is direction from leadership; session notes are everyone's. Both live in
@@ -1183,6 +1218,8 @@ without accidentally requiring a PR per session note.
 | `CANON_GUARD` | `warn` | `block` = refuse commits to paths you don't own; `off` = disable |
 | `CANON_BRANCH_MODE` | `auto` | `trunk` = always push direct; `branch` = always open a PR; `auto` = direct, except for governed paths |
 | `CANON_SKIP_SCAN` | `0` | `1` = bypass the gate. Be sure. |
+| `CANON_CHECK_UPDATES` | `1` | `0` = never ask GitHub whether a newer canon exists. Asked by `canon-sync` at most once a day and cached; `canon-status` only reads the cache and never calls out |
+| `CANON_STALE_DAYS` | `2` | How long since the last pull before it is worth mentioning |
 
 Auto-pull is **off by default**: a hook that mutates a git repo you didn't ask
 it to touch is a bad default, and a half-rebased vault is worse than a stale one.

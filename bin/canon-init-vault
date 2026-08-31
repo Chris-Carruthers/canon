@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-CANON_VERSION="0.2.0"
+CANON_VERSION="0.3.0"
 case "${1:-}" in
   --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;;
   -h|--help)    sed -n '2,/^[^#]/p' "$0" | sed '$d;s/^#[[:space:]]\{0,1\}//'; exit 0 ;;
@@ -78,6 +78,9 @@ for tool in canon-scan canon-guard canon-path canon-install-vault-hooks canon-tr
   [ -f "$KIT_DIR/bin/$tool" ] && cp "$KIT_DIR/bin/$tool" "$VAULT/.canon/$tool"
   [ -f "$VAULT/.canon/$tool" ] && chmod +x "$VAULT/.canon/$tool"
 done
+# Same reason as the repo stamp: .canon/ holds COPIES of the tools, refreshed only
+# by re-running this command. Record what wrote them so canon-status can notice.
+printf '%s\n' "$CANON_VERSION" > "$VAULT/.canon/.canon-version"
 echo "  vendored .canon/{canon-scan,canon-guard,canon-path,canon-install-vault-hooks,canon-trust,canon-verify,canon-status,canon-design-audit,canon-test-audit}"
 
 # Optional packs, through canon-pack so there is exactly one copy path and one set

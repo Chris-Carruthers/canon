@@ -6,7 +6,69 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.3.0] — 2026-08-29
+
 ### Added
+
+- **CI runs on every branch, not only `main` and pull requests.** Feature branches
+  were covered solely by the `pull_request` event. When GitHub missed the
+  `synchronize` for a push, the PR kept showing the **previous** commit's four green
+  checks while the code that would actually merge had never been tested — and the
+  commit then merged untested. A false green is worse than a missing one, because
+  nobody investigates it. Costs a duplicate run on PR branches; the suite is under a
+  minute.
+
+- **Releases exist now, and a stale install says so.** There were **no git tags and
+  no GitHub releases**, and `VERSION` had not moved in 68 commits — everything since
+  `413d433` accumulated under `[Unreleased]` at 0.2.0. So nobody could be behind,
+  because there was nothing to be behind of, and nothing anywhere checked.
+
+  Worse, **three copies drift independently**: the kit, the vault's vendored
+  `.canon/` tools, and each repo's `.claude/hooks/`. Upgrading the kit does nothing
+  to a repo wired weeks ago — it keeps running the old hooks, silently, forever, and
+  nothing in the files says how old they are.
+
+  `canon-init-vault` and `install.sh` now stamp `.canon-version` where they write.
+  `canon-status` compares those against what is actually running and names the
+  command that fixes it — `re-run canon-init-vault`, `re-run install.sh`. Both hooks
+  export `CANON_REPO` so the repo copy can be checked at all; without it that check
+  could never fire, and the repo copy is the one most likely to be stale.
+
+  **The release check does not live in `canon-status`.** That command runs in a
+  `SessionStart` hook and promises no network call — a hook that hangs on a bad
+  connection is worse than a stale version number. `canon-sync` already makes a
+  network call, so it asks GitHub once a day and writes the answer to
+  `${XDG_CACHE_HOME:-~/.cache}/canon/latest-release`; `canon-status` only reads it.
+  Best-effort throughout: no curl, no network, no releases, a rate limit — all leave
+  the cache alone and say nothing. Opt out with `CANON_CHECK_UPDATES=0`.
+
+  An in-step install is **silent**. A banner that always shows is one people stop
+  reading, which is exactly how the solo-vault nag survived this long.
+
+- **A vault with no remote was reported as out of step with a team that does not
+  exist.** `canon-init-vault` creates a repo and configures no remote, so
+  `canon-status` found no `.git/FETCH_HEAD` and said *"never pulled from the team ·
+  Get up to date: canon-sync"* — on **every vault's first run**, and permanently for
+  anyone working alone. The `SessionStart` hook instructs the agent to raise this in
+  its first reply, so canon's opening move was a standing complaint the user could
+  not act on: with no remote, `canon-sync` has nothing to pull.
+
+  Team signals are now conditional on a remote existing. A solo vault with
+  uncommitted work says *"Save it locally: canon-sync (no remote yet — add one to
+  share with a team)"* rather than offering `--push` into nowhere, and a clean one
+  is silent. Add a remote and every previous signal returns unchanged.
+
+  The test that covered this **required** the wrong message — `has "flags a vault
+  never pulled"` against a vault with no remote — so the suite encoded the defect
+  instead of catching it. Replaced with assertions for both states.
+
+  The `Stop` hook echoes `canon-status`, so it inherited the same wrong framing in
+  prose it hardcodes: *"out of step with the team"* and *"the note is not shared
+  until it is pushed"*. Both are now conditional on a remote existing — a solo
+  vault is told its work is unsaved and one lost laptop from gone, which is the
+  true and actionable version.
 
 - **The MCP server's header promised a default it did not have.** It said large
   vendored subtrees are *"skipped by default"* and named the 79 MB documentation
