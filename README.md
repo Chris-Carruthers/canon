@@ -44,11 +44,12 @@ reading the vault with two apps and no commands.
 - [Cognitive coverage](#cognitive-coverage-can-you-explain-what-your-agent-built) — the quiz nobody else runs
 - [House voice](#house-voice-who-each-document-should-read-like) — who each document should read like, and who it must not
 - [Template packs](#template-packs-the-core-stays-small) — optional documents, asked for rather than installed
+- [Staying current](#staying-current) — how to tell when your install is out of date
 - [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
 - [Design, and why](#design-and-why) — the limits that shaped it
 - [Sync](#sync-automatic-inbound-deliberate-outbound) · [The gate](#the-gate) · [Trust](#trust-telling-an-agent-draft-from-a-checked-fact) · [Ownership](#ownership-not-everything-should-be-everyones)
 - [Ask it from chat](#ask-it-from-chat) — Slack, Discord, MCP
-- [Configuration](#configuration) · [Before you roll this out](#before-you-roll-this-out-to-a-team) · [Status](#status)
+- [Configuration](#configuration) · [Before you roll this out](#before-you-roll-this-out-to-a-team) · [What this is not](#what-this-is-not) · [Requirements](#requirements) · [Status](#status) · [Contributing](#contributing)
 
 </details>
 
@@ -143,9 +144,9 @@ months, when the person who decided it is on holiday, their reasoning is still t
 | You want to… | You do this |
 |---|---|
 | Read or explore the notes | Open the folder in **Obsidian**. `Cmd+O` jumps to any note by name. |
-| Add a document — a PDF, a deck, a transcript | Drop it in the `Sources` folder and run `/ingest`. Your assistant reads it and files the useful parts into the right notes. |
+| Add a document — a PDF, a deck, a transcript | Drop it in the `Sources` folder and ask your assistant to file the useful parts into the right notes. |
 | Find where something stands | Open the project's note, then the newest session log linked from it. |
-| Tidy up after a busy week | Run `/lint-vault`. It reports broken links, stale notes and contradictions, and offers to fix them. |
+| Tidy up after a busy week | Ask your assistant to check the vault for broken links, stale notes and contradictions. `canon-trust` lists what has gone stale. |
 | Share your notes with the team | One command that checks them and sends them up. |
 
 **You rarely write the notes by hand.** You drop things in, ask questions, and the
@@ -214,7 +215,7 @@ loading it is not an option and is not the point.
 ```mermaid
 flowchart TB
     H(["SessionStart hook"])
-    R["Agent Router · ~40 lines<br/>in context, every session"]
+    R["Agent Router · ~70 lines<br/>in context, every session"]
     A["Your agent"]
     V[("Vault on disk · thousands of notes<br/>never loaded whole")]
     W["Work happens in your working folder<br/>a code repo, or the vault itself"]
@@ -406,7 +407,9 @@ conventional filename, all generated from one template so they cannot disagree:
 | Cline | `.clinerules/knowledge-vault.md` |
 
 All on by default; opt out with `--no-gemini`, `--no-copilot`, `--no-windsurf`,
-`--no-cline`, or `--claude-only`. `--design` is the one that is *off* by default —
+`--no-cline`, or `--claude-only`. `--dry-run` shows what it would write and changes
+nothing; `--vault PATH` names the vault when it is not where `canon-path` would look.
+`--design` is the one that is *off* by default —
 see [the design canon](#the-design-canon-names-and-pointers-never-values). `--uninstall` removes every one of them **without
 needing the same flags you installed with**, and deletes files it created outright
 rather than leaving empty ones behind.
@@ -435,10 +438,15 @@ cd ~/team-vault && ./.canon/bootstrap.sh && cd -
 ./install.sh /path/to/your/repo      # b. a code repo — safe if it already has a CLAUDE.md
 ./install.sh /path/to/ui/repo --design   # ...and it has UI: also write a DESIGN.md
 
-# 4. Confirm it resolves
-~/team-vault/.claude/hooks/canon-path           # prints the vault path
-./bin/canon-sync --status                       # what would sync; changes nothing
+# 4. Put the commands on your PATH (add this line to ~/.zshrc or ~/.bashrc to keep it)
+export PATH="$PWD/bin:$PATH"
+
+# 5. Confirm it resolves
+canon-path               # prints the vault path
+canon-sync --status      # what would sync; changes nothing
 ```
+
+The rest of this README writes the commands without `./bin/`, so step 4 matters.
 
 Then open a Claude Code session in that folder and ask *"what does the team
 knowledge vault say about how we work?"* If the wiring is live, it answers from
@@ -562,7 +570,15 @@ canon-sync              # pull, scan, commit locally
 canon-sync --push       # ...and push, only if the scan passed
 canon-sync --status     # what would happen, changes nothing
 canon-sync --branch     # put it on a branch for review instead of on trunk
+canon-sync --trunk      # push straight to the shared branch
+canon-sync --only PATH  # stage only PATH (repeatable)
+canon-sync --no-pull    # skip the pull
+canon-sync -m "msg"     # your own commit message
 ```
+
+**Use `--only` if more than one agent session writes to the same vault.** By default
+`canon-sync` stages everything, so another session's half-written notes would land
+in your commit, under your message.
 
 ### What happens when two people push at once
 
@@ -618,7 +634,7 @@ with nothing installed.
 a planted API key blocks both paths, and an auto-commit that trips the gate
 reports itself instead of failing silently.
 
-Two limits, stated plainly:
+Three limits, stated plainly:
 
 - **`.git/hooks` is not shared by cloning.** Each teammate runs
   `canon-install-vault-hooks` once. Your git host's own push protection is the
@@ -688,18 +704,6 @@ Optional by design: they need Node and a couple of npm packages, which the core 
 does not. **None has been run against live credentials yet** — each README has a
 verification checklist; treat it as acceptance criteria, not a formality.
 
-## Works with agents other than Claude
-
-`install.sh` writes the same instruction block into **`CLAUDE.md`** *and*
-**`AGENTS.md`**, and drops a Cursor rule at `.cursor/rules/knowledge-vault.mdc`.
-[AGENTS.md](https://github.com/agentsmd/agents.md) is the cross-tool convention
-other coding agents read, so Codex, Cursor and friends get the vault contract
-without extra work.
-
-Both files are generated from one template and the test suite asserts their blocks
-are **byte-identical**, because two hand-maintained copies of the same instructions
-is a guarantee they will disagree within a month.
-
 ## Trust: telling an agent draft from a checked fact
 
 Once most notes are written by agents, "what does the vault say" stops being enough.
@@ -740,6 +744,14 @@ judge the note** — you confirm, it records that you did. A tool that stamped n
 automatically would manufacture exactly the false confidence the field exists to
 prevent. Agents are told to write `generated` and *never* to write `verified` for
 themselves.
+
+```bash
+canon-trust --tier unverified               # list only one tier
+canon-verify --stale-after 2026-12-01 <note>  # confirm it, and say when to re-check
+canon-verify --actor process:nightly <note>   # record a non-human check
+```
+
+Your identity comes from `git config user.email`; set `CANON_ACTOR` to override it.
 
 Every key is optional and nothing is ever rejected for lacking them — absence just
 carries meaning. The shape follows the
@@ -829,7 +841,7 @@ canon or change the code and re-run.
 
 ```
 $ canon-design-audit ~/code/web-app
-canon-design-audit 0.2.0
+canon-design-audit 0.3.0
   scanned 695 file(s) in 1 repo(s)
   canon: 3 vocabular(ies), 12 component(s)
 
@@ -929,7 +941,7 @@ completely ungated.
 
 ```
 $ canon-test-audit ~/code/api ~/code/web-app ~/code/svc
-canon-test-audit 0.2.0
+canon-test-audit 0.3.0
   canon: 3 suite(s), 2 gate(s) across 3 repo(s)
 
   VIOLATION TEST-FLOOR-BREACH            1
@@ -1220,6 +1232,10 @@ without accidentally requiring a PR per session note.
 | `CANON_SKIP_SCAN` | `0` | `1` = bypass the gate. Be sure. |
 | `CANON_CHECK_UPDATES` | `1` | `0` = never ask GitHub whether a newer canon exists. Asked by `canon-sync` at most once a day and cached; `canon-status` only reads the cache and never calls out |
 | `CANON_STALE_DAYS` | `2` | How long since the last pull before it is worth mentioning |
+| `CANON_ACTOR` | your git email | Who `canon-verify` records as the reviewer |
+| `CANON_REPO_SLUG` | `Chris-Carruthers/canon` | Which GitHub repo the update check asks. Set it if you run a fork |
+
+The chat connectors have their own settings — see each connector's README.
 
 Auto-pull is **off by default**: a hook that mutates a git repo you didn't ask
 it to touch is a bad default, and a half-rebased vault is worse than a stale one.
@@ -1235,7 +1251,7 @@ it to touch is a bad default, and a half-rebased vault is worse than a stale one
 - **If you're in a regulated industry, get the compliance question answered
   first** — where this data may live, and under what agreement with your git
   host. Do this before the vault has a hundred notes in it, not after.
-- **Pin a Claude Code version** and run `docs/VERIFY.md` against it. The hook and
+- **Pin a Claude Code version** and run [`docs/VERIFY.md`](docs/VERIFY.md) against it. The hook and
   skill surface changes frequently; version-stale config that silently does
   nothing is the most common failure.
 
@@ -1268,7 +1284,9 @@ changed *are* the notes you wrote.
 
 ## Requirements
 
-`bash`, `git`, `python3`. No package installs, no daemons, no network calls.
+`bash`, `git`, `python3`. No package installs, no daemons. The only network call
+is `canon-sync` checking for a newer release, once a day at most
+(`CANON_CHECK_UPDATES=0` turns it off). The optional chat connectors also need Node.
 
 **Not required:** a code repository, an IDE, a terminal (for readers and
 contributors — see [Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)),
@@ -1291,5 +1309,7 @@ Two known unknowns, deliberately not papered over:
    question — where this data may live, under what agreement with your git host —
    is yours to answer, not this kit's.
 
-Requires `bash`, `git`, `python3`. No package installs, no daemons, no network
-calls.
+## Contributing
+
+See [CONTRIBUTING](CONTRIBUTING.md). Changes are listed in the
+[CHANGELOG](CHANGELOG.md). MIT licensed — see [LICENSE](LICENSE).
