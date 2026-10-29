@@ -6,7 +6,16 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **`docs/COMPANION-TOOLS.md`: the tools worth installing next to canon.** There was no
+  answer to "what else should my team install?", so every team rebuilt the same list,
+  plus the same mistakes. The doc covers context7, Atlassian, Figma, impeccable, Chrome
+  DevTools, Playwright, ponytail, superpowers, code-review and `gh`. Each entry gives the
+  canon job the tool supports, an install line and the caveat. The Atlassian entry
+  carries the publishing gotchas that each cost a full page re-send. The impeccable
+  entry points to the existing `DESIGN.md` hazard rather than restating it. Docs only:
+  none of these becomes a dependency, and `install.sh` installs none of them.
 
 ## [0.3.0] — 2026-08-29
 
