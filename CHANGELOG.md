@@ -6,7 +6,15 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **`code-index` skill.** Points agents at
+  [code-index](https://github.com/Chris-Carruthers/code-index), a separate MIT tool
+  that indexes every git checkout on the machine and returns exact `repo/path:line`
+  for definitions, callers and imports over MCP. The vault links to code rather than
+  copying it, and this is where those links come from. The skill is optional at
+  runtime. Without the MCP tools it falls back to grep and says once what to
+  install, and it never installs anything itself.
 
 ## [0.3.0] — 2026-08-29
 

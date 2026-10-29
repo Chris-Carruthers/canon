@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-382%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-390%20passing-22C55E" alt="tests">
 </p>
 
 <h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
@@ -43,6 +43,7 @@ reading the vault with two apps and no commands.
 - [The testing canon](#the-testing-canon-a-ratchet-and-a-gate-that-actually-runs) — a floor that only rises
 - [Cognitive coverage](#cognitive-coverage-can-you-explain-what-your-agent-built) — the quiz nobody else runs
 - [House voice](#house-voice-who-each-document-should-read-like) — who each document should read like, and who it must not
+- [Code index](#code-index-where-the-code-is-not-only-why) — exact `repo/path:line` for the links the vault makes
 - [Template packs](#template-packs-the-core-stays-small) — optional documents, asked for rather than installed
 - [Staying current](#staying-current) — how to tell when your install is out of date
 - [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
@@ -1063,6 +1064,22 @@ hides.
 It is a coverage report for a system, not a performance review — and it says so,
 because if it reads as a scorecard on a colleague then nobody asks for it twice and
 the people who need it stop first.
+
+## Code index: where the code is, not only why
+
+The vault links to code instead of copying it, so every link is a `repo/path:line`,
+and an agent that greps for one guesses at least some of the time. A text search
+can't tell a definition from a mention, or say which function a call sits inside.
+
+[code-index](https://github.com/Chris-Carruthers/code-index) is a separate, optional
+tool: a tree-sitter index of every checkout on your machine, served over MCP. It
+answers *where is this defined*, *who calls it* and *what is in this file* with an
+exact line. It keys content by git blob, so a repo with forty agent worktrees costs
+about the same as one, and returns one answer, not forty. The `code-index` skill
+tells an agent when to use it over grep, to confirm a zero-caller result before
+calling something dead, and never to cite a branch-only hit as shipped. If the
+tools aren't installed, the skill falls back to grep and says once what would
+have answered the question.
 
 ## House voice: who each document should read like
 

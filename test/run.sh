@@ -764,6 +764,25 @@ is "BOTH rules files mention cognitive coverage" "${missing_cc:-none}" "none"
 has "justifies storing the result" "$(cat "$CC")" "cannot be recomputed"
 
 # ---------------------------------------------------------------------------
+section "code index"
+# The skill fronts a separate tool, so what CI can check is that it is wired and that
+# it degrades: an agent without the MCP server must still get an answer, and must not
+# install an indexer over every checkout on the machine without asking.
+CI_SK="$KIT/skills/code-index/SKILL.md"
+is "ships the skill"                "$([ -f "$CI_SK" ] && echo y)" "y"
+has "frontmatter names the skill"   "$(sed -n '1,6p' "$CI_SK")" "name: code-index"
+has "description carries triggers"  "$(sed -n '1,6p' "$CI_SK")" "who calls X"
+has "falls back when not installed" "$(cat "$CI_SK")" "use grep"
+has "never installs on its own"     "$(cat "$CI_SK")" "Do not install it yourself"
+has "flags unmerged hits"           "$(cat "$CI_SK")" "BRANCH ONLY"
+has "plugin advertises it"          "$(cat "$KIT/.claude-plugin/plugin.json")" "code-index"
+missing_ci=""
+for f in "$R2/.claude/rules/knowledge-vault.md" "$R2/.cursor/rules/knowledge-vault.mdc"; do
+  LC_ALL=C grep -q "code-index" "$f" 2>/dev/null || missing_ci="$missing_ci $(basename "$f")"
+done
+is "BOTH rules files mention code-index" "${missing_ci:-none}" "none"
+
+# ---------------------------------------------------------------------------
 section "house voice"
 # The reference files are prose, so what CI can check is that they are WIRED: every
 # template points at one, every one is reachable from the skill, and none of the

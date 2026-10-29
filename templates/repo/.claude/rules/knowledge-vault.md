@@ -15,6 +15,8 @@ by filename and structure long before it reads content.
   results from a production database.
 - **Secrets** — API keys, tokens, connection strings, `.env` contents.
 - **Source code.** Link `repo/path.ts:42` instead. Code rots inside documents.
+  If the `code-index` MCP tools are available, `code_def` and `code_callers` return
+  exactly that `repo/path:line`; cite it as returned.
 - **Design-token values.** A token *name* is API surface and belongs in the vault;
   its *value* is source. Write `--primary`, never `222 47% 11%`. Copying values in
   creates a second source of truth that drifts silently and reads as authoritative.
