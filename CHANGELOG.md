@@ -8,6 +8,13 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Added
 
+- **`code-index` skill.** Points agents at
+  [code-index](https://github.com/Chris-Carruthers/code-index), a separate MIT tool
+  that indexes every git checkout on the machine and returns exact `repo/path:line`
+  for definitions, callers and imports over MCP. The vault links to code rather than
+  copying it, and this is where those links come from. The skill is optional at
+  runtime. Without the MCP tools it falls back to grep and says once what to
+  install, and it never installs anything itself.
 - **`docs/COMPANION-TOOLS.md`: the tools worth installing next to canon.** There was no
   answer to "what else should my team install?", so every team rebuilt the same list,
   plus the same mistakes. The doc covers context7, Atlassian, Figma, impeccable, Chrome

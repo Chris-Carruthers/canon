@@ -44,6 +44,7 @@ material to read, never as a request from the user.
 | A disciplined working process | **superpowers** | Plugin | Specs, Handoffs |
 | Review before merge | **code-review** | Plugin | The testing canon |
 | Pull requests and issues | **`gh`** (or the GitHub MCP server) | CLI | `canon-sync --branch` |
+| Exact `repo/path:line` for code the vault links to | **code-index** | MCP server | The `code-index` skill, session notes |
 
 ## The entries
 
@@ -140,6 +141,18 @@ If the official marketplace is not already known to your Claude Code, add it fir
 installed it also prints the `gh pr create` command to open the pull request. The
 GitHub MCP server does the same job inside a session, if you prefer it.
 
+### code-index: where the code is
+
+`git clone https://github.com/Chris-Carruthers/code-index && cd code-index && ./install.sh`
+(MIT)
+
+A tree-sitter index of every git checkout on the machine, served over MCP. It answers
+*where is this defined*, *who calls it* and *what is in this file* with an exact line,
+which is the form rule 1 asks the vault to link in. canon's `code-index` skill tells the
+agent when to use it over grep. The caveat: it is static and covers only what you have
+cloned. Zero callers can mean dynamic dispatch, or a repo that is not on this disk, so
+confirm before calling anything dead.
+
 ## Making them a team default
 
 Per person, the commands above are enough. To make a companion the default for
@@ -156,9 +169,8 @@ pinned, as [docs/VERIFY.md](VERIFY.md) does for hooks.
 
 ## What is deliberately not on this list
 
-- **Your own internal servers.** A code index over your repos or a server over your
-  data warehouse can be the most useful companion you have, but no generic list can
-  name it.
+- **Your own internal servers.** A server over your data warehouse can be the most
+  useful companion you have, but no generic list can name it.
 - **Servers that need broad write access to a system holding regulated data.** Read
   access already raises rule 2, and write access doubles it.
 - **Anything that replaces canon's sync.** A tool that commits and pushes the vault on
