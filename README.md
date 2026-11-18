@@ -1,29 +1,22 @@
 <p align="center">
-  <img src="assets/hero.png" alt="canon — shared knowledge for AI teams" width="100%">
+  <img src="assets/hero.webp" alt="canon: Claude Code, Codex, Cursor and Gemini CLI reading from and writing back to one Git-versioned Markdown vault" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-390%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-396%20passing-22C55E" alt="tests">
 </p>
 
-<h3 align="center">The opinionated starter kit for a shared knowledge canon.</h3>
+canon gives your team's AI agents one shared knowledge vault: Markdown in a Git
+repo, readable in Obsidian. Agents read it before real work and write a dated session
+note after, so what one session learns is there for the next person's.
 
-<p align="center">
-  Built on Obsidian, Git, and Markdown. Your team's AI agents read the same
-  accumulated knowledge — and write what they learn back into it.<br>
-  <em>Every session makes the team smarter.</em>
-</p>
-
-<p align="center">
-  <strong>For everyone on a team building with AI</strong> — product, design, research,
-  program and project management,<br>support, clinical, ops, strategy, leadership,
-  engineering. Not an engineering tool.<br>
-  <em>It pays off most when the team is cross-functional: a decision recorded by one
-  discipline<br>becomes context for an assistant working in another.</em>
-</p>
+It is for anyone on the team doing real work with an assistant (product, design,
+research, support, clinical, ops, strategy, leadership, engineering), and it pays off
+most when the team is cross-functional: a decision recorded by one discipline becomes
+context for an assistant working in another.
 
 **Three ways in.** New to the idea? Start with the plain-English walkthrough below.
 Here to install it? Jump to **[Quickstart](#quickstart)**. Don't use a terminal?
@@ -36,7 +29,7 @@ reading the vault with two apps and no commands.
 - [New here? Read this first](#new-here-read-this-first) — the plain-English version
 - **[Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)** — GitHub Desktop + Obsidian, no commands
 - [How it works](#how-it-works) — the two diagrams
-- [What you get](#what-you-get) · [Install as a Claude Code plugin](#install-it-as-a-claude-code-plugin) · [Quickstart](#quickstart) · [How it finds the vault](#how-it-finds-the-vault)
+- [What you get](#what-you-get) · [Quickstart](#quickstart) · [Install as a Claude Code plugin](#install-it-as-a-claude-code-plugin) · [How it finds the vault](#how-it-finds-the-vault)
 - [Claude Desktop and Cowork](#claude-desktop-and-cowork) — connected folder, or the `.mcpb` bundle
 - [Works with agents that are not Claude](#works-with-agents-that-are-not-claude) — seven runtimes from one template
 - [The design canon](#the-design-canon-names-and-pointers-never-values) — names and pointers, never values
@@ -49,7 +42,7 @@ reading the vault with two apps and no commands.
 - [Staying current](#staying-current) — how to tell when your install is out of date
 - [Reading it as a human](#reading-it-as-a-human-obsidian-optional) — Obsidian, optional
 - [Design, and why](#design-and-why) — the limits that shaped it
-- [Sync](#sync-automatic-inbound-deliberate-outbound) · [The gate](#the-gate) · [Trust](#trust-telling-an-agent-draft-from-a-checked-fact) · [Ownership](#ownership-not-everything-should-be-everyones)
+- [Sync](#sync-safe-inbound-deliberate-outbound) · [The gate](#the-gate) · [Trust](#trust-telling-an-agent-draft-from-a-checked-fact) · [Ownership](#ownership-not-everything-should-be-everyones)
 - [Ask it from chat](#ask-it-from-chat) — Slack, Discord, MCP
 - [Configuration](#configuration) · [Before you roll this out](#before-you-roll-this-out-to-a-team) · [What this is not](#what-this-is-not) · [Requirements](#requirements) · [Status](#status) · [Contributing](#contributing)
 
@@ -90,15 +83,8 @@ anybody else — you change your copy, then send it up.
 
 ### Two ways to set it up
 
-The examples in this README wire canon into a code repository, and that has misled
-people into reading it as an engineering tool. **It is for everyone on a team
-building with AI** — product, design, research, program and project management,
-support, clinical, strategy, leadership, and engineering. Engineers are very much
-included; they are just not the point. Whoever on your team is asking an assistant
-to do real work is who this is for, and the value compounds precisely when those
-people are *not* all in the same discipline: a decision recorded by product is
-context engineering needed, and a constraint discovered in code is context product
-needed.
+The examples in this README wire canon into a code repository. That is one option,
+not the point.
 
 **A code repository is one place to put the standing instruction, not a
 requirement.** Pick whichever line describes your work:
@@ -160,7 +146,7 @@ notes get maintained as a side effect of the work.
 |---|---|
 | Reading the notes at the start | **Automatic** |
 | Writing the session note at the end | **Automatic**, with a nudge if it gets skipped |
-| Getting teammates' updates | **Automatic** — and only ever a safe update; it will not overwrite something you are mid-edit on |
+| Getting teammates' updates | **Opt-in** (`CANON_AUTOPULL=1`). When on, it only fast-forwards and skips if you are mid-edit |
 | **Publishing your notes to the team** | **You decide.** Never automatic. |
 
 That last line is deliberate. Once something is published it is effectively
@@ -263,7 +249,7 @@ flowchart LR
         W --> C
     end
 
-    RM -->|"pull · automatic"| W
+    RM -->|"pull · at session start, if enabled"| W
     C --> G
     G -->|"clean"| P
     G -->|"credential, or a path<br/>you do not own"| X
@@ -293,7 +279,7 @@ flowchart LR
 | **House voice** | Each document type mapped to a writer with a real corpus, the moves to imitate, and the anti-model to avoid. Overridable per team |
 | **`canon-pack`** | Optional template packs — the product ladder, engineering documents, research craft. Add never overwrites; remove only reclaims what it shipped |
 | **A router note** | The one small file agents load every session — a map of what lives where |
-| **Repo wiring** | `CLAUDE.md`, `AGENTS.md` and four more, all from one template, so agents find the vault from any repo — plus a `This repo` section for the build, test and gotchas |
+| **Repo wiring** | `CLAUDE.md`, `AGENTS.md` and five more, all from one template, so agents find the vault from any repo — plus a `This repo` section for the build, test and gotchas |
 | **A session-note check** | A `Stop` hook that notices when work happened but nothing got written down |
 | **Path-scoped rules** | Write conventions that load only when an agent touches vault files |
 | **`canon-sync`** | Pull, scan, commit, and — only when you ask — push |
@@ -309,6 +295,50 @@ flowchart LR
 | **`DESIGN.md`** | Per-repo pointer file (`install.sh --design`) telling a design tool which vocabulary this repo uses, so it doesn't invent one |
 | **Chat connectors** | Ask the canon questions from **Slack** or **Discord**; read-only, cites its sources |
 | **MCP server** | Exposes the vault to **any MCP client** — Claude Desktop, Cursor, VS Code. One connector, not one per editor |
+
+## Quickstart
+
+*About five minutes. Nothing to install beyond `bash`, `git` and `python3`.*
+
+```bash
+git clone https://github.com/Chris-Carruthers/canon && cd canon
+
+# 1. Create the vault — or point this at a folder of notes you already have
+./bin/canon-init-vault ~/team-vault
+
+# 2. Set it up: records the path for this machine, installs the commit safety check
+cd ~/team-vault && ./.canon/bootstrap.sh && cd -
+
+# 3. Wire up the folder you work in. Pick a OR b — see "Two ways to set it up".
+./install.sh ~/team-vault            # a. no code repo: the vault IS your workspace
+./install.sh /path/to/your/repo      # b. a code repo — safe if it already has a CLAUDE.md
+#    add --design to (b) if the repo has UI: it also writes a DESIGN.md
+
+# 4. Put the commands on your PATH (add this line to ~/.zshrc or ~/.bashrc to keep it)
+export PATH="$PWD/bin:$PATH"
+
+# 5. Confirm it resolves
+canon-path               # prints the vault path
+canon-sync --status      # what would sync; changes nothing
+```
+
+The rest of this README writes the commands without `./bin/`, so step 4 matters.
+
+Then open a Claude Code session in that folder and ask *"what does the team
+knowledge vault say about how we work?"* If the wiring is live, it answers from
+the router note without being told where to look.
+
+In case (b), commit `.claude/` and `CLAUDE.md` so teammates inherit the repo
+wiring by cloning. In case (a) they are already in the vault, so cloning the vault
+is all a teammate needs.
+
+**Joining a vault that already exists** is shorter — clone it and run its bootstrap;
+everything it needs is committed inside:
+
+```bash
+git clone <your-vault-repo> ~/team-vault
+cd ~/team-vault && ./.canon/bootstrap.sh
+```
 
 ## Install it as a Claude Code plugin
 
@@ -422,50 +452,6 @@ session ending with nothing written down — the other runtimes have no hook sys
 attach to. Adding one when they do is a welcome contribution; see
 [CONTRIBUTING](CONTRIBUTING.md).
 
-## Quickstart
-
-*About five minutes. Nothing to install beyond `bash`, `git` and `python3`.*
-
-```bash
-git clone https://github.com/Chris-Carruthers/canon && cd canon
-
-# 1. Create the vault — or point this at a folder of notes you already have
-./bin/canon-init-vault ~/team-vault
-
-# 2. Set it up: records the path for this machine, installs the commit safety check
-cd ~/team-vault && ./.canon/bootstrap.sh && cd -
-
-# 3. Wire up the folder you work in. Pick ONE — see "Two ways to set it up".
-./install.sh ~/team-vault            # a. no code repo: the vault IS your workspace
-./install.sh /path/to/your/repo      # b. a code repo — safe if it already has a CLAUDE.md
-./install.sh /path/to/ui/repo --design   # ...and it has UI: also write a DESIGN.md
-
-# 4. Put the commands on your PATH (add this line to ~/.zshrc or ~/.bashrc to keep it)
-export PATH="$PWD/bin:$PATH"
-
-# 5. Confirm it resolves
-canon-path               # prints the vault path
-canon-sync --status      # what would sync; changes nothing
-```
-
-The rest of this README writes the commands without `./bin/`, so step 4 matters.
-
-Then open a Claude Code session in that folder and ask *"what does the team
-knowledge vault say about how we work?"* If the wiring is live, it answers from
-the router note without being told where to look.
-
-In case (b), commit `.claude/` and `CLAUDE.md` so teammates inherit the repo
-wiring by cloning. In case (a) they are already in the vault, so cloning the vault
-is all a teammate needs.
-
-**Joining a vault that already exists** is shorter — clone it and run its bootstrap;
-everything it needs is committed inside:
-
-```bash
-git clone <your-vault-repo> ~/team-vault
-cd ~/team-vault && ./.canon/bootstrap.sh
-```
-
 ## How it finds the vault
 
 Nothing hardcodes a path. `canon-path` resolves, first hit wins:
@@ -554,7 +540,7 @@ disabled by enterprise policy. Redundancy is the design. Pair every preventer
 with a detector — the `Stop` hook exists precisely because the end-of-session
 write is the step that gets skipped.
 
-## Sync: automatic inbound, deliberate outbound
+## Sync: safe inbound, deliberate outbound
 
 Sharing a vault fails in a specific way: everyone writes locally, nobody commits,
 and the "shared" vault quietly becomes a set of private ones. So sync is
@@ -563,7 +549,7 @@ risk.
 
 | Step | Default | Why |
 |---|---|---|
-| **Pull** | automatic (`CANON_AUTOPULL=1`) | Pure upside. `--ff-only`, so it cannot rewrite history or strand a rebase under an open editor. |
+| **Pull** | opt-in at session start (`CANON_AUTOPULL=1`) | Pure upside. `--ff-only`, so it cannot rewrite history or strand a rebase under an open editor. |
 | **Commit** | local, opt-in (`CANON_AUTOCOMMIT=1`) | Real history and diffs, still nothing leaves your machine. |
 | **Push** | **never automatic** | The irreversible step. Once a note is on a remote it may be cached or indexed even after you delete it. |
 
@@ -712,53 +698,7 @@ Once most notes are written by agents, "what does the vault say" stops being eno
 A reader needs to know **what this was made from, whether anyone checked it, and
 whether it is still true.** Four optional frontmatter keys make that answerable:
 
-```yaml
-generated: { by: claude-opus-5, at: 2026-07-30T21:00:00Z }   # how it was produced
-verified:  { by: human:chris,   at: 2026-07-30T22:15:00Z }   # who confirmed it
-status: stable                                              # draft|stable|deprecated
-stale_after: 2026-10-30                                     # absolute date, not a TTL
-```
-
-`generated` and `verified` are kept separate on purpose: **who wrote a note need not
-be who confirmed it**, and collapsing them loses the only interesting thing about the
-distinction.
-
-**Trust tiers are derived, never stored.** No `verified` key means unverified;
-non-human actors only means machine-confirmed; any `human:<id>` means human-reviewed.
-Storing a *score* instead would be subjective, unportable between readers, and stale
-the moment it was written — so canon records signals and lets the reader judge.
-
-```
-$ canon-trust
-  Trust tiers (derived from `verified`, never stored)
-    human-reviewed        14  ███████
-    machine-confirmed      3  █
-    unverified           198  ████████████████████████████████████
-
-  Agent-written and never confirmed (198):
-    Decisions/2026-07-30 — token validation.md  ← claude-opus-5
-    …
-  Confirm one after reading it:  canon-verify <path>
-```
-
-`canon-verify <note>` stamps a human review. It deliberately **does not read or
-judge the note** — you confirm, it records that you did. A tool that stamped notes
-automatically would manufacture exactly the false confidence the field exists to
-prevent. Agents are told to write `generated` and *never* to write `verified` for
-themselves.
-
-```bash
-canon-trust --tier unverified               # list only one tier
-canon-verify --stale-after 2026-12-01 <note>  # confirm it, and say when to re-check
-canon-verify --actor process:nightly <note>   # record a non-human check
-```
-
-Your identity comes from `git config user.email`; set `CANON_ACTOR` to override it.
-
-Every key is optional and nothing is ever rejected for lacking them — absence just
-carries meaning. The shape follows the
-[Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md),
-so a canon vault stays legible to other OKF-aware tooling.
+Full detail: [docs/TRUST.md](docs/TRUST.md).
 
 ## The design canon: names and pointers, never values
 
@@ -766,129 +706,7 @@ A design system is mostly code, and code stays out of the vault. So
 `Reference/Design/` holds the part that isn't code — and the split is sharper than
 it first looks:
 
-> A token **name** is API surface, like a schema field name, and `Reference/` is for
-> schemas. A token **value** is source. It has a format, it belongs to a cascade, and
-> any tool can read it from the repo when asked.
-
-Copy values into the vault and you have built a second source of truth that drifts
-silently while reading as authoritative.
-
-**For coding agents, the useful part is that assets resolve deterministically.** Two
-frozen fenced blocks — `design-tokens` and `design-components` — give a three-rung
-ladder, and *every rung's absence is detectable*:
-
-| Rung | Field | Needs |
-|---|---|---|
-| Exported image | `image: Attachments/Design/<slug>--<variant>--<state>@<theme>.png` | nothing |
-| Figma node | `figma: { file: <key>, node: <dash-form-id> }` | Figma MCP or an authed fetch |
-| Implementation | `impl: repo/path[:line]` | the repo |
-
-Filenames are **constructible**, so an agent derives the expected path from the slug
-and checks whether it exists rather than guessing. **Omit a key you do not have —
-never `TODO`.** Absence is the signal, and coverage is derived from it. `status:
-absent` is a legitimate row: *"there is no shared `PageHeader`"* stops an agent
-hunting for one and stops it silently inventing a fourth.
-
-### What you are allowed to build UI *with*
-
-A third block, `design-tools`, records the tools approved for making or fixing UI.
-It exists because the other two blocks answer *what exists* and leave *what do I
-build one with* to whoever is guessing that day.
-
-Any tool whose `roles:` write UI must name the vocabularies it targets, and the
-audit checks each one exists. That rule is the whole point: **a generator given no
-target vocabulary does not abstain from choosing one — it invents one**, and you
-find out months later when a fifth `--primary` appears in a diff that looked fine.
-Which vocabulary applies in a given repo needs no key, because every vocabulary's
-`source` is repo-prefixed: the one whose source lives in the repo you are editing is
-the one to use.
-
-`install.sh --design` writes the `DESIGN.md` that tells a tool which that is. It is
-off by default — a stray `CLAUDE.md` costs nothing, but a stray `DESIGN.md` in a
-repo with no UI points a design tool at an unrelated vocabulary. Once you fill in
-the slug it is your file: never overwritten, and left in place by `--uninstall`.
-
-Rows also carry `status: approved | trial | rejected`. A **rejected** row is the
-useful one — it says somebody evaluated this and said no, where silence says nobody
-has looked. Full contract and two worked entries:
-**[`docs/DESIGN-TOOLS.md`](docs/DESIGN-TOOLS.md)**.
-
-### Reading the canon back out
-
-The blocks are easy to write and were, for a while, hard to read. Two flags fix
-that, and both derive everything on the spot:
-
-**`--export`** prints the canon as JSON — every token name with the value read out
-of the repo *at call time*, which rungs each component resolves to, the registered
-tools with their targets joined per repo, and the names more than one vocabulary
-claims. An agent reads one document instead of re-implementing the subtree walk and
-the fence parsing. Where a repo was not scanned, values come back `unverifiable`
-rather than absent: unscanned is unknown, not empty.
-
-**`--view`** writes the same model to `Outputs/<date> — Design System View.md`.
-Plain markdown, so an agent can grep it and a person can read it in Obsidian, with a
-colour chip beside every value. Colours are emitted as the CSS function their
-declared format implies and left for the renderer to resolve — the same reason the
-audit never compares two values itself.
-
-The section people actually open it for is **the tokens more than one vocabulary
-declares**, flagged where they also differ in colour space. That is where "I assumed
-they matched" starts, and before this it could only be asserted in prose.
-
-Values appear in both outputs and are still not stored: each is dated, derived and
-regenerated, exactly like the audit report. Do not hand-edit either — change the
-canon or change the code and re-run.
-
-### `canon-design-audit`
-
-```
-$ canon-design-audit ~/code/web-app
-canon-design-audit 0.3.0
-  scanned 695 file(s) in 1 repo(s)
-  canon: 3 vocabular(ies), 12 component(s)
-
-  VIOLATION DS-PALETTE-UTILITY     1204
-              web-app/src/Page.tsx:31  bg-blue-500
-              … and 1199 more
-  VIOLATION DS-COLOR-LITERAL       88
-  GAP       DS-FORMAT-SPLIT        4
-              --primary  declared in web-app, design-system, mobile across
-                         formats hsl-triplet, oklch
-
-  coverage: image 0/12 · figma 3/12 · impl 9/12 · absent 2
-```
-
-*Illustrative figures from a made-up repo.* Your first run against an existing
-codebase will report a far larger `DS-PALETTE-UTILITY` count, which is the point of
-`--baseline-write`.
-
-Two claims worth being precise about, because they are why the thing is usable:
-
-**Derived, never stored.** It reads the contract from the vault and the facts from
-the code and recomputes on every run. No frontmatter caches a verdict, no note holds
-a score, and there is no scorecard to keep current. `--report` writes one dated
-`Outputs/` note carrying `stale_after: +30d`, so `canon-trust --strict` fails on an
-audit nobody re-ran.
-
-**It never compares two token values.** Deciding whether `var(--foreground)` equals
-`222 47% 11%` is a CSS resolution problem — aliases, `calc()`, colour spaces, the
-cascade, shadow-root scoping — and a regex cannot solve it. So it compares **name
-sets and format labels** and leaves value equivalence to the browser. This is a
-direct lesson from a real token-parity script that reports nine false results out of
-twenty-six and is consequently read by nobody.
-
-Everything else follows from the same instinct: **VIOLATION** is a fact you can check
-by opening the cited line, **GAP** is a judgement call and can never fail a build,
-the Tailwind rule uses a **closed list** of the default palette so `bg-primary` is
-structurally unmatchable, the skip-list is **learned from the canon** so declaring a
-vocabulary silences its own false positives, and `--strict` compares against a
-`.canon-design-baseline` rather than zero — on a repo with fourteen thousand existing
-violations the only useful signal is *did it get worse*.
-
-It is **read-only in every repo it scans**, asserted by a test. And it is not in any
-pre-commit hook: it scans code repos, not the vault. It measures. Enforcement is
-CODEOWNERS on the token files plus branch protection, in the repos where those files
-live.
+Full detail: [docs/DESIGN-CANON.md](docs/DESIGN-CANON.md).
 
 ## The testing canon: a ratchet, and a gate that actually runs
 
@@ -898,134 +716,7 @@ measurements**. The percentage lives in the coverage report your suite already
 writes; a number typed into a note is wrong the next day and still reads as
 authoritative.
 
-Two frozen fenced blocks, `test-suites` and `test-gates`, declare what exists:
-
-```test-suites
-- suite: api-python
-  repo: api
-  command: pytest -q
-  report: coverage.xml
-  format: cobertura
-  metric: lines
-  floor: 62
-  status: enforced
-```
-
-```test-gates
-- gate: api-ci
-  repo: api
-  workflow: .github/workflows/ci.yml
-  job: test
-  branches: [Dev]
-  required: false
-```
-
-Two rules carry most of the value:
-
-> **A floor is a ratchet, not a target.** Set it to the coverage you already have,
-> rounded down. It only ever goes up.
-
-A floor set to where you wish you were fails on day one, gets muted within a week,
-and then measures nothing at all — while still looking like a control to anyone
-reading the config.
-
-> **A gate nobody made required is a decoration.**
-
-A workflow that runs, reports, and cannot block a merge is advice. That difference
-is invisible from a checkout, because branch protection is server-side, so
-`required:` is a **human attestation** recorded with `canon-verify` and never
-inferred. The Test Canon template gives "who can make a check required" its own
-ownership row, because that is reliably the role nobody holds — and repo-admin
-rights are rare enough that a team can merge a dozen PRs building gates and remain
-completely ungated.
-
-### `canon-test-audit`
-
-```
-$ canon-test-audit ~/code/api ~/code/web-app ~/code/svc
-canon-test-audit 0.3.0
-  canon: 3 suite(s), 2 gate(s) across 3 repo(s)
-
-  VIOLATION TEST-FLOOR-BREACH            1
-              web-frontend (web-app)  lines 17.6% is below the declared floor of 18
-  VIOLATION TEST-GATE-BRANCH-MISMATCH    1
-              api/.github/workflows/ci.yml  filter says 'dev', canon declares
-                'Dev' — forge branch filters are CASE-SENSITIVE, so this gate
-                has never run
-  GAP       TEST-GATE-ADVISORY           1
-              api-ci  required: false — a red run can still merge
-  GAP       TEST-SUITE-UNDECLARED        1
-              svc  tested (pytest.ini, tests/) but no test-suites row declares it
-
-  measured  api-python             lines 62.4% (floor 62)
-  measured  web-frontend           lines 17.6% (floor 18)
-  coverage: report 2/2 · floor 2/2 · gate 2/2 · required 1/2 · absent 1
-```
-
-*Illustrative figures from made-up repos.*
-
-**The branch-filter check is the one worth the whole tool.** Forge branch filters
-are case-sensitive: a workflow filtered on `dev` against a branch named `Dev` runs
-on nothing. No run, no failure, no signal, and a PR list that looks clean — for as
-long as you let it. It is a string comparison, and it is the difference between a
-gate and a decoration.
-
-Everything else follows the same instincts as the design audit. **Derived, never
-stored** — no note holds a percentage and there is no scorecard to keep current;
-`--report` writes one dated `Outputs/` note carrying `stale_after: +30d`, so
-`canon-trust --strict` fails on an audit nobody re-ran. **VIOLATION** is a fact you
-can check by opening the cited file, **GAP** is a judgement call and can never fail
-a build. `--strict` compares against a `.canon-test-baseline` rather than zero,
-because on a repo with a long tail of untested code the only useful signal is
-*did it get worse*. And
-`--ratchet` prints the floor each suite could claim today — while deliberately
-refusing to suggest a **lower** number, since lowering a floor is how a ratchet
-quietly becomes a target.
-
-Four things it will not do, each of them the design rather than an omission:
-
-- **It never runs your tests.** Executing an arbitrary repo's suite is slow, needs
-  that repo's dependencies, and is a code-execution surface pointed at whatever the
-  canon happens to name. It reads the report your suite already wrote, and tells
-  you how old it is.
-- **It never computes coverage.** It parses cobertura, lcov, or an istanbul
-  json-summary. An unrecognised format is a clean error, not a guess, because a
-  guessed denominator is a confident wrong number.
-- **It cannot see branch protection** — hence the attestation above. A tool that
-  inferred it would produce confident false results, and a report with known-false
-  lines is a report nobody reads.
-- **It does not judge whether coverage is *meaningful*.** A test that merely
-  imports a module takes it from 0% to 100%. That trap is a documented caveat for
-  the human setting the floor, not a faked check.
-
-It is **read-only in every repo it scans**, asserted by a test, and it is in no
-pre-commit hook: it scans code repos, not the vault. It measures. Enforcement is a
-required status check, set in the forge by somebody with admin.
-
-### The other half of `CLAUDE.md`
-
-canon writes `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` and three more from one
-template, so they cannot drift. Those files tell an agent about the vault — and for
-a long time they said nothing about **the repo it is standing in**.
-
-So the template also ships a `## This repo` skeleton: build and run, test,
-architecture in three sentences, and gotchas. **Real headings, deliberately, rather
-than a comment** — an empty section is visible, and an agent can say nobody has
-written this down. The same words in an HTML comment are invisible in every
-rendered view and get skipped for years.
-
-```
-/repo-context
-```
-
-fills it in from the repo itself — manifests, the CI workflow, compose files, env
-templates — and **cites where each command is defined** rather than asserting one
-it never saw, because a confidently wrong build command is worse than a blank
-section. As a byproduct it emits the `test-suites` and `test-gates` rows above:
-you have just read the test config and the workflow, which is exactly what the
-canon needs, so it is produced then instead of becoming a second chore nobody does.
-If the workflow's branch filter disagrees with what git actually calls the branch,
-it reports that as a finding instead of quietly writing the working one down.
+Full detail: [docs/TESTING-CANON.md](docs/TESTING-CANON.md).
 
 ## Cognitive coverage: can you explain what your agent built?
 
@@ -1033,38 +724,7 @@ Code review asks *is this correct*. Tests ask *does it work*. Neither asks the
 question that decides whether a team can operate what it ships: **can a person
 explain it without reading it again?**
 
-Agent-built code fails that quietly, because it passes review — it *is* correct. The
-gap surfaces later, when someone has to change it and realises they are reading it
-for the first time.
-
-```
-/cognitive-coverage
-```
-
-The skill reads what you just built, writes six to ten questions across six bands —
-shape, state, failure, boundary, decision, change — asks them one at a time, and
-grades against the implementation rather than against your confidence. At least one
-question is about something *surprising* in the code, because that is where
-understanding actually lives and it is what nobody retains from watching an agent
-work.
-
-Then it records a dated entry in `Reference/Cognitive Coverage/<feature>.md`, newest
-first, **appending rather than overwriting**. The history is the value: it shows
-whether understanding improved after somebody went and read the code, or quietly
-decayed. It records the questions too, so a re-test can be harder instead of
-identical.
-
-**The design is mostly about refusing to be nice.** A quiz everyone passes is worse
-than no quiz — it converts an unknown gap into a false belief and burns the one
-moment someone was willing to be tested. So: an answer that would equally fit a
-different implementation is *partial* at best, "I don't know" is a *gap* and never a
-partial, and the bands are never averaged into one number, because a person who is
-solid on shape and blank on failure modes has a specific problem that a percentage
-hides.
-
-It is a coverage report for a system, not a performance review — and it says so,
-because if it reads as a scorecard on a colleague then nobody asks for it twice and
-the people who need it stop first.
+Full detail: [docs/COGNITIVE-COVERAGE.md](docs/COGNITIVE-COVERAGE.md).
 
 ## Code index: where the code is, not only why
 
@@ -1092,92 +752,13 @@ cost. A Handoff becomes a status report, with the unmerged branch marked "in pro
 which is an adjective standing where a fact should be. Both pass their template check.
 Both are useless to the next person.
 
-So canon ships a map: each document type to somebody who already writes it well, the
-four to six **moves** to imitate, what to go read, and a pre-save check.
-
-```
-/house-voice
-```
-
-**The selection criterion is a retrievable corpus of that exact document type — not
-fame.** This is the whole trick, and it is why the map names some people you would not
-expect and refuses some you would. An agent cannot imitate a sensibility it has never
-read; it can imitate a corpus. Ask for the most celebrated designer of the last thirty
-years and you get reverent adjectives about materials, because he spoke in product
-films and left almost nothing written — there is no corpus behind the name, so the
-model fills the gap with the *idea* of him. Ask for a GOV.UK Design System component
-page and you get *when to use this / when not to use this / how it works / research on
-this component*, because ten thousand pages of exactly that exist.
-
-**Every entry names an anti-model, and the anti-model is doing more work than the
-exemplar.** "Write it like Nygard's ADR" is advice. "Do not write it like meeting
-minutes, which record what was discussed rather than what was chosen" names the
-specific failure the writer is otherwise about to commit. The reference files spend as
-much space on the failing register as on the good one.
-
-The defaults are opinionated so a new vault is not blank, and they lose to yours:
-`Reference/Writing/House Voice.md` in the vault overrides them, and a team that has
-named its own exemplars — a regulator's published guidance, a predecessor's document
-everybody already imitates — has done the more valuable thing. Alongside it,
-`Reference/Writing/Choosing a Document.md` is the escalation ladder: which document at
-which stage, and the standing instruction to pick the cheapest rung that still works.
-The commonest documentation failure is not writing badly, it is reaching for the full
-spec before anybody has agreed the idea survives.
-
-Two things it deliberately does not do. It does not make a document good — it makes it
-the right *kind* of document, and a well-voiced spec with no evidence in it is still a
-bad spec. And it is never announced: a document that mentions which writer it is
-imitating has failed at imitating them.
+Full detail: [docs/HOUSE-VOICE.md](docs/HOUSE-VOICE.md).
 
 ## Template packs: the core stays small
 
 `canon-init-vault` ships ten note templates. Everything else you ask for.
 
-```
-canon-pack list
-canon-pack add engineering
-canon-init-vault --pack product-ladder /path/to/vault
-```
-
-The core has to be right for every team that installs canon, so it holds only the
-documents almost everybody writes. A template that four teams in ten would use is not
-free: it lands in the other six vaults, where it makes `Templates/` harder to read and
-quietly implies somebody ought to be filling it in. Same rule the design canon states
-about component notes — *thirty notes for thirty primitives is boilerplate, not
-knowledge*. A folder is a recommendation; make it long enough and it stops being one.
-
-| Pack | Templates | The gap it fills |
-|---|---|---|
-| `product-ladder` | One-pager · PR-FAQ · Six-pager · Shape Up Pitch | The core ships one product document and it is the heavyweight one. These are the cheap rungs below it |
-| `engineering` | RFC · Architecture Overview · Runbook · Postmortem | canon can *record* a decision but not *argue* for one |
-| `research-craft` | Research Findings · Design Critique · Content & UX Copy Guide | Three documents that shape what gets built without describing it |
-
-**The RFC is the one worth singling out.** canon's `Decision` template is an ADR:
-retrospective by design, recording what was chosen after the choosing. There was no
-template for the document that does the persuading — the Oxide RFD, the Go proposal,
-the design doc that goes round for two weeks before anyone writes code. Teams without
-one either decide in chat and lose the reasoning, or write an ADR pre-emptively and
-pretend the argument already happened. An accepted RFC then produces a `Decisions/`
-note: the RFC is the argument, the ADR is the record of what it settled.
-
-**`add` never overwrites** — an existing file is left alone and reported, exactly like
-`canon-init-vault`, so re-running is how you pick up new templates after an upgrade.
-**`remove` only deletes what it shipped**: a file goes only if it is still
-byte-identical to the kit's template. The moment you have edited it, it is your note
-and not ours, so it is kept and reported. Without that rule an `add` typo followed by a
-`remove` would silently destroy somebody's work.
-
-The `house-voice` reference files for pack templates ship whether or not the pack is
-installed. A skill costs nothing until it loads, so gating them saves nothing — and a
-template arriving without the guidance for how to write it is the worse failure.
-
-`canon-pack` is deliberately **not** vendored into vaults. Unlike `canon-scan` and the
-rest it is not self-contained: it copies out of the kit's `templates/packs/`, which is
-not in your vault. A vendored copy would resolve an empty pack directory and report "no
-packs available", which reads as a fact about canon rather than a broken install. It
-refuses to run instead, and says why.
-
-Full detail, and how to add your own: [docs/PACKS.md](docs/PACKS.md).
+Full detail: [docs/PACKS.md](docs/PACKS.md).
 
 ## Companion tools
 
@@ -1298,27 +879,11 @@ Obsidian is **recommended, not required**: it is the nicest way for a human to
 read a linked vault, and nothing in the kit depends on it. Requirements stay
 `bash`, `git`, `python3`.
 
-**Not an engineering-only tool**, despite the examples. It is for whole teams
-building with AI — product, design, research, program and project management,
-support, clinical, ops, strategy, leadership, engineering. The vault is a git
-repository because git is a good way to share a folder of text between fifteen
-laptops with history and no server, *not* because the content is code. Product,
-clinical, ops and strategy notes are the common case, and a cross-functional team
-is where this pays off most: the whole point is that a decision made in one
-discipline is available to an assistant working in another.
-
-One thing genuinely *is* engineering-shaped and worth knowing about: the
-end-of-session prompt infers "real work happened" from changed files in your
-working folder, which is a good signal in a code repo and no signal in a folder
-that isn't one. [Two ways to set it up](#two-ways-to-set-it-up) is how you make it
-fire for work that isn't commits — point it at the vault, and the files you
-changed *are* the notes you wrote.
-
 ## Requirements
 
-`bash`, `git`, `python3`. No package installs, no daemons. The only network call
-is `canon-sync` checking for a newer release, once a day at most
-(`CANON_CHECK_UPDATES=0` turns it off). The optional chat connectors also need Node.
+`bash`, `git`, `python3`. No package installs, no daemons. Apart from git's own
+pull and push, the only network call is `canon-sync` checking for a newer release,
+once a day at most (`CANON_CHECK_UPDATES=0` turns it off). The optional chat connectors also need Node.
 
 **Not required:** a code repository, an IDE, a terminal (for readers and
 contributors — see [Getting Started — No Terminal](docs/GETTING-STARTED-NO-TERMINAL.md)),

@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-CANON_VERSION="0.2.0"
+CANON_VERSION="0.3.0"
 case "${1:-}" in --version|-V) printf 'canon %s\n' "$CANON_VERSION"; exit 0 ;; esac
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

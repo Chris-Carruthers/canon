@@ -117,7 +117,8 @@ app.command("/canon", async ({ command, ack, client, respond }) => {
   }
   const posted = await client.chat.postMessage({
     channel: command.channel_id,
-    text: `:mag: *${command.text}* — asked by <@${command.user_id}>`,
+    // Escaped so a question containing <!channel> cannot ping the whole channel.
+    text: `:mag: *${command.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}* — asked by <@${command.user_id}>`,
   });
   await ask({
     client, channel: command.channel_id, threadTs: posted.ts,

@@ -404,9 +404,6 @@ git_q commit -qm "must be blocked" >/dev/null 2>&1
 is "gate actually fires under core.hooksPath" "$?" "1"
 git reset -q; cd "$V" || exit 1
 
-# The Slack connector is optional and needs Node, so we cannot run it here. But
-# its safety properties are static and MUST NOT regress — someone adding Bash "for
-# convenience" turns a read-only Q&A bot into a remote shell over the vault.
 section "connector safety (static)"
 # Connectors are optional and need Node, so we cannot run them here. Their safety
 # properties are static and MUST NOT regress: someone adding Bash "for
@@ -454,10 +451,10 @@ print(','.join(t.strip().strip(chr(34)+chr(39)) for t in m.group(1).split(',') i
       && ok "markdown links and anchors resolve" \
       || bad "broken link or anchor — run: node test/links.test.mjs"
     node "$KIT/test/paths.test.mjs" >/dev/null 2>&1 \
-      && ok "MCP path-traversal boundary holds (10 cases)" \
+      && ok "connector path and tool boundary holds" \
       || bad "MCP path-traversal tests FAILED — run test/paths.test.mjs"
   fi
-  if grep -q "refusing to start with no allowlist" "$CORE"; then
+  if grep -q "refusing to start with no allowlist" "$VAULTMOD"; then
     ok "fails closed without an allowlist"; else bad "no fail-closed allowlist check in core"; fi
 
   # Tokens must never be committable.
@@ -709,7 +706,7 @@ is "every runtime file is byte-identical" "${drift:-none}" "none"
 
 "$KIT/install.sh" "$R3" --vault "$V4" >/dev/null 2>&1
 is "re-install does not duplicate the block" \
-  "$(LC_ALL=C grep -c 'canon:knowledge-vault' "$R3/GEMINI.md" | tr -d ' ')" "1"
+  "$(LC_ALL=C grep -c '<!-- canon:knowledge-vault' "$R3/GEMINI.md" | tr -d ' ')" "1"
 
 is "--claude-only writes no extra runtimes" \
   "$(R4="$SB/repo4"; mkdir -p "$R4"; git init -q "$R4" 2>/dev/null; \
@@ -1926,7 +1923,10 @@ cd "$V" || exit 1
 
 # ---------------------------------------------------------------------------
 section "uninstall"
+echo "## written after install" >> "$R2/CLAUDE.md"
 "$KIT/install.sh" "$R2" --uninstall >/dev/null 2>&1
+has "keeps what was written after our block" "$(cat "$R2/CLAUDE.md")" "written after install"
+is "removes the version stamp" "$([ -e "$R2/.claude/hooks/.canon-version" ] && echo present || echo gone)" "gone"
 is "removes our hooks"        "$([ -f "$R2/.claude/hooks/session-start.sh" ] && echo present || echo gone)" "gone"
 is "removes cursor rules"     "$([ -f "$R2/.cursor/rules/knowledge-vault.mdc" ] && echo present || echo gone)" "gone"
 if grep -q "canon:knowledge-vault" "$R2/AGENTS.md" 2>/dev/null; then
@@ -1935,6 +1935,28 @@ has "leaves foreign hooks alone" "$(cat "$R2/.claude/settings.json")" "keep-me"
 has "leaves CLAUDE.md body"      "$(cat "$R2/CLAUDE.md")" "npm test"
 if grep -q "canon:knowledge-vault" "$R2/CLAUDE.md" 2>/dev/null; then
   bad "strips our CLAUDE.md block"; else ok "strips our CLAUDE.md block"; fi
+
+# ---------------------------------------------------------------------------
+section "argument and staging edge cases"
+RG="$SB/regress"; mkdir -p "$RG/Sessions" "$RG/.canon" && git -C "$RG" init -q
+( cd "$RG" && echo seed > seed.md && git add seed.md && git_q commit -qm seed )
+# git quotes non-ASCII paths by default, and the session-note convention uses an em
+# dash; a quoted header once let the previous file's exclusion carry over.
+echo x > "$RG/.canon/x.sh"
+printf 'ghp_%s\n' "$(printf 'a%.0s' $(seq 36))" > "$RG/Sessions/2026-01-01 — note (t).md"
+( cd "$RG" && git add .canon/x.sh "Sessions/2026-01-01 — note (t).md" )
+is "scanner reads non-ASCII paths after an excluded file" \
+   "$( (cd "$RG" && "$KIT/bin/canon-scan" "$RG") >/dev/null 2>&1; echo $?)" "1"
+( cd "$RG" && git reset -q && rm -f .canon/x.sh "Sessions/2026-01-01 — note (t).md" )
+echo theirs > "$RG/Sessions/theirs.md"; git -C "$RG" add Sessions/theirs.md
+echo mine > "$RG/Sessions/mine.md"
+( cd "$RG" && CANON_HOME="$RG" CANON_CHECK_UPDATES=0 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com \
+    GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com \
+    "$KIT/bin/canon-sync" --no-pull --only Sessions/mine.md -m mine >/dev/null 2>&1 )
+is "--only commits only the named path" "$(git -C "$RG" show --name-only --format= HEAD)" "Sessions/mine.md"
+is "--only leaves another session's staging alone" "$(git -C "$RG" diff --cached --name-only)" "Sessions/theirs.md"
+is "a flag missing its value exits instead of hanging" \
+   "$(perl -e 'alarm 5; exec @ARGV' "$KIT/bin/canon-sync" -m >/dev/null 2>&1; echo $?)" "1"
 
 # ---------------------------------------------------------------------------
 printf '\n\033[1m%d passed, %d failed\033[0m\n' "$PASS" "$FAIL"
