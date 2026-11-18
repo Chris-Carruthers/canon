@@ -37,7 +37,8 @@ if [ ! -d "$VAULT/.git" ]; then
   echo "  ! not a git repository — skipping the commit check" >&2
 else
   if [ -x "$HERE/canon-install-vault-hooks" ]; then
-    "$HERE/canon-install-vault-hooks" "$VAULT" | sed 's/^/  /'
+    "$HERE/canon-install-vault-hooks" "$VAULT" | sed 's/^/  /' \
+      || { echo "  ! the commit check did NOT install — commits are UNGATED" >&2; exit 1; }
   else
     echo "  ! .canon/canon-install-vault-hooks is missing — commits will be UNGATED" >&2
     echo "    ask whoever maintains this vault to commit it" >&2
@@ -52,7 +53,7 @@ Done. To check it worked, try to commit something that looks like a secret:
   cd "$VAULT"
   echo 'AKIA1234567890ABCDEF' > _probe.md
   git add _probe.md && git commit -m probe     # should be REFUSED
-  git reset -q && rm -f _probe.md
+  git reset -q -- _probe.md && rm -f _probe.md
 
 Next:
   * Open this folder in Obsidian: File > Open folder as vault.

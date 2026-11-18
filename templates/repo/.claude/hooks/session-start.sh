@@ -79,7 +79,8 @@ fi
 # that is what `canon-sync` is for, run when you are looking at it.
 if [ "${CANON_AUTOPULL:-0}" = "1" ] && [ -d "$VAULT/.git" ]; then
   if [ -z "$(git -C "$VAULT" status --porcelain 2>/dev/null | head -1)" ]; then
-    git -C "$VAULT" pull --ff-only --quiet >/dev/null 2>&1 || true
+    GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes" \
+      git -C "$VAULT" pull --ff-only --quiet >/dev/null 2>&1 || true
   fi
 fi
 

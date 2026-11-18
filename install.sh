@@ -46,6 +46,7 @@ esac
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TPL="$KIT_DIR/templates/repo"
 MARKER="<!-- canon:knowledge-vault -->"
+END_MARKER="<!-- /canon:knowledge-vault -->"
 
 TARGET=""
 VAULT=""
@@ -58,7 +59,7 @@ WANT_GEMINI=1; WANT_COPILOT=1; WANT_WINDSURF=1; WANT_CLINE=1
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --vault) VAULT="${2:-}"; shift 2 ;;
+    --vault) VAULT="${2:?$1 needs a value}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     --no-gemini) WANT_GEMINI=0; shift ;;
@@ -86,6 +87,11 @@ git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1 || {
   echo "      If your work is notes rather than code, install into the vault itself." >&2
 }
 
+# Back up settings.json outside the repo: a .bak inside .claude/ gets committed.
+backup_settings() {
+  BK="${XDG_CACHE_HOME:-$HOME/.cache}/canon/backups"
+  mkdir -p "$BK" && cp "$SETTINGS" "$BK/settings.json.$(date +%Y%m%d%H%M%S)" && say "settings backup: $BK"
+}
 say() { printf '  %s\n' "$*"; }
 run() { if [ "$DRY" = "1" ]; then say "[dry-run] $*"; else "$@"; fi; }
 
@@ -95,23 +101,23 @@ run() { if [ "$DRY" = "1" ]; then say "[dry-run] $*"; else "$@"; fi; }
 # repo had before is left exactly as it was.
 if [ "$UNINSTALL" = "1" ]; then
   echo "Removing canon from $TARGET"
-  for f in session-start.sh session-end-check.sh canon-path canon-status; do
+  for f in session-start.sh session-end-check.sh canon-path canon-status .canon-version; do
     [ -e "$TARGET/.claude/hooks/$f" ] && { run rm -f "$TARGET/.claude/hooks/$f"; say "removed hook: $f"; }
   done
   [ -e "$TARGET/.claude/rules/knowledge-vault.md" ] \
     && { run rm -f "$TARGET/.claude/rules/knowledge-vault.md"; say "removed rules"; }
-  [ -e "$TARGET/.canon" ] && { run rm -f "$TARGET/.canon"; say "removed .canon marker"; }
+  [ -f "$TARGET/.canon" ] && { run rm -f "$TARGET/.canon"; say "removed .canon marker"; }
 
   SETTINGS="$TARGET/.claude/settings.json"
   if [ -f "$SETTINGS" ] && [ "$DRY" != "1" ]; then
-    cp "$SETTINGS" "$SETTINGS.bak.$(date +%Y%m%d%H%M%S)"
+    backup_settings
     python3 - "$SETTINGS" <<'PY'
 import json, sys
 p = sys.argv[1]
 with open(p) as f: d = json.load(f)
 
-def ours(cmd): return "canon" in (cmd or "") or "session-start.sh" in (cmd or "") \
-                   or "session-end-check.sh" in (cmd or "")
+OUR_HOOKS = (".claude/hooks/session-start.sh", ".claude/hooks/session-end-check.sh", ".claude/hooks/canon-")
+def ours(cmd): return any(h in (cmd or "") for h in OUR_HOOKS)
 
 hooks = d.get("hooks", {})
 for event in list(hooks):
@@ -145,14 +151,16 @@ PY
               .windsurf/rules/knowledge-vault.md .clinerules/knowledge-vault.md; do
   CM="$TARGET/$name"
   if [ -f "$CM" ] && grep -qF "$MARKER" "$CM" 2>/dev/null && [ "$DRY" != "1" ]; then
-    python3 - "$CM" "$MARKER" <<'PY'
+    python3 - "$CM" "$MARKER" "$END_MARKER" <<'PY'
 import os, sys
-path, marker = sys.argv[1], sys.argv[2]
+path, marker, end = sys.argv[1], sys.argv[2], sys.argv[3]
 lines = open(path, encoding="utf-8").read().split("\n")
 try: i = next(n for n, l in enumerate(lines) if marker in l)
 except StopIteration: sys.exit(0)
-# Our block runs from the marker to EOF (install.sh only ever appends it).
-kept = "\n".join(lines[:i]).rstrip() + "\n"
+# Our block runs to the end marker; older installs wrote none, so to EOF.
+j = next((n for n in range(i, len(lines)) if end in lines[n]), len(lines) - 1)
+after = "\n".join(lines[j + 1:]).strip()
+kept = "\n".join(lines[:i]).rstrip() + "\n" + (f"\n{after}\n" if after else "")
 name = path.rsplit("/", 1)[-1]
 if kept.strip() == "":
     # Nothing of theirs was in it, so we created the whole file. Leaving a
@@ -243,7 +251,7 @@ SETTINGS="$TARGET/.claude/settings.json"
 if [ "$DRY" = "1" ]; then
   say "[dry-run] merge .claude/settings.json"
 elif [ -f "$SETTINGS" ]; then
-  cp "$SETTINGS" "$SETTINGS.bak.$(date +%Y%m%d%H%M%S)"
+  backup_settings
   python3 - "$SETTINGS" "$TPL/.claude/settings.json" <<'PY'
 import json, sys
 dst_path, src_path = sys.argv[1], sys.argv[2]
@@ -313,18 +321,20 @@ for name in $RUNTIME_FILES; do
   fi
   mkdir -p "$(dirname "$CM")"
   if [ ! -f "$CM" ]; then
-    { printf '%s\n' "$MARKER"; cat "$TPL/agent-instructions.md"; } > "$CM"
+    { printf '%s\n' "$MARKER"; cat "$TPL/agent-instructions.md"; printf '%s\n' "$END_MARKER"; } > "$CM"
     say "created $name"
   elif grep -qF "$MARKER" "$CM" 2>/dev/null; then
     say "$name already has the vault block — left alone"
   else
-    { printf '\n\n%s\n' "$MARKER"; cat "$TPL/agent-instructions.md"; } >> "$CM"
+    { printf '\n\n%s\n' "$MARKER"; cat "$TPL/agent-instructions.md"; printf '%s\n' "$END_MARKER"; } >> "$CM"
     say "appended vault block to existing $name"
   fi
 done
 
 # --- .canon marker -----------------------------------------------------------
-if [ -n "$VAULT" ]; then
+if [ -n "$VAULT" ] && [ -d "$TARGET/.canon" ]; then
+  say ".canon is the vault's own tools folder here — no marker needed"
+elif [ -n "$VAULT" ]; then
   if [ "$DRY" = "1" ]; then
     say "[dry-run] write .canon -> $VAULT"
   else

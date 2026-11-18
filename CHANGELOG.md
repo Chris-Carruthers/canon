@@ -6,6 +6,51 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ## [Unreleased]
 
+### Security
+
+- **The Slack and Discord bots could run any tool and read any file on the host.**
+  `allowedTools` in the Agent SDK only pre-approves the tools it lists; it removes
+  none, and `cwd` is not a sandbox. Under `bypassPermissions` a channel member could
+  ask for Bash or `~/.ssh`. A `PreToolUse` hook (`confineTools` in
+  `connectors/shared/vault.mjs`) now allows only Read, Grep and Glob, only inside the
+  vault, and never under a dot-path. Tested in `test/paths.test.mjs`.
+- **MCP `canon_read` returned dot-files**, including `.git/config` (which can hold a
+  token in the remote URL) and Obsidian plugin data. It now refuses dot-paths.
+- **`safeResolve` treated a dangling symlink as inside the vault.** It now stops on it.
+- **Slack `/canon` echoed the question unescaped**, so `<!channel>` pinged everyone.
+
+### Fixed
+
+- **`canon-scan` skipped files with non-ASCII names** when one followed an excluded
+  file. Git quotes such paths, and the session-note convention uses an em dash.
+- **`canon-sync --only` committed the whole index**, including what another session
+  had staged. It now commits only the named paths.
+- **A flag given without its value hung forever** (`canon-sync -m`, and five more
+  scripts). It now exits with an error.
+- **`install.sh --uninstall` deleted anything written after the canon block** in
+  `CLAUDE.md` and the other runtime files. The block now has an end marker.
+- **Uninstall removed any hook whose command contained "canon"**, and left
+  `.canon-version` and a `settings.json.bak` behind in `.claude/`. Backups now go to
+  `~/.cache/canon/backups`.
+- **Installing into the vault itself failed** on its `.canon/` folder, both ways.
+- **With `CANON_AUTOCOMMIT=1` and no gate, the session-note reminder never fired.**
+- **`bootstrap.sh` printed "Done" when the commit check failed to install**, and its
+  probe instructions unstaged everything rather than the probe file.
+- **`canon-verify` suggested `git add -A`.** It now names the files it changed.
+- **The plugin's hooks had no timeout**, and auto-pull could wait on a credential prompt.
+- **The `.mcpb` bundle reported version 0.2.0.** CI now checks `build.sh` and lints it
+  and `bootstrap.sh`.
+
+### Changed
+
+- **The README is a third shorter.** The trust, design canon, testing canon, cognitive
+  coverage and house voice sections moved to their own files in `docs/`; each README
+  section keeps its heading and opening paragraph. Auto-pull is no longer described as
+  automatic in three places when its default is off, the quickstart no longer offers
+  `--design` as a third choice, and the hero is a WebP at a quarter of the weight.
+  `assets/brand-guide.png`, unreferenced and showing invented repo stats, is gone.
+- **Removed a dead, broken copy of the vault helpers** from `connectors/shared/agent.mjs`.
+
 ### Added
 
 - **`code-index` skill.** Points agents at

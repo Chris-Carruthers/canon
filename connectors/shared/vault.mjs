@@ -129,7 +129,9 @@ export function safeResolve(vault, relPath) {
   let probe = candidate;
   const tail = [];
   for (;;) {
-    if (fs.existsSync(probe)) break;
+    // lstat, not exists: a dangling symlink must stop here (realpath then throws),
+    // not be re-appended as a plain name that only looks inside the vault.
+    try { fs.lstatSync(probe); break; } catch { /* keep climbing */ }
     const parent = path.dirname(probe);
     if (parent === probe) break;
     tail.unshift(path.basename(probe));
@@ -142,4 +144,38 @@ export function safeResolve(vault, relPath) {
     throw new Error(`path escapes the vault: ${relPath}`);
   }
   return real;
+}
+
+/**
+ * safeResolve, plus: no dot-paths. `.git/config` can hold a token in the remote URL
+ * and Obsidian plugin data under `.obsidian/` holds API keys; neither is a note.
+ */
+export function safeNotePath(vault, relPath) {
+  const abs = safeResolve(vault, relPath);
+  const rel = path.relative(fs.realpathSync(vault), abs);
+  if (rel.split(path.sep).some((s) => s.startsWith("."))) throw new Error(`not a note: ${relPath}`);
+  return abs;
+}
+
+/**
+ * PreToolUse hook for the chat bots, and the real boundary for them. The Agent SDK's
+ * allowedTools only pre-approves tools (it removes none) and cwd is not a sandbox,
+ * so without this a channel member could ask the bot to run Bash or read ~/.ssh.
+ */
+export function confineTools(vault, tools) {
+  const root = fs.realpathSync(vault);
+  const deny = (why) => ({
+    hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: why },
+  });
+  return async (input) => {
+    if (!tools.includes(input.tool_name)) return deny(`${input.tool_name} is not available: this assistant is read-only`);
+    const { file_path, path: dir, pattern } = input.tool_input ?? {};
+    if (input.tool_name === "Glob" && typeof pattern === "string"
+        && (path.isAbsolute(pattern) || pattern.split("/").includes(".."))) {
+      return deny("glob patterns must stay inside the vault");
+    }
+    const p = file_path ?? dir;
+    if (p === undefined || [root, path.resolve(vault)].includes(path.resolve(root, p))) return {};  // whole-vault search
+    try { safeNotePath(root, p); return {}; } catch (e) { return deny(e.message); }
+  };
 }

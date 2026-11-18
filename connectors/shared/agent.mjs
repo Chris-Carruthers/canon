@@ -7,76 +7,9 @@
 
 import path from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { confineTools } from "./vault.mjs";
 
 export const READ_ONLY_TOOLS = ["Read", "Grep", "Glob"];
-
-export function die(msg) {
-  console.error(`canon: ${msg}`);
-  process.exit(1);
-}
-
-export function list(v) {
-  return (v || "").split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
-}
-
-/**
- * Find the vault. Uses the same resolution order as the rest of canon, by
- * shelling out to canon-path where possible, so there is one definition of
- * "where is the vault" across the whole kit rather than a JS reimplementation
- * that can disagree with the shell one.
- */
-export function resolveVault() {
-  if (process.env.CANON_HOME) {
-    const p = process.env.CANON_HOME.replace(/^~(?=$|\/)/, os.homedir());
-    if (!fs.existsSync(p)) die(`CANON_HOME is set to '${p}' but that does not exist`);
-    return fs.realpathSync(p);
-  }
-  const here = import.meta.dirname;
-  for (const candidate of [
-    path.resolve(here, "../../bin/canon-path"),
-    path.resolve(here, "../../.canon/canon-path"),
-    "canon-path",
-  ]) {
-    try {
-      const out = execFileSync(candidate, { encoding: "utf8" }).trim();
-      if (out && fs.existsSync(out)) return fs.realpathSync(out);
-    } catch { /* try the next */ }
-  }
-  const cfg = path.join(os.homedir(), ".config/canon/path");
-  if (fs.existsSync(cfg)) {
-    const line = fs.readFileSync(cfg, "utf8").split("\n")
-      .find((l) => l.trim() && !l.startsWith("#"));
-    if (line && fs.existsSync(line.trim())) return fs.realpathSync(line.trim());
-  }
-  die("cannot find the vault. Set CANON_HOME, or write the path into ~/.config/canon/path");
-}
-
-/**
- * Fail-closed access control.
- *
- * These connectors BYPASS git permissions: git decides who can clone the vault,
- * the chat platform decides who is in the channel. Where those sets differ, an
- * open bot hands notes to people who were never granted access. So an empty
- * allowlist is a hard error at startup, not a permissive default.
- */
-export function makeGate({ channels = [], users = [], roles = [], platform = "chat" }) {
-  if (!channels.length && !users.length && !roles.length) {
-    die(
-      `refusing to start with no allowlist.\n` +
-      `  This bot can read the whole vault, and ${platform} membership is not the same\n` +
-      `  as git access. Allow specific channels, users, or roles.\n` +
-      `  Use '*' for channels only if everyone who can reach this bot may read every note.`
-    );
-  }
-  const open = channels.includes("*");
-  return function allowed({ channel, user, userRoles = [] } = {}) {
-    if (open) return true;
-    if (channel && channels.includes(channel)) return true;
-    if (user && users.includes(user)) return true;
-    if (roles.length && userRoles.some((r) => roles.includes(r))) return true;
-    return false;
-  };
-}
 
 export function systemPrompt(router) {
   return `You answer questions about this team's knowledge vault, which is on disk at
@@ -122,12 +55,14 @@ export async function askVault({
       prompt: question,
       options: {
         model,
-        cwd: vault,                    // pinned: cannot reach other repositories
+        cwd: vault,
         appendSystemPrompt: systemPrompt(router),
         maxTurns,
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
         allowedTools: READ_ONLY_TOOLS,
         permissionMode: "bypassPermissions",
+        // The boundary: allowedTools above only pre-approves, it does not restrict.
+        hooks: { PreToolUse: [{ hooks: [confineTools(vault, READ_ONLY_TOOLS)] }] },
       },
     })) {
       if (msg.session_id) onSession(msg.session_id);

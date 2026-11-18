@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/templates/repo/.claude/hooks/session-start.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/templates/repo/.claude/hooks/session-start.sh\"",
+            "timeout": 10
           }
         ]
       }
@@ -16,7 +17,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/templates/repo/.claude/hooks/session-end-check.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/templates/repo/.claude/hooks/session-end-check.sh\"",
+            "timeout": 10
           }
         ]
       }

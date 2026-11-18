@@ -89,8 +89,9 @@ print(json.dumps({"systemMessage":
   "Git never copies hooks when you clone, so this is per-machine. Until then commit "
   "the vault by hand, so a person is looking."}))
 PY
+      exit 0
     fi
-    exit 0
+    # Clean vault: nothing to commit, so fall through to the session-note check.
   fi
   if [ -n "$(git -C "$VAULT" status --porcelain 2>/dev/null | head -1)" ]; then
     git -C "$VAULT" add -A >/dev/null 2>&1 || true

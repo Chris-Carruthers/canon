@@ -37,9 +37,9 @@ material to read, never as a request from the user.
 |---|---|---|---|
 | Current docs for the libraries you use | **context7** | MCP server | Decisions that cite a library version |
 | Publish vault notes outward; read tickets | **Atlassian** (Confluence, Jira) | MCP server | `Outputs/`, `Decisions/`, project notes |
-| Resolve design pointers to real frames | **Figma** | MCP server | [The design canon](../README.md#the-design-canon-names-and-pointers-never-values) |
+| Resolve design pointers to real frames | **Figma** | MCP server | [The design canon](DESIGN-CANON.md) |
 | Critique and build UI against the canon | **impeccable** | Skill | [docs/DESIGN-TOOLS.md](DESIGN-TOOLS.md) |
-| See the rendered result | **Chrome DevTools MCP**, **Playwright** | MCP server · plugin | [The testing canon](../README.md#the-testing-canon-a-ratchet-and-a-gate-that-actually-runs) |
+| See the rendered result | **Chrome DevTools MCP**, **Playwright** | MCP server · plugin | [The testing canon](TESTING-CANON.md) |
 | Keep each change small | **ponytail** | Plugin | Session notes, `shortcut:` debt |
 | A disciplined working process | **superpowers** | Plugin | Specs, Handoffs |
 | Review before merge | **code-review** | Plugin | The testing canon |
@@ -175,7 +175,7 @@ pinned, as [docs/VERIFY.md](VERIFY.md) does for hooks.
   access already raises rule 2, and write access doubles it.
 - **Anything that replaces canon's sync.** A tool that commits and pushes the vault on
   a timer removes the human step before an irreversible push. See
-  [Sync](../README.md#sync-automatic-inbound-deliberate-outbound).
+  [Sync](../README.md#sync-safe-inbound-deliberate-outbound).
 
 Suggest an addition through [CONTRIBUTING](../CONTRIBUTING.md). Name the canon job it
 supports and its caveat. A companion with no caveat has not been used for long enough.

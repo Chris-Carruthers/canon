@@ -19,7 +19,7 @@
  * 2. Read-only. There is no write tool. Not "a write tool that refuses" — no
  *    write tool exists. Writing to the canon belongs where it is reviewable.
  *
- * 3. Every caller-supplied path goes through safeResolve(), which refuses
+ * 3. Every caller-supplied path goes through safeNotePath(), which refuses dot-paths and
  *    traversal and symlinks pointing out of the vault. That is the entire
  *    security boundary and it is unit-tested in test/paths.test.mjs.
  *
@@ -37,7 +37,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema, ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { resolveVault, safeResolve, list } from "../../shared/vault.mjs";
+import { resolveVault, safeNotePath, list } from "../../shared/vault.mjs";
 
 const VAULT = resolveVault();
 const ROUTER = process.env.CANON_ROUTER || "Vision/Agent Router.md";
@@ -48,7 +48,7 @@ const excluded = (rel) => EXCLUDE.some((e) => rel === e || rel.startsWith(`${e}/
 
 // ── vault reads ─────────────────────────────────────────────────────────────
 function readNote(rel) {
-  const abs = safeResolve(VAULT, rel);
+  const abs = safeNotePath(VAULT, rel);
   const st = fs.statSync(abs);
   if (st.isDirectory()) throw new Error(`${rel} is a directory — use canon_list`);
   const buf = fs.readFileSync(abs, "utf8");

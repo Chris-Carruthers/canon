@@ -106,7 +106,7 @@ PATTERNS = [
 
 try:
     diff = subprocess.run(
-        ["git", "diff", "--cached", "--unified=0", "--no-color", "--diff-filter=ACMR"],
+        ["git", "-c", "core.quotePath=false", "diff", "--cached", "--unified=0", "--no-color", "--diff-filter=ACMR"],
         capture_output=True, text=True, errors="replace", check=False).stdout
 except Exception as e:
     print(f"canon-scan: could not read staged diff: {e}", file=sys.stderr)
@@ -114,8 +114,16 @@ except Exception as e:
 
 path, lineno, hits, skipping = None, 0, [], False
 for raw in diff.splitlines():
-    if raw.startswith("+++ b/"):
-        path = raw[6:]
+    # A new file header always resets state: inheriting the previous file's
+    # exclusion would let a secret through unscanned.
+    if raw.startswith("diff --git "):
+        path, skipping = None, False
+        continue
+    if raw.startswith("+++ "):
+        # quotePath=false keeps "Sessions/2026-11-18 — x.md" unquoted; a path with
+        # a tab or quote is still quoted, so strip those too rather than skip it.
+        path = raw[4:].rstrip("\t").strip('"')
+        path = path[2:] if path.startswith("b/") else path
         skipping = any(x.search(path) for x in EXCLUDE)
         continue
     if raw.startswith("@@"):

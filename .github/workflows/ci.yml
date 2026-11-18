@@ -50,6 +50,7 @@ jobs:
             install.sh \
             bin/canon-* \
             templates/repo/.claude/hooks/*.sh \
+            templates/vault/.canon/bootstrap.sh connectors/mcpb/build.sh \
             test/run.sh
 
   hygiene:
@@ -82,7 +83,7 @@ jobs:
         run: |
           want="$(cat VERSION)"
           fail=0
-          for f in bin/canon-* ./install.sh; do
+          for f in bin/canon-* ./install.sh connectors/mcpb/build.sh; do
             got="$("$f" --version | awk '{print $2}')"
             [ "$got" = "$want" ] || { echo "$f reports $got, VERSION says $want"; fail=1; }
           done
