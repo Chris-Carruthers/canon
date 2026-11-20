@@ -1969,7 +1969,7 @@ is "verify adds the new entry"                "$(grep -c 'human:carol' "$RG/v.md
 RB="$SB/remote.git"; git init -q --bare "$RB"
 git -C "$RG" remote add origin "$RB"; git -C "$RG" push -q origin HEAD:main 2>/dev/null
 git -C "$RG" branch -q -u origin/main 2>/dev/null || git -C "$RG" branch -q --set-upstream-to=origin/main
-git clone -q "$RB" "$SB/other" 2>/dev/null
+git clone -q -b main "$RB" "$SB/other" 2>/dev/null
 ( cd "$SB/other" && echo ahead > Sessions-ahead.md && git add Sessions-ahead.md && git_q commit -qm ahead && git push -q origin HEAD:main )
 echo "half-written" > "$RG/Sessions/open.md"
 ( cd "$RG" && CANON_HOME="$RG" CANON_CHECK_UPDATES=0 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com \
