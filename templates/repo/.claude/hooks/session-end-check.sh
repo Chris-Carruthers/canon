@@ -69,12 +69,12 @@ SESSIONS_DIR="${CANON_SESSIONS_DIR:-Sessions}"
 # it silently turns "I forgot to run bootstrap" into "an agent wrote my API key into
 # permanent history." Verified: with no pre-commit hook, an autocommit will commit a
 # planted AWS key without a word. So check first, and say something useful instead.
-if [ "${CANON_AUTOCOMMIT:-0}" = "1" ] && [ -d "$VAULT/.git" ]; then
+if [ "${CANON_AUTOCOMMIT:-0}" = "1" ] && [ -e "$VAULT/.git" ]; then
   HOOKS_DIR="$(git -C "$VAULT" config --get core.hooksPath 2>/dev/null || true)"
   if [ -n "$HOOKS_DIR" ]; then
     case "$HOOKS_DIR" in /*) : ;; *) HOOKS_DIR="$VAULT/$HOOKS_DIR" ;; esac
   else
-    HOOKS_DIR="$VAULT/.git/hooks"
+    HOOKS_DIR="$(git -C "$VAULT" rev-parse --path-format=absolute --git-path hooks 2>/dev/null || echo "$VAULT/.git/hooks")"
   fi
   if ! grep -qs 'canon' "$HOOKS_DIR/pre-commit" 2>/dev/null; then
     if [ -n "$(git -C "$VAULT" status --porcelain 2>/dev/null | head -1)" ]; then

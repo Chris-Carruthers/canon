@@ -36,7 +36,7 @@ if [ -z "$VAULT" ]; then
   [ -n "$RESOLVER" ] && VAULT="$("$RESOLVER" 2>/dev/null || true)"
 fi
 [ -n "$VAULT" ] || { echo "usage: canon-install-vault-hooks /path/to/vault" >&2; exit 2; }
-[ -d "$VAULT/.git" ] || { echo "error: not a git repo: $VAULT" >&2; exit 2; }
+[ -e "$VAULT/.git" ] || { echo "error: not a git repo: $VAULT" >&2; exit 2; }
 VAULT="$(cd "$VAULT" && pwd)"
 
 # Ship the scanner inside the vault repo so the hook has no external dependency
@@ -68,7 +68,7 @@ if [ -n "$HOOKS_DIR" ]; then
   echo "        (git ignores .git/hooks entirely when it is set)"
   mkdir -p "$HOOKS_DIR"
 else
-  HOOKS_DIR="$VAULT/.git/hooks"
+  HOOKS_DIR="$(git -C "$VAULT" rev-parse --path-format=absolute --git-path hooks 2>/dev/null || echo "$VAULT/.git/hooks")"  # right in a worktree too
 fi
 
 HOOK="$HOOKS_DIR/pre-commit"
@@ -110,7 +110,7 @@ ROOT="$(git rev-parse --show-toplevel)"
 # Whatever pre-commit check this repo had before canon was installed runs first
 # and keeps its veto. We are an addition, not a replacement.
 HD="$(git config core.hooksPath 2>/dev/null || true)"
-if [ -n "$HD" ]; then case "$HD" in /*) : ;; *) HD="$ROOT/$HD" ;; esac; else HD="$ROOT/.git/hooks"; fi
+if [ -n "$HD" ]; then case "$HD" in /*) : ;; *) HD="$ROOT/$HD" ;; esac; else HD="$(git rev-parse --path-format=absolute --git-path hooks 2>/dev/null || echo "$ROOT/.git/hooks")"; fi
 PRIOR="$HD/pre-commit.canon-chained"
 if [ -x "$PRIOR" ]; then
   "$PRIOR" "$@" || exit $?

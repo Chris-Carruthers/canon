@@ -82,10 +82,11 @@ function listNotes(globish) {
 }
 
 function search(qry, limit = 40) {
-  // git grep where available: fast, respects .gitignore, no shell quoting games.
+  // git grep where available: fast, no shell quoting games. --untracked so a note
+  // written but not yet committed is findable; .gitignore is still honoured.
   try {
     const out = execFileSync(
-      "git", ["-C", VAULT, "grep", "-n", "-I", "--no-color", "-i", "-e", qry, "--", "*.md"],
+      "git", ["-C", VAULT, "grep", "--untracked", "-n", "-I", "--no-color", "-i", "-e", qry, "--", "*.md"],
       { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
     );
     return out.split("\n").filter(Boolean)

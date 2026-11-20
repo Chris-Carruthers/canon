@@ -21,6 +21,20 @@ public surface is the CLI flags, the config variables, and the file formats
 
 ### Fixed
 
+- **`canon-sync` no longer uses `--autostash`.** The stash is shared by every session
+  and worktree on a repo, and a failed pop left conflict markers in open notes. A
+  clean tree rebases; with local edits it fast-forwards only, or skips the pull and
+  rebases at push time.
+- **Vaults checked out as git worktrees** were reported as "not a git repo", and the
+  gate installed into a hooks folder git never reads. Hooks paths now come from
+  `git rev-parse --git-path`.
+- **`canon-verify` dropped or mangled other people's entries** when their keys were in
+  another order or had an extra key. Entries it cannot parse are now kept verbatim.
+- **`bootstrap.sh` was never upgraded** in an existing vault. `canon-init-vault` now
+  refreshes it with the other vendored tools.
+- **MCP search could not find uncommitted notes.** It now searches untracked files too.
+- **The chat bots kept their thread map in the shared tmp dir.** It is now under
+  `~/.cache/canon/`, written owner-only.
 - **`canon-scan` skipped files with non-ASCII names** when one followed an excluded
   file. Git quotes such paths, and the session-note convention uses an em dash.
 - **`canon-sync --only` committed the whole index**, including what another session
@@ -50,6 +64,7 @@ public surface is the CLI flags, the config variables, and the file formats
   `--design` as a third choice, and the hero is a WebP at a quarter of the weight.
   `assets/brand-guide.png`, unreferenced and showing invented repo stats, is gone.
 - **Removed a dead, broken copy of the vault helpers** from `connectors/shared/agent.mjs`.
+- **Removed `assets/logo.png` and `assets/icon.png`**, which nothing referenced.
 
 ### Added
 

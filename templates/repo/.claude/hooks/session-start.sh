@@ -77,7 +77,7 @@ fi
 # We also skip entirely when the tree is dirty, because those are exactly the
 # files someone is editing. Reconciling divergent history is a deliberate act:
 # that is what `canon-sync` is for, run when you are looking at it.
-if [ "${CANON_AUTOPULL:-0}" = "1" ] && [ -d "$VAULT/.git" ]; then
+if [ "${CANON_AUTOPULL:-0}" = "1" ] && [ -e "$VAULT/.git" ]; then
   if [ -z "$(git -C "$VAULT" status --porcelain 2>/dev/null | head -1)" ]; then
     GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes" \
       git -C "$VAULT" pull --ff-only --quiet >/dev/null 2>&1 || true

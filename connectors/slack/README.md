@@ -122,7 +122,7 @@ It's a long-lived process that needs the vault on disk and outbound HTTPS.
 | `CANON_SLACK_MODEL` | `claude-sonnet-5` | Model |
 | `CANON_ROUTER` | `Vision/Agent Router.md` | Note it reads first |
 | `CANON_SLACK_MAX_TURNS` | `24` | Cap on agent turns per question |
-| `CANON_SLACK_STORE` | tmpdir | Thread → session map |
+| `CANON_SLACK_STORE` | `~/.cache/canon/slack-threads.json` | Thread → session map |
 | `CANON_SLACK_DEBUG` | — | Verbose Bolt logging |
 
 ## Known limits

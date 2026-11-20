@@ -1958,6 +1958,37 @@ is "--only leaves another session's staging alone" "$(git -C "$RG" diff --cached
 is "a flag missing its value exits instead of hanging" \
    "$(perl -e 'alarm 5; exec @ARGV' "$KIT/bin/canon-sync" -m >/dev/null 2>&1; echo $?)" "1"
 
+# canon-verify keeps other people's entries whatever their key order.
+printf -- '---\nverified:\n  - { at: 2026-01-02T00:00:00Z, by: human:alice }\n  - { by: human:bob, at: 2026-01-03T00:00:00Z, note: x }\n---\nbody\n' > "$RG/v.md"
+"$KIT/bin/canon-verify" --actor human:carol "$RG/v.md" >/dev/null 2>&1
+is "verify keeps an entry with keys reversed" "$(grep -c 'human:alice' "$RG/v.md")" "1"
+is "verify keeps an entry with an extra key"  "$(grep -c 'human:bob' "$RG/v.md")" "1"
+is "verify adds the new entry"                "$(grep -c 'human:carol' "$RG/v.md")" "1"
+
+# Sync never stashes: the stash is shared by every session on the repo.
+RB="$SB/remote.git"; git init -q --bare "$RB"
+git -C "$RG" remote add origin "$RB"; git -C "$RG" push -q origin HEAD:main 2>/dev/null
+git -C "$RG" branch -q -u origin/main 2>/dev/null || git -C "$RG" branch -q --set-upstream-to=origin/main
+git clone -q -b main "$RB" "$SB/other" 2>/dev/null
+( cd "$SB/other" && echo ahead > Sessions-ahead.md && git add Sessions-ahead.md && git_q commit -qm ahead && git push -q origin HEAD:main )
+echo "half-written" > "$RG/Sessions/open.md"
+( cd "$RG" && CANON_HOME="$RG" CANON_CHECK_UPDATES=0 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com \
+    GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com \
+    "$KIT/bin/canon-sync" --only Sessions/mine.md -m pull-test >/dev/null 2>&1 )
+is "sync with local edits never touches the stash" "$(git -C "$RG" stash list | wc -l | tr -d ' ')" "0"
+is "sync with local edits leaves them in place"    "$(cat "$RG/Sessions/open.md")" "half-written"
+is "sync pulled the teammate's commit" "$([ -f "$RG/Sessions-ahead.md" ] && echo y || echo n)" "y"
+is "sync never uses --autostash" "$(grep -c 'git pull.*--autostash' "$KIT/bin/canon-sync")" "0"
+
+# A vault checked out as a linked worktree has a .git FILE, not a directory.
+git -C "$RG" worktree add -q "$SB/wt" -b wt-test 2>/dev/null
+is "status works in a worktree vault" "$(CANON_HOME="$SB/wt" "$KIT/bin/canon-sync" --status >/dev/null 2>&1; echo $?)" "0"
+"$KIT/bin/canon-install-vault-hooks" "$SB/wt" >/dev/null 2>&1
+printf 'AKIA1234567890ABCDEF\n' > "$SB/wt/leak.md"
+( cd "$SB/wt" && git add leak.md && git_q commit -qm leak >/dev/null 2>&1 )
+is "the gate fires in a worktree vault" "$?" "1"
+is "the gate blocked the commit in a worktree vault" "$(git -C "$SB/wt" log --oneline -1 --format=%s)" "$(git -C "$RG" log --oneline -1 --format=%s)"
+
 # ---------------------------------------------------------------------------
 printf '\n\033[1m%d passed, %d failed\033[0m\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

@@ -17,17 +17,15 @@
  * rule. Runs fine on a laptop for a pilot.
  */
 
-import path from "node:path";
-import os from "node:os";
 import { App, LogLevel } from "@slack/bolt";
 import "dotenv/config";
-import { resolveVault, makeGate, clip, list, die, makeStore } from "../../shared/vault.mjs";
+import { resolveVault, makeGate, clip, list, die, makeStore, storePath } from "../../shared/vault.mjs";
 import { askVault } from "../../shared/agent.mjs";
 
 const MODEL = process.env.CANON_SLACK_MODEL || "claude-sonnet-5";
 const ROUTER = process.env.CANON_ROUTER || "Vision/Agent Router.md";
 const MAX_TURNS = Number(process.env.CANON_SLACK_MAX_TURNS || 24);
-const STORE = process.env.CANON_SLACK_STORE || path.join(os.tmpdir(), "canon-slack-threads.json");
+const STORE = process.env.CANON_SLACK_STORE || storePath("slack-threads.json");
 const SLACK_LIMIT = 2900;
 
 for (const k of ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"]) {

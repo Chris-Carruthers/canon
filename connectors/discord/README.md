@@ -113,7 +113,7 @@ acceptance checks:
 | `CANON_DISCORD_MODEL` | `claude-sonnet-5` | Model |
 | `CANON_ROUTER` | `Vision/Agent Router.md` | Note it reads first |
 | `CANON_DISCORD_MAX_TURNS` | `24` | Cap on agent turns per question |
-| `CANON_DISCORD_STORE` | tmpdir | Thread → session map |
+| `CANON_DISCORD_STORE` | `~/.cache/canon/discord-threads.json` | Thread → session map |
 
 ## Known limits
 
