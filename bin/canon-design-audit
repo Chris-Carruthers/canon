@@ -24,8 +24,8 @@
 # A vault that registers no tools gets byte-identical output to a build without
 # the feature; an unused registry should be invisible, not a row of zeroes.
 #
-# READ-ONLY in every repo it scans. The single file it ever writes is the report,
-# and only with --report.
+# READ-ONLY in every repo it scans. It writes only into <vault>/Outputs/, and only
+# with --report or --view.
 #
 # WHAT IT DELIBERATELY DOES NOT DO: compare two token values.
 #

@@ -21,21 +21,19 @@
  * opt-in via CANON_DISCORD_ALLOW_MENTIONS=1, and off by default.
  */
 
-import path from "node:path";
-import os from "node:os";
 import {
   Client, GatewayIntentBits, Events, REST, Routes,
   SlashCommandBuilder, MessageFlags,
 } from "discord.js";
 import "dotenv/config";
-import { resolveVault, makeGate, clip, list, die, makeStore } from "../../shared/vault.mjs";
+import { resolveVault, makeGate, clip, list, die, makeStore, storePath } from "../../shared/vault.mjs";
 import { askVault } from "../../shared/agent.mjs";
 
 const MODEL = process.env.CANON_DISCORD_MODEL || "claude-sonnet-5";
 const ROUTER = process.env.CANON_ROUTER || "Vision/Agent Router.md";
 const MAX_TURNS = Number(process.env.CANON_DISCORD_MAX_TURNS || 24);
 const STORE = process.env.CANON_DISCORD_STORE
-  || path.join(os.tmpdir(), "canon-discord-threads.json");
+  || storePath("discord-threads.json");
 const ALLOW_MENTIONS = process.env.CANON_DISCORD_ALLOW_MENTIONS === "1";
 const DISCORD_LIMIT = 2000;   // hard cap on a Discord message
 

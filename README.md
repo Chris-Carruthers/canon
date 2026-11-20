@@ -6,7 +6,7 @@
   <a href="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml"><img src="https://github.com/Chris-Carruthers/canon/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-A78BFA" alt="MIT">
   <img src="https://img.shields.io/badge/requires-bash%20%C2%B7%20git%20%C2%B7%20python3-6366F1" alt="requirements">
-  <img src="https://img.shields.io/badge/tests-396%20passing-22C55E" alt="tests">
+  <img src="https://img.shields.io/badge/tests-406%20passing-22C55E" alt="tests">
 </p>
 
 canon gives your team's AI agents one shared knowledge vault: Markdown in a Git

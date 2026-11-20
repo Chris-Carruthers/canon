@@ -293,8 +293,9 @@ reconciling in prose over silently discarding someone's sentence.
 **Two people created the same filename** — rename yours with your initials. This
 is why author-scoping is the convention.
 
-**You pulled and your local edits vanished** — they didn't; `--autostash` put them
-back after the rebase. Check `git stash list` if something looks missing.
+**`canon-sync` skipped the pull** — you had uncommitted edits and unpushed commits.
+It never stashes your work to make room (the stash is shared by every session on the
+repo), so it commits first and rebases at push time instead.
 
 **Someone force-pushed the vault** — the one genuinely destructive operation.
 Branch protection blocks it; without protection, treat it as an incident and

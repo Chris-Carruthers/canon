@@ -88,7 +88,7 @@ RESOLVER="$HERE/canon-path"
 
 VAULT="$("$RESOLVER" 2>/dev/null || true)"
 [ -n "$VAULT" ] || { echo "canon-sync: no vault configured (set \$CANON_HOME or ~/.config/canon/path)" >&2; exit 2; }
-[ -d "$VAULT/.git" ] || { echo "canon-sync: $VAULT is not a git repo — run: git -C \"$VAULT\" init" >&2; exit 2; }
+[ -e "$VAULT/.git" ] || { echo "canon-sync: $VAULT is not a git repo — run: git -C \"$VAULT\" init" >&2; exit 2; }
 
 # Hard fail: everything below assumes cwd is the vault, and this script runs
 # `git add -A`. A silent cd failure would stage some other repository.
@@ -143,7 +143,12 @@ canon_push() {
       return 1
     fi
     echo "  a teammate pushed first — rebasing onto origin/${TARGET} and retrying (${ATTEMPT}/3)"
-    if ! git pull --rebase --autostash --quiet origin "$TARGET" >/dev/null 2>&1; then
+    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+      echo "  cannot rebase: there are uncommitted edits elsewhere in the vault." >&2
+      echo "  Nothing was pushed and your commit is intact. Commit or finish those, then: canon-sync --push" >&2
+      return 1
+    fi
+    if ! git pull --rebase --quiet origin "$TARGET" >/dev/null 2>&1; then
       git rebase --abort >/dev/null 2>&1 || true
       echo "  that rebase hit a real conflict: two people edited the same lines." >&2
       echo "  Nothing was pushed and your commit is intact. Resolve it in the vault:" >&2
@@ -175,8 +180,15 @@ if [ "$DO_PULL" = "1" ] && [ "$HAS_REMOTE" = 1 ]; then
     # with no arguments fails on it. That is not an error worth aborting over —
     # there is nothing upstream to be behind.
     echo "  $BRANCH has no upstream yet — nothing to pull"
-  elif git pull --rebase --autostash --quiet 2>/dev/null; then
+  # No --autostash: git stash is shared by every session and worktree on the repo,
+  # and a failed pop strands conflict markers in notes someone has open. A clean
+  # tree rebases; with local edits, fast-forward only, which never touches them.
+  elif [ -z "$(git status --porcelain 2>/dev/null)" ] && git pull --rebase --quiet 2>/dev/null; then
     echo "  up to date with origin/$BRANCH"
+  elif [ -n "$(git status --porcelain 2>/dev/null)" ] && git pull --ff-only --quiet 2>/dev/null; then
+    echo "  up to date with origin/$BRANCH (fast-forward; your edits untouched)"
+  elif [ -n "$(git status --porcelain 2>/dev/null)" ] && [ -z "$(git ls-files -u)" ]; then
+    echo "  you have local edits and unpushed commits — skipping the pull; the push rebases after your commit"
   else
     echo "  pull failed or left a conflict — resolve it in the vault, then re-run" >&2
     git status --short | head -20 >&2

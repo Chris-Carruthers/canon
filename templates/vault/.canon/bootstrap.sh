@@ -33,7 +33,7 @@ else
 fi
 
 # --- 2. install the safety check ---------------------------------------------
-if [ ! -d "$VAULT/.git" ]; then
+if [ ! -e "$VAULT/.git" ]; then
   echo "  ! not a git repository — skipping the commit check" >&2
 else
   if [ -x "$HERE/canon-install-vault-hooks" ]; then

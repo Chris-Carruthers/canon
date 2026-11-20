@@ -74,14 +74,18 @@ mkdir -p "$VAULT/.canon"
 # This list is hand-maintained, which means a new tool is one forgotten edit
 # away from never reaching a vault. test/run.sh asserts every canon-*-audit in
 # bin/ appears here, so the omission fails a build instead of going unnoticed.
-for tool in canon-scan canon-guard canon-path canon-install-vault-hooks canon-trust canon-verify canon-status canon-design-audit canon-test-audit; do
+TOOLS="canon-scan canon-guard canon-path canon-install-vault-hooks canon-trust canon-verify canon-status canon-design-audit canon-test-audit"
+for tool in $TOOLS; do
   [ -f "$KIT_DIR/bin/$tool" ] && cp "$KIT_DIR/bin/$tool" "$VAULT/.canon/$tool"
   [ -f "$VAULT/.canon/$tool" ] && chmod +x "$VAULT/.canon/$tool"
 done
 # Same reason as the repo stamp: .canon/ holds COPIES of the tools, refreshed only
 # by re-running this command. Record what wrote them so canon-status can notice.
 printf '%s\n' "$CANON_VERSION" > "$VAULT/.canon/.canon-version"
-echo "  vendored .canon/{canon-scan,canon-guard,canon-path,canon-install-vault-hooks,canon-trust,canon-verify,canon-status,canon-design-audit,canon-test-audit}"
+# bootstrap.sh is a tool too: refresh it with the others, or an old vault keeps
+# the first version forever (the template copy above never overwrites).
+cp "$TPL/.canon/bootstrap.sh" "$VAULT/.canon/bootstrap.sh" && chmod +x "$VAULT/.canon/bootstrap.sh"
+echo "  vendored .canon/: $TOOLS bootstrap.sh"
 
 # Optional packs, through canon-pack so there is exactly one copy path and one set
 # of semantics. Same non-destructive contract as everything above.
@@ -90,7 +94,7 @@ for pk in $WANT_PACKS; do
   "$KIT_DIR/bin/canon-pack" add "$pk" "$VAULT" | sed 's/^/  /'
 done
 
-if [ ! -d "$VAULT/.git" ]; then
+if [ ! -e "$VAULT/.git" ]; then
   git -C "$VAULT" init --quiet 2>/dev/null && echo "  initialised git repo"
 fi
 

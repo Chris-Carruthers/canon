@@ -41,7 +41,7 @@ if [ -z "$VAULT" ]; then
   R="$HERE/canon-path"; [ -x "$R" ] || R="$(command -v canon-path 2>/dev/null || true)"
   [ -n "$R" ] && [ -x "$R" ] && VAULT="$("$R" 2>/dev/null || true)"
 fi
-[ -n "$VAULT" ] && [ -d "$VAULT/.git" ] || exit 0    # no vault, nothing to say
+[ -n "$VAULT" ] && [ -e "$VAULT/.git" ] || exit 0    # no vault, nothing to say
 
 STALE_DAYS="${CANON_STALE_DAYS:-2}"
 
@@ -62,7 +62,7 @@ HAS_REMOTE=0
 [ -n "$(git -C "$VAULT" remote 2>/dev/null)" ] && HAS_REMOTE=1
 
 DAYS=""
-FH="$VAULT/.git/FETCH_HEAD"
+FH="$(git -C "$VAULT" rev-parse --path-format=absolute --git-path FETCH_HEAD 2>/dev/null || echo "$VAULT/.git/FETCH_HEAD")"
 if [ -f "$FH" ]; then
   # python3 rather than stat. `stat -f %m` is BSD and `stat -c %Y` is GNU, and the
   # obvious fallback chain is WRONG: on GNU, -f means --file-system, so it succeeds

@@ -88,17 +88,21 @@ entries, action = [], "added"
 
 if block:
     body = block.group(1)
-    entries = [{"by": b, "at": a} for b, a in
-               re.findall(r"by:\s*([A-Za-z0-9_.:/@+-]+)\s*,\s*at:\s*([^\s}]+)", body)]
-    if any(e["by"] == actor for e in entries):
+    # Keys in any order, extra keys ignored; an entry without both keys is kept
+    # verbatim rather than silently dropped, since it is someone else's record.
+    for item in re.findall(r"\{([^}]*)\}", body):
+        kv = dict(re.findall(r"(\w+)\s*:\s*([^,\s}]+)", item))
+        entries.append({"by": kv["by"], "at": kv["at"]} if "by" in kv and "at" in kv else {"raw": item.strip()})
+    if any(e.get("by") == actor for e in entries):
         action = "re-confirmed"
 
 # One entry per actor: "how recently did this actor check" should have a single
 # answer, not a pile of timestamps to scan.
-entries = [e for e in entries if e["by"] != actor]
+entries = [e for e in entries if e.get("by") != actor]
 entries.append({"by": actor, "at": now})
 
-rendered = "verified:\n" + "".join(f"  - {{ by: {e['by']}, at: {e['at']} }}\n" for e in entries)
+rendered = "verified:\n" + "".join(
+    f"  - {{ {e['raw']} }}\n" if "raw" in e else f"  - {{ by: {e['by']}, at: {e['at']} }}\n" for e in entries)
 
 if block:
     fm = fm[:block.start(0)] + rendered + fm[block.end(1):]

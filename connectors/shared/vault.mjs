@@ -89,6 +89,11 @@ export function clip(s, limit) {
 }
 
 /** A tiny JSON thread→session store. Losing it costs conversation continuity, nothing more. */
+// Per-user cache, not the shared tmp dir: on Linux /tmp is world-writable, so another
+// user could read the session map or plant a symlink where we write.
+export const storePath = (name) =>
+  path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"), "canon", name);
+
 export function makeStore(file) {
   let data = {};
   try { data = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* first run */ }
@@ -96,7 +101,10 @@ export function makeStore(file) {
     get: (k) => data[k],
     set(k, v) {
       data[k] = { ...(data[k] || {}), ...v };
-      try { fs.writeFileSync(file, JSON.stringify(data, null, 2)); } catch { /* non-fatal */ }
+      try {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify(data, null, 2), { mode: 0o600 });
+      } catch { /* non-fatal */ }
     },
     has: (k) => Object.prototype.hasOwnProperty.call(data, k),
   };
